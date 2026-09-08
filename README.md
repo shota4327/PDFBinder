@@ -63,10 +63,17 @@ dotnet build
 dotnet test
 ```
 
-### アプリケーションの起動
+### アプリケーションの起動（デバッグ）
 ```powershell
 dotnet run --project src/PDFBinder.App
 ```
+
+### 単一実行ファイル（Self-Contained Single-File EXE）の発行
+.NET 10 ランタイムを内包したポータブルな単一ファイル（`dist/PDFBinder.exe`）を発行します。
+```powershell
+.\build.ps1
+```
+発行された `dist/PDFBinder.exe` は、.NETがインストールされていないWindows PCでも単体で起動可能です。
 
 ---
 
