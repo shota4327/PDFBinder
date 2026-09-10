@@ -51,13 +51,17 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRedoStroke;
 
-    /// <summary>カラーパレットプリセット（黒・赤・青・緑）</summary>
+    /// <summary>黄色のプリセット・蛍光ペンデフォルト色（Tailwind Yellow 500: #EAB308）</summary>
+    public static readonly Color YellowPresetColor = Color.FromRgb(0xEA, 0xB3, 0x08);
+
+    /// <summary>カラーパレットプリセット（黒・赤・青・緑・黄）</summary>
     public ObservableCollection<Color> ColorPalette { get; } = new()
     {
         Color.FromRgb(0x00, 0x00, 0x00), // 黒
         Color.FromRgb(0xEF, 0x44, 0x44), // 赤
         Color.FromRgb(0x25, 0x63, 0xEB), // 青
-        Color.FromRgb(0x16, 0xA3, 0x4A)  // 緑
+        Color.FromRgb(0x16, 0xA3, 0x4A), // 緑
+        YellowPresetColor                // 黄
     };
 
     public bool HasPreviousPage => _pageLookup(CurrentPage.PageNumber - 2) != null;
@@ -103,13 +107,13 @@ public partial class DetailEditorViewModel : ObservableObject
         {
             if (SelectedColor == Colors.Black)
             {
-                SelectedColor = Colors.Yellow;
+                SelectedColor = YellowPresetColor;
             }
             StrokeThickness = 12.0;
         }
         else if (value == EditorToolMode.Pen)
         {
-            if (SelectedColor == Colors.Yellow)
+            if (SelectedColor == YellowPresetColor)
             {
                 SelectedColor = Colors.Black;
             }

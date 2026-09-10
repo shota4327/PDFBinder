@@ -102,7 +102,7 @@ public class ViewModelsTests
         vm.SelectToolCommand.Execute(EditorToolMode.Highlighter);
         Assert.Equal(EditorToolMode.Highlighter, vm.SelectedTool);
         Assert.Equal(12.0, vm.StrokeThickness);
-        Assert.Equal(Colors.Yellow, vm.SelectedColor);
+        Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.SelectedColor);
 
         // Act: Pen
         vm.SelectToolCommand.Execute(EditorToolMode.Pen);
@@ -217,7 +217,7 @@ public class ViewModelsTests
 
         // Assert: 色が黄色、太さが12pxに自動調整される
         Assert.Equal(EditorToolMode.Highlighter, vm.SelectedTool);
-        Assert.Equal(Colors.Yellow, vm.SelectedColor);
+        Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.SelectedColor);
         Assert.Equal(12.0, vm.StrokeThickness);
 
         // Act: 再び通常ペンに変更
@@ -287,7 +287,7 @@ public class ViewModelsTests
     }
 
     [Fact]
-    public void DetailEditorViewModel_ColorPalette_ContainsFourModernColors()
+    public void DetailEditorViewModel_ColorPalette_ContainsFiveModernColors()
     {
         // Arrange
         var page = new PdfPageModel();
@@ -297,11 +297,30 @@ public class ViewModelsTests
             () => { },
             _ => null);
 
-        // Assert: 4色（黒、明るい赤、明るい青、明るい緑）
-        Assert.Equal(4, vm.ColorPalette.Count);
+        // Assert: 5色（黒、赤、青、緑、黄）
+        Assert.Equal(5, vm.ColorPalette.Count);
         Assert.Equal(Color.FromRgb(0x00, 0x00, 0x00), vm.ColorPalette[0]);
         Assert.Equal(Color.FromRgb(0xEF, 0x44, 0x44), vm.ColorPalette[1]);
         Assert.Equal(Color.FromRgb(0x25, 0x63, 0xEB), vm.ColorPalette[2]);
         Assert.Equal(Color.FromRgb(0x16, 0xA3, 0x4A), vm.ColorPalette[3]);
+        Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.ColorPalette[4]);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_SelectColorCommand_SelectsYellow()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // Act
+        vm.SelectColorCommand.Execute(DetailEditorViewModel.YellowPresetColor);
+
+        // Assert
+        Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.SelectedColor);
     }
 }
