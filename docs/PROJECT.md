@@ -35,6 +35,7 @@
 | **F32** | UI・グリッド俯瞰 | 外部PDFのグリッドへのD&D差し込み | **完了** | OnControlDrop / FileDrop |
 | **F33** | UI・グリッド俯瞰 | 複数選択・一括操作（回転・削除・分割） | **完了** | CheckBox / Batch commands |
 | **F34** | UI・グリッド俯瞰 | Undo / Redo（元に戻す・やり直す） | **完了** | UndoRedoService / Ctrl+Z, Ctrl+Y |
+| **F35** | UI・グリッド俯瞰 | メインヘッダーツールバー刷新（ブランドアイコン・リボン＆専用ボタン・％ズーム） | **完了** | Issue #3 |
 | **F40** | 手書き詳細 | ページダブルクリックでの詳細エディタ切り替え | **完了** | DetailEditorView.xaml |
 | **F41** | 手書き詳細 | ペンツール（色・太さ変更） | **完了** | EditorInkCanvas / ToolMode |
 | **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・色変更） | **完了** | IsHighlighter = true |
@@ -42,7 +43,7 @@
 | **F44** | 手書き詳細 | 直線描画ツール（プレビュー付き） | **完了** | CommitStraightLine |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
 | **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 18件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 19件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 

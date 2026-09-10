@@ -29,8 +29,32 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "PDFファイルを開くか、ドラッグ＆ドロップしてください。";
 
+    /// <summary>
+    /// サムネイル基準サイズ（100%基準 = 220px）
+    /// </summary>
+    public const double DefaultThumbnailSize = 220.0;
+
     [ObservableProperty]
-    private double _thumbnailSize = 220.0;
+    private double _thumbnailSize = DefaultThumbnailSize;
+
+    /// <summary>
+    /// サムネイルの表示拡大率（パーセント）を取得します。
+    /// </summary>
+    public int ThumbnailZoomPercentage => (int)Math.Round(ThumbnailSize / DefaultThumbnailSize * 100);
+
+    partial void OnThumbnailSizeChanged(double value)
+    {
+        OnPropertyChanged(nameof(ThumbnailZoomPercentage));
+    }
+
+    /// <summary>
+    /// サムネイルの表示サイズをデフォルト（100% = 220px）にリセットします。
+    /// </summary>
+    [RelayCommand]
+    public void ResetThumbnailSize()
+    {
+        ThumbnailSize = DefaultThumbnailSize;
+    }
 
     [ObservableProperty]
     private bool _isLoading;
