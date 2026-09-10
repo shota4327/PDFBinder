@@ -175,6 +175,32 @@
                 </Setter>
             </Style>
 
+            <!-- 危険アクション用リボンボタンスタイル（削除等：通常標準色、ホバー時赤ハイライト） -->
+            <Style TargetType="Button" x:Key="DangerRibbonToolbarButtonStyle" BasedOn="{StaticResource RibbonToolbarButtonStyle}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#FEE2E2" />
+                                    <Setter Property="Foreground" Value="#DC2626" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#FECACA" />
+                                    <Setter Property="Foreground" Value="#B91C1C" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="#94A3B8" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- アイコン専用ツールバーボタンスタイル -->
             <Style TargetType="Button" x:Key="IconToolbarButtonStyle" BasedOn="{StaticResource BaseFont}">
                 <Setter Property="Background" Value="Transparent" />

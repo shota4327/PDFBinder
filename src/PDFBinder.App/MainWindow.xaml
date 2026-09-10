@@ -69,7 +69,7 @@
                     <Button Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="&#xE8AC;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="別名保存..." FontSize="11" HorizontalAlignment="Center" />
+                            <TextBlock Text="別名保存" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     
@@ -91,19 +91,28 @@
                     
                     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- ページ編集（アイコン専用スタイル・シンプルツールチップ） -->
-                    <Button Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource IconToolbarButtonStyle}" ToolTip="左回転">
-                        <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
-                            <TextBlock.RenderTransform>
-                                <ScaleTransform ScaleX="-1" />
-                            </TextBlock.RenderTransform>
-                        </TextBlock>
+                    <!-- ページ編集（リボンスタイル） -->
+                    <Button Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="左回転 (Ctrl+L)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" RenderTransformOrigin="0.5,0.5">
+                                <TextBlock.RenderTransform>
+                                    <ScaleTransform ScaleX="-1" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <TextBlock Text="左回転" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Button>
-                    <Button Command="{Binding RotateClockwiseCommand}" Style="{StaticResource IconToolbarButtonStyle}" ToolTip="右回転">
-                        <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button Command="{Binding RotateClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="右回転 (Ctrl+R)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="右回転" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Button>
-                    <Button Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource DangerIconToolbarButtonStyle}" ToolTip="削除">
-                        <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource DangerRibbonToolbarButtonStyle}" ToolTip="削除 (Delete)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Button>
 
                     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
@@ -124,12 +133,18 @@
 
                     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- 履歴（アイコン専用スタイル・シンプルツールチップ） -->
-                    <Button Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource IconToolbarButtonStyle}" ToolTip="元に戻す">
-                        <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <!-- 履歴（リボンスタイル） -->
+                    <Button Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="元に戻す" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Button>
-                    <Button Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource IconToolbarButtonStyle}" ToolTip="やり直す">
-                        <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Button Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="やり直す (Ctrl+Y)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
                     </Button>
                 </WrapPanel>
             </DockPanel>
