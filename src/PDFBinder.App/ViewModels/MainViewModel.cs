@@ -23,6 +23,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetailViewActive;
 
+    /// <summary>
+    /// 現在選択中のリボンタブのインデックス（0: PDF編集, 1: 手書き）
+    /// </summary>
+    [ObservableProperty]
+    private int _selectedRibbonTabIndex = 0;
+
     [ObservableProperty]
     private DetailEditorViewModel? _detailEditor;
 
@@ -410,6 +416,7 @@ public partial class MainViewModel : ObservableObject
             index => index >= 0 && index < Document.Pages.Count ? Document.Pages[index] : null);
 
         IsDetailViewActive = true;
+        SelectedRibbonTabIndex = 1;
         StatusMessage = $"ページ {page.PageNumber} を編集しています。";
     }
 
@@ -424,6 +431,7 @@ public partial class MainViewModel : ObservableObject
             _ = RefreshSelectedThumbnailsAsync(new[] { DetailEditor.CurrentPage });
         }
         IsDetailViewActive = false;
+        SelectedRibbonTabIndex = 0;
         DetailEditor = null;
         StatusMessage = "グリッド表示に戻りました。";
     }

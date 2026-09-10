@@ -12,6 +12,8 @@
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
             <converters:InverseCountToVisibilityConverter x:Key="InverseCountToVisibilityConverter" />
             <converters:ToolToBooleanConverter x:Key="ToolToBooleanConverter" />
+            <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter" />
+            <converters:EqualityToBooleanConverter x:Key="EqualityToBooleanConverter" />
 
             <!-- アイコンフォント -->
             <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
@@ -280,6 +282,108 @@
                                     <Setter TargetName="border" Property="Background" Value="#DBEAFE" />
                                     <Setter Property="Foreground" Value="#1D4ED8" />
                                     <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <!-- リボンタブヘッダー用スタイル（Office風タブ） -->
+            <Style TargetType="RadioButton" x:Key="RibbonTabRadioButtonStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#475569" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="Normal" />
+                <Setter Property="Padding" Value="16,6" />
+                <Setter Property="Margin" Value="0,0,4,0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                    BorderBrush="Transparent" BorderThickness="1,1,1,0"
+                                    CornerRadius="5,5,0,0" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#F8FAFC" />
+                                    <Setter Property="Foreground" Value="#1E293B" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="White" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#E2E8F0" />
+                                    <Setter Property="Foreground" Value="#2563EB" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="#94A3B8" />
+                                    <Setter Property="Cursor" Value="Arrow" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- リボンツールバー用ラジオボタンスタイル（上アイコン・下テキスト・選択状態トグル） -->
+            <Style TargetType="RadioButton" x:Key="RibbonToolRadioStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#1E293B" />
+                <Setter Property="Padding" Value="8,4" />
+                <Setter Property="Margin" Value="2,0" />
+                <Setter Property="Height" Value="48" />
+                <Setter Property="MinWidth" Value="44" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                    BorderBrush="Transparent" BorderThickness="1"
+                                    CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#E2E8F0" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#DBEAFE" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#93C5FD" />
+                                    <Setter Property="Foreground" Value="#1D4ED8" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="#94A3B8" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 太さ選択用ボタンスタイル -->
+            <Style TargetType="Button" x:Key="ThicknessButtonStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#1E293B" />
+                <Setter Property="Width" Value="32" />
+                <Setter Property="Height" Value="48" />
+                <Setter Property="Margin" Value="1,0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                    BorderBrush="Transparent" BorderThickness="1"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#E2E8F0" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#CBD5E1" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

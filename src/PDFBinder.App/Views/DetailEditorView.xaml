@@ -9,112 +9,27 @@
              d:DesignHeight="700" d:DesignWidth="900">
     
     <Grid Background="#E2E8F0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- 手書きエディタ上部ツールバー -->
-        <Border Grid.Row="0" Background="White" BorderBrush="#CBD5E1" BorderThickness="0,0,0,1" Padding="12,8">
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- 戻るボタン -->
-                <Button Content="← 一覧に戻る" Command="{Binding BackToGridCommand}" 
-                        Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,16,0" Padding="12,6" />
-
-                <!-- ツール切り替えボタングループ -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
-                    <RadioButton Content="👆 選択" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Select}" />
-                    <RadioButton Content="✏️ ペン" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Pen}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Pen}" />
-                    <RadioButton Content="🖍 蛍光ペン" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Highlighter}" />
-                    <RadioButton Content="📏 直線" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.StraightLine}" />
-                    <RadioButton Content="🧹 全消しゴム" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserStroke}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.EraserStroke}" ToolTip="触れたストローク全体を消去" />
-                    <RadioButton Content="✂️ 部分消し" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserPoint}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.EraserPoint}" ToolTip="なぞった部分のみを消去" />
-                    <RadioButton Content="✋ 手のひら" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand}"
-                                 Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Hand}" ToolTip="画面のスクロール・パン" />
-                </StackPanel>
-
-                <!-- 太さスライダー -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <TextBlock Text="太さ:" FontSize="12" Foreground="#475569" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <Slider Width="90" Minimum="1" Maximum="24" Value="{Binding StrokeThickness, Mode=TwoWay}" 
-                            TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding StrokeThickness, StringFormat='{}{0:0}px'}" FontSize="11" Foreground="#64748B" 
-                               Width="32" Margin="6,0,0,0" VerticalAlignment="Center" />
-                </StackPanel>
-
-                <!-- カラーパレット -->
-                <ItemsControl ItemsSource="{Binding ColorPalette}" Margin="0,0,16,0">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Width="22" Height="22" Margin="3,0" Cursor="Hand"
-                                    Click="OnColorCircleClick" Tag="{Binding}">
-                                <Button.Template>
-                                    <ControlTemplate>
-                                        <Border CornerRadius="11" BorderThickness="2" BorderBrush="#94A3B8">
-                                            <Border.Background>
-                                                <SolidColorBrush Color="{Binding}" />
-                                            </Border.Background>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <!-- ズーム操作 -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <Button Content="−" Command="{Binding ZoomOutCommand}" Style="{StaticResource MiniIconButtonStyle}" ToolTip="縮小" />
-                    <TextBlock Text="{Binding Zoom, StringFormat='{}{0:P0}'}" FontSize="12" FontWeight="SemiBold" 
-                               Foreground="#334155" Width="44" TextAlignment="Center" VerticalAlignment="Center" />
-                    <Button Content="＋" Command="{Binding ZoomInCommand}" Style="{StaticResource MiniIconButtonStyle}" ToolTip="拡大" />
-                    <Button Content="100%" Command="{Binding ZoomResetCommand}" Style="{StaticResource SecondaryButtonStyle}" Margin="4,0,0,0" Padding="6,2" />
-                </StackPanel>
-
-                <!-- ページ送りナビゲーション -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="◀" Command="{Binding GoToPreviousPageCommand}" IsEnabled="{Binding HasPreviousPage}" 
-                            Style="{StaticResource MiniIconButtonStyle}" ToolTip="前のページ" />
-                    <TextBlock Text="{Binding CurrentPage.PageNumber, StringFormat='P.{0}'}" 
-                               FontSize="13" FontWeight="Bold" Foreground="#1E293B" Margin="6,0" VerticalAlignment="Center" />
-                    <Button Content="▶" Command="{Binding GoToNextPageCommand}" IsEnabled="{Binding HasNextPage}" 
-                            Style="{StaticResource MiniIconButtonStyle}" ToolTip="次のページ" />
-                </StackPanel>
-            </WrapPanel>
-        </Border>
-
-        <!-- メインキャンバス領域 -->
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="30">
+        <!-- メインキャンバス領域（上部ツールバーはメインウィンドウのリボン「手書き」タブに統合） -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="30">
             <Border HorizontalAlignment="Center" VerticalAlignment="Center" Background="White"
                     CornerRadius="4" BorderThickness="1" BorderBrush="#CBD5E1">
                 <Border.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
                 </Border.LayoutTransform>
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
-                    </Border.Effect>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
+                </Border.Effect>
 
-                    <Grid Width="{Binding CurrentPage.DisplayWidth}" Height="{Binding CurrentPage.DisplayHeight}">
-                        <!-- 背景PDFレンダリング画像 -->
-                        <Image Source="{Binding PageBackground}" Stretch="Fill" />
+                <Grid Width="{Binding CurrentPage.DisplayWidth}" Height="{Binding CurrentPage.DisplayHeight}">
+                    <!-- 背景PDFレンダリング画像 -->
+                    <Image Source="{Binding PageBackground}" Stretch="Fill" />
 
-                        <!-- 前面手書きInkCanvas -->
-                        <controls:EditorInkCanvas x:Name="InkCanvas"
-                                                  Background="Transparent"
-                                                  ToolMode="{Binding SelectedTool, Mode=TwoWay}" />
-                    </Grid>
-                </Border>
+                    <!-- 前面手書きInkCanvas -->
+                    <controls:EditorInkCanvas x:Name="InkCanvas"
+                                              Background="Transparent"
+                                              ToolMode="{Binding SelectedTool, Mode=TwoWay}" />
+                </Grid>
+            </Border>
         </ScrollViewer>
     </Grid>
 </UserControl>

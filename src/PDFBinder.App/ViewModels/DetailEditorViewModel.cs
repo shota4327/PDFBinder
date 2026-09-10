@@ -51,16 +51,13 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRedoStroke;
 
-    /// <summary>カラーパレットプリセット</summary>
+    /// <summary>カラーパレットプリセット（黒・赤・青・緑）</summary>
     public ObservableCollection<Color> ColorPalette { get; } = new()
     {
-        Colors.Black,
-        Colors.DarkRed,
-        Colors.DarkBlue,
-        Colors.DarkGreen,
-        Colors.DarkOrange,
-        Colors.Purple,
-        Colors.Gold
+        Color.FromRgb(0x00, 0x00, 0x00), // 黒
+        Color.FromRgb(0xEF, 0x44, 0x44), // 赤
+        Color.FromRgb(0x25, 0x63, 0xEB), // 青
+        Color.FromRgb(0x16, 0xA3, 0x4A)  // 緑
     };
 
     public bool HasPreviousPage => _pageLookup(CurrentPage.PageNumber - 2) != null;
@@ -130,6 +127,23 @@ public partial class DetailEditorViewModel : ObservableObject
     private void SelectColor(Color color)
     {
         SelectedColor = color;
+    }
+
+    /// <summary>
+    /// プリセットの太さを設定します。
+    /// </summary>
+    [RelayCommand]
+    private void SetPresetThickness(object? parameter)
+    {
+        if (parameter == null) return;
+        if (parameter is double d)
+        {
+            StrokeThickness = d;
+        }
+        else if (double.TryParse(parameter.ToString(), System.Globalization.CultureInfo.InvariantCulture, out double parsed))
+        {
+            StrokeThickness = parsed;
+        }
     }
 
     /// <summary>

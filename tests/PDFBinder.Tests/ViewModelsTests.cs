@@ -234,4 +234,74 @@ public class ViewModelsTests
         // Assert: ツールが正しく切り替わる
         Assert.Equal(EditorToolMode.EraserStroke, vm.SelectedTool);
     }
+
+    [Fact]
+    public void MainViewModel_RibbonTab_SwitchesAutomaticallyOnDetailEditorOpenAndClose()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        vm.AddBlankPage();
+        var page = vm.Document.Pages[0];
+
+        // Assert: 初期状態は「PDF編集」タブ（0）
+        Assert.Equal(0, vm.SelectedRibbonTabIndex);
+
+        // Act: エディタを開く
+        vm.OpenPageDetailCommand.Execute(page);
+
+        // Assert: 「手書き」タブ（1）へ自動切り替え
+        Assert.Equal(1, vm.SelectedRibbonTabIndex);
+
+        // Act: エディタを閉じる
+        vm.ClosePageDetailCommand.Execute(null);
+
+        // Assert: 「PDF編集」タブ（0）へ自動復帰
+        Assert.Equal(0, vm.SelectedRibbonTabIndex);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_PresetThickness_WorksCorrectly()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // 初期太さ
+        Assert.Equal(2.0, vm.StrokeThickness);
+
+        // Act: プリセット選択（0.5px）
+        vm.SetPresetThicknessCommand.Execute(0.5);
+        Assert.Equal(0.5, vm.StrokeThickness);
+
+        // Act: プリセット選択（1.0px）
+        vm.SetPresetThicknessCommand.Execute(1.0);
+        Assert.Equal(1.0, vm.StrokeThickness);
+
+        // Act: 文字列引数（"4.0"）でのプリセット選択
+        vm.SetPresetThicknessCommand.Execute("4.0");
+        Assert.Equal(4.0, vm.StrokeThickness);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_ColorPalette_ContainsFourModernColors()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // Assert: 4色（黒、明るい赤、明るい青、明るい緑）
+        Assert.Equal(4, vm.ColorPalette.Count);
+        Assert.Equal(Color.FromRgb(0x00, 0x00, 0x00), vm.ColorPalette[0]);
+        Assert.Equal(Color.FromRgb(0xEF, 0x44, 0x44), vm.ColorPalette[1]);
+        Assert.Equal(Color.FromRgb(0x25, 0x63, 0xEB), vm.ColorPalette[2]);
+        Assert.Equal(Color.FromRgb(0x16, 0xA3, 0x4A), vm.ColorPalette[3]);
+    }
 }
