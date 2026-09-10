@@ -34,51 +34,118 @@
         <!-- 上部メインツールバー（リボン） -->
         <Border Grid.Row="0" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,6">
             <DockPanel LastChildFill="True">
-                <!-- アプリアイコンとタイトル -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0" DockPanel.Dock="Left">
-                    <Image Source="Assets/icon.png" Width="26" Height="26" Margin="0,0,8,0" />
-                    <TextBlock Text="PDF Binder" FontSize="16" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center" />
-                </StackPanel>
+                <!-- アプリアイコン（タイトル省略・高解像度表示） -->
+                <Image Source="Assets/icon.png" Width="38" Height="38" Margin="0,0,14,0" VerticalAlignment="Center" DockPanel.Dock="Left"
+                       RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" ToolTip="PDF Binder" />
 
-                <!-- ズームスライダー（グリッド俯瞰時のみ表示） -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right" Margin="10,0,0,0"
+                <!-- ズームスライダー（グリッド俯瞰時のみ表示・％動的表示とリセット機能） -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right" Margin="12,0,0,0"
                             Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                    <TextBlock Text="表示サイズ:" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button Command="{Binding ResetThumbnailSizeCommand}" Background="Transparent" BorderThickness="0" Cursor="Hand" ToolTip="クリックして100%にリセット" Padding="4,2" Margin="0,0,4,0">
+                        <TextBlock FontSize="11" Foreground="#64748B" VerticalAlignment="Center">
+                            <Run Text="表示サイズ:" />
+                            <Run Text="{Binding ThumbnailZoomPercentage, Mode=OneWay, StringFormat='{}{0}%'}" FontWeight="SemiBold" Foreground="#1E293B" />
+                        </TextBlock>
+                    </Button>
                     <Slider Width="100" Minimum="140" Maximum="360" Value="{Binding ThumbnailSize, Mode=TwoWay}" 
                             VerticalAlignment="Center" TickFrequency="20" IsSnapToTickEnabled="True" />
                 </StackPanel>
 
                 <!-- アクションボタングループ -->
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- ファイル操作 -->
-                    <Button Content="📂 開く" Command="{Binding OpenDocumentCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="PDFファイルを開く (Ctrl+O)" />
-                    <Button Content="💾 保存" Command="{Binding SaveDocumentCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)" />
-                    <Button Content="💾 別名保存..." Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)" />
+                    <!-- ファイル操作（リボンスタイル） -->
+                    <Button Command="{Binding OpenDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="PDFファイルを開く (Ctrl+O)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8E5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SaveDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE74E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8AC;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="別名保存" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,2" />
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- バインダー操作 -->
-                    <Button Content="➕ PDF追加結合" Command="{Binding AppendDocumentCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="別のPDFを結合・追加" />
-                    <Button Content="📄 白紙追加" Command="{Binding AddBlankPageCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="白紙ページを追加 (Ctrl+B)" />
+                    <!-- バインダー操作（リボンスタイル） -->
+                    <Button Command="{Binding AppendDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="別のPDFを結合・追加">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="PDF追加結合" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding AddBlankPageCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="白紙ページを追加 (Ctrl+B)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7C3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="白紙追加" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,2" />
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- ページ編集 -->
-                    <Button Content="⟲ 左回転" Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="反時計回りに90°回転 (Ctrl+L)" />
-                    <Button Content="⟳ 右回転" Command="{Binding RotateClockwiseCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="時計回りに90°回転 (Ctrl+R)" />
-                    <Button Content="🗑 削除" Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource ToolbarButtonStyle}" Foreground="#DC2626" ToolTip="選択したページを削除 (Delete)" />
+                    <!-- ページ編集（リボンスタイル） -->
+                    <Button Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="左回転 (Ctrl+L)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" RenderTransformOrigin="0.5,0.5">
+                                <TextBlock.RenderTransform>
+                                    <ScaleTransform ScaleX="-1" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <TextBlock Text="左回転" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RotateClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="右回転 (Ctrl+R)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="右回転" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource DangerRibbonToolbarButtonStyle}" ToolTip="削除 (Delete)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,2" />
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- 分割エクスポート -->
-                    <Button Content="📤 選択抽出" Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存" />
-                    <Button Content="✂️ 全分割" Command="{Binding SplitAllPagesCommand}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力" />
+                    <!-- 分割エクスポート（リボンスタイル） -->
+                    <Button Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="選択抽出" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SplitAllPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8C8;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,2" />
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- 履歴 -->
-                    <Button Content="↩ 元に戻す" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)" />
-                    <Button Content="↪ やり直す" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource ToolbarButtonStyle}" ToolTip="やり直す (Ctrl+Y)" />
+                    <!-- 履歴（リボンスタイル） -->
+                    <Button Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="元に戻す" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="やり直す (Ctrl+Y)">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </WrapPanel>
             </DockPanel>
         </Border>

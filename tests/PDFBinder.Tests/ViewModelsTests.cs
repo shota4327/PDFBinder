@@ -133,4 +133,37 @@ public class ViewModelsTests
         vm.ZoomResetCommand.Execute(null);
         Assert.Equal(1.0, vm.Zoom);
     }
+
+    [Fact]
+    public void MainViewModel_ThumbnailZoomPercentage_CalculatesAndNotifiesCorrectly()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        var notifiedProperties = new List<string>();
+        vm.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName != null)
+            {
+                notifiedProperties.Add(e.PropertyName);
+            }
+        };
+
+        // Assert default
+        Assert.Equal(220.0, vm.ThumbnailSize);
+        Assert.Equal(100, vm.ThumbnailZoomPercentage);
+
+        // Act: minimum slider value
+        vm.ThumbnailSize = 140.0;
+        Assert.Equal(64, vm.ThumbnailZoomPercentage);
+        Assert.Contains(nameof(vm.ThumbnailZoomPercentage), notifiedProperties);
+
+        // Act: maximum slider value
+        vm.ThumbnailSize = 360.0;
+        Assert.Equal(164, vm.ThumbnailZoomPercentage);
+
+        // Act: reset command
+        vm.ResetThumbnailSizeCommand.Execute(null);
+        Assert.Equal(220.0, vm.ThumbnailSize);
+        Assert.Equal(100, vm.ThumbnailZoomPercentage);
+    }
 }
