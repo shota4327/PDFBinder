@@ -240,7 +240,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE7C5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xECE9;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="手のひら" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>

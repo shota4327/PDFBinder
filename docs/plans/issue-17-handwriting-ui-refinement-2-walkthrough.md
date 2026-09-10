@@ -29,7 +29,7 @@
   - **蛍光ペン**: `&#xED64;`（Windows Ink標準蛍光ペン / チゼル先端マーカー）
   - **直線**: `&#xED5E;`（Windows Ink標準直線・定規アイコン）
   - **部分消し**: `&#xED61;`（Windows Ink標準ピンポイント消しゴムアイコン）
-  - **手のひら**: `&#xE7C5;`（Windows標準PanMode手のひらアイコン）
+  - **手のひら**: `&#xECE9;`（Windows標準PanMode手のひらアイコン）
 
 ### 5. 単体テスト & ドキュメント更新
 - [ViewModelsTests.cs](file:///c:/Git/PDFBinder/tests/PDFBinder.Tests/ViewModelsTests.cs):
