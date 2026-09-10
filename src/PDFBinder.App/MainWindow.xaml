@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:PDFBinder.App.Views"
         xmlns:vm="clr-namespace:PDFBinder.App.ViewModels"
+        xmlns:controls="clr-namespace:PDFBinder.App.Controls"
         mc:Ignorable="d"
         Title="PDF Binder" Height="760" Width="1100"
         MinHeight="500" MinWidth="750"
@@ -35,121 +36,330 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 上部メインツールバー（リボン） -->
-        <Border Grid.Row="0" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,6">
-            <DockPanel LastChildFill="True">
-                <!-- アクションボタングループ -->
-                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- ファイル操作（リボンスタイル） -->
-                    <Button Command="{Binding OpenDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="PDFファイルを開く (Ctrl+O)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8E5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding AppendDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="別のPDFを結合・追加">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="追加" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SaveDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE74E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8AC;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="別名保存" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+        <!-- 上部メインリボンエリア -->
+        <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <!-- リボンタブヘッダーバー -->
+                <Border Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,4,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Content="PDF編集" GroupName="RibbonTabs"
+                                     IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
+                                     Style="{StaticResource RibbonTabRadioButtonStyle}" />
+                        <RadioButton Content="手書き" GroupName="RibbonTabs"
+                                     IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=1, Mode=TwoWay}"
+                                     IsEnabled="{Binding IsDetailViewActive}"
+                                     Style="{StaticResource RibbonTabRadioButtonStyle}" />
+                    </StackPanel>
+                </Border>
 
-                    <!-- ページ構成・抽出（リボンスタイル） -->
-                    <Button Command="{Binding AddBlankPageCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="白紙ページを追加 (Ctrl+B)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7C3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="白紙追加" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="選択抽出" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SplitAllPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8C8;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                <!-- ツールバーコンテンツ領域 -->
+                <Border Background="White" Padding="12,6">
+                    <Grid>
+                        <!-- PDF編集タブコンテンツ -->
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                   Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=0}">
+                            <!-- ファイル操作（リボンスタイル） -->
+                            <Button Command="{Binding OpenDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="PDFファイルを開く (Ctrl+O)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8E5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding AppendDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="別のPDFを結合・追加">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="追加" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding SaveDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE74E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="保存" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8AC;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="別名保存" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+                            <!-- ページ構成・抽出（リボンスタイル） -->
+                            <Button Command="{Binding AddBlankPageCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="白紙ページを追加 (Ctrl+B)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7C3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="白紙追加" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="選択抽出" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding SplitAllPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8C8;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
-                    <!-- ページ編集（リボンスタイル） -->
-                    <Button Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="左回転 (Ctrl+L)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" RenderTransformOrigin="0.5,0.5">
-                                <TextBlock.RenderTransform>
-                                    <ScaleTransform ScaleX="-1" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
-                            <TextBlock Text="左回転" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding RotateClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="右回転 (Ctrl+R)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="右回転" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource DangerRibbonToolbarButtonStyle}" ToolTip="削除 (Delete)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+                            <!-- ページ編集（リボンスタイル） -->
+                            <Button Command="{Binding RotateCounterClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="左回転 (Ctrl+L)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock.RenderTransform>
+                                            <ScaleTransform ScaleX="-1" />
+                                        </TextBlock.RenderTransform>
+                                    </TextBlock>
+                                    <TextBlock Text="左回転" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RotateClockwiseCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="右回転 (Ctrl+R)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="右回転" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DeleteSelectedPagesCommand}" Style="{StaticResource DangerRibbonToolbarButtonStyle}" ToolTip="削除 (Delete)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
-                    <!-- 履歴（リボンスタイル） -->
-                    <Button Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="元に戻す" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="やり直す (Ctrl+Y)">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4"
-                               Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
+                            <!-- 履歴（リボンスタイル） -->
+                            <Button Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="元に戻す" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="やり直す (Ctrl+Y)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
-                    <!-- 表示ズーム（リボンスタイル・グリッド俯瞰時のみ表示） -->
-                    <Button Command="{Binding ZoomOutThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)"
-                            Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding ZoomInThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)"
-                            Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </WrapPanel>
-            </DockPanel>
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4"
+                                       Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
+
+                            <!-- 表示ズーム（リボンスタイル・グリッド俯瞰時のみ表示） -->
+                            <Button Command="{Binding ZoomOutThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)"
+                                    Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ZoomInThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)"
+                                    Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- 手書きタブコンテンツ -->
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                   Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=1}">
+                            <!-- グループ1: 【戻る】 -->
+                            <Button Command="{Binding ClosePageDetailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="グリッド一覧に戻る">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="一覧に戻る" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
+                            <!-- グループ2: 【ツール】 -->
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="選択ツール"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Select}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEF20;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="選択" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="ペンツール"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Pen, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Pen}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xED63;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="ペン" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="半透明蛍光ペン"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Highlighter}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="蛍光ペン" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="直線描画"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.StraightLine}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE81E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="直線" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="触れたストローク全体を消去"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserStroke, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.EraserStroke}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE75C;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="全消しゴム" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="なぞった部分のみを消去"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserPoint, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.EraserPoint}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="部分消し" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="画面のスクロール・パン"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEDE3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="手のひら" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
+                            <!-- グループ3: 【太さ & 色】 -->
+                            <!-- 太さプリセットボタン群（・の大きさで表示） -->
+                            <Button Command="{Binding DetailEditor.SetPresetThicknessCommand}" CommandParameter="0.5"
+                                    Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 0.5px">
+                                <Ellipse Width="3" Height="3" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                            <Button Command="{Binding DetailEditor.SetPresetThicknessCommand}" CommandParameter="1.0"
+                                    Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 1.0px">
+                                <Ellipse Width="5" Height="5" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                            <Button Command="{Binding DetailEditor.SetPresetThicknessCommand}" CommandParameter="2.0"
+                                    Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 2.0px">
+                                <Ellipse Width="8" Height="8" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+                            <Button Command="{Binding DetailEditor.SetPresetThicknessCommand}" CommandParameter="4.0"
+                                    Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 4.0px">
+                                <Ellipse Width="13" Height="13" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
+
+                            <!-- 自由選択トグルボタン -->
+                            <Button Command="{Binding DetailEditor.ToggleCustomThicknessCommand}"
+                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="自由太さ調整スライダーの展開/折りたたみ">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="自由選択" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- インライン展開スライダーパネル -->
+                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="2,0,6,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding DetailEditor.IsCustomThicknessOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="太さ:" FontSize="11" Foreground="#475569" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Slider Width="90" Minimum="0.5" Maximum="24.0" Value="{Binding DetailEditor.StrokeThickness, Mode=TwoWay}"
+                                            TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding DetailEditor.StrokeThickness, StringFormat='{}{0:0.0}px'}" FontSize="11" Foreground="#64748B"
+                                               Width="38" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- カラーパレット -->
+                            <ItemsControl ItemsSource="{Binding DetailEditor.ColorPalette}" VerticalAlignment="Center" Margin="2,0,6,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Width="22" Height="22" Margin="3,0" Cursor="Hand"
+                                                Command="{Binding DataContext.DetailEditor.SelectColorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <Button.Template>
+                                                <ControlTemplate>
+                                                    <Border CornerRadius="11" BorderThickness="2" BorderBrush="#94A3B8">
+                                                        <Border.Background>
+                                                            <SolidColorBrush Color="{Binding}" />
+                                                        </Border.Background>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
+                            <!-- グループ4: 【表示・移動】 -->
+                            <Button Command="{Binding DetailEditor.ZoomOutCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DetailEditor.ZoomResetCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="等倍表示 (100%)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding DetailEditor.Zoom, StringFormat='{}{0:P0}'}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4,0,3" />
+                                    <TextBlock Text="100%" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding DetailEditor.ZoomInCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
+                            <Button Command="{Binding DetailEditor.GoToPreviousPageCommand}" IsEnabled="{Binding DetailEditor.HasPreviousPage}"
+                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="前のページ">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE76B;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="前ページ" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Border VerticalAlignment="Center" Padding="4,0">
+                                <TextBlock Text="{Binding DetailEditor.CurrentPage.PageNumber, StringFormat='P.{0}'}"
+                                           FontSize="13" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center" />
+                            </Border>
+                            <Button Command="{Binding DetailEditor.GoToNextPageCommand}" IsEnabled="{Binding DetailEditor.HasNextPage}"
+                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="次のページ">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="次ページ" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
         </Border>
 
         <!-- メイン画面切り替えエリア -->

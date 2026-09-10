@@ -36,6 +36,9 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private double _strokeThickness = 2.0;
 
+    [ObservableProperty]
+    private bool _isCustomThicknessOpen;
+
     /// <summary>最小ズーム倍率</summary>
     public const double MinZoom = 0.5;
 
@@ -130,6 +133,33 @@ public partial class DetailEditorViewModel : ObservableObject
     private void SelectColor(Color color)
     {
         SelectedColor = color;
+    }
+
+    /// <summary>
+    /// プリセットの太さを設定し、カスタム展開パネルを閉じます。
+    /// </summary>
+    [RelayCommand]
+    private void SetPresetThickness(object? parameter)
+    {
+        if (parameter == null) return;
+        if (parameter is double d)
+        {
+            StrokeThickness = d;
+        }
+        else if (double.TryParse(parameter.ToString(), System.Globalization.CultureInfo.InvariantCulture, out double parsed))
+        {
+            StrokeThickness = parsed;
+        }
+        IsCustomThicknessOpen = false;
+    }
+
+    /// <summary>
+    /// 自由太さ調整スライダーの展開・折りたたみを切り替えます。
+    /// </summary>
+    [RelayCommand]
+    private void ToggleCustomThickness()
+    {
+        IsCustomThicknessOpen = !IsCustomThicknessOpen;
     }
 
     /// <summary>

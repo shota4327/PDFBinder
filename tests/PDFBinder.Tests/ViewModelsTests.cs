@@ -234,4 +234,57 @@ public class ViewModelsTests
         // Assert: ツールが正しく切り替わる
         Assert.Equal(EditorToolMode.EraserStroke, vm.SelectedTool);
     }
+
+    [Fact]
+    public void MainViewModel_RibbonTab_SwitchesAutomaticallyOnDetailEditorOpenAndClose()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        vm.AddBlankPage();
+        var page = vm.Document.Pages[0];
+
+        // Assert: 初期状態は「PDF編集」タブ（0）
+        Assert.Equal(0, vm.SelectedRibbonTabIndex);
+
+        // Act: エディタを開く
+        vm.OpenPageDetailCommand.Execute(page);
+
+        // Assert: 「手書き」タブ（1）へ自動切り替え
+        Assert.Equal(1, vm.SelectedRibbonTabIndex);
+
+        // Act: エディタを閉じる
+        vm.ClosePageDetailCommand.Execute(null);
+
+        // Assert: 「PDF編集」タブ（0）へ自動復帰
+        Assert.Equal(0, vm.SelectedRibbonTabIndex);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_PresetAndCustomThickness_WorksCorrectly()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // 初期値の確認
+        Assert.False(vm.IsCustomThicknessOpen);
+
+        // Act: 自由選択スライダーのトグル展開
+        vm.ToggleCustomThicknessCommand.Execute(null);
+        Assert.True(vm.IsCustomThicknessOpen);
+
+        // Act: プリセット選択（0.5px）で太さ反映＆展開パネル自動クローズ
+        vm.SetPresetThicknessCommand.Execute(0.5);
+        Assert.Equal(0.5, vm.StrokeThickness);
+        Assert.False(vm.IsCustomThicknessOpen);
+
+        // Act: 文字列引数（"4.0"）でのプリセット選択
+        vm.SetPresetThicknessCommand.Execute("4.0");
+        Assert.Equal(4.0, vm.StrokeThickness);
+        Assert.False(vm.IsCustomThicknessOpen);
+    }
 }

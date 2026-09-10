@@ -95,3 +95,27 @@ public class ToolToBooleanConverter : IValueConverter
         return Binding.DoNothing;
     }
 }
+
+/// <summary>
+/// 条件一致でBoolean（True/False）を返すコンバーター
+/// </summary>
+public class EqualityToBooleanConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return Equals(value?.ToString(), parameter?.ToString());
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is true && parameter != null)
+        {
+            if (int.TryParse(parameter.ToString(), out int intVal))
+            {
+                return intVal;
+            }
+            return parameter.ToString()!;
+        }
+        return Binding.DoNothing;
+    }
+}

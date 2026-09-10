@@ -70,20 +70,4 @@ public partial class DetailEditorView : UserControl
 
         InkCanvas.DefaultDrawingAttributes = attr;
     }
-
-    private void OnToolRadioButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement elem && elem.Tag is EditorToolMode mode && ViewModel != null)
-        {
-            ViewModel.SelectToolCommand.Execute(mode);
-        }
-    }
-
-    private void OnColorCircleClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement elem && elem.Tag is Color color && ViewModel != null)
-        {
-            ViewModel.SelectColorCommand.Execute(color);
-        }
-    }
 }
