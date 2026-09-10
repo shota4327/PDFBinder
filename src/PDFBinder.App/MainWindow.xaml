@@ -38,10 +38,6 @@
         <!-- 上部メインツールバー（リボン） -->
         <Border Grid.Row="0" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,6">
             <DockPanel LastChildFill="True">
-                <!-- アプリアイコン（タイトル省略・高解像度表示） -->
-                <Image Source="Assets/icon.png" Width="38" Height="38" Margin="0,0,14,0" VerticalAlignment="Center" DockPanel.Dock="Left"
-                       RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" ToolTip="PDF Binder" />
-
                 <!-- アクションボタングループ -->
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- ファイル操作（リボンスタイル） -->
@@ -49,6 +45,12 @@
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="&#xE8E5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding AppendDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="別のPDFを結合・追加">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="追加" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding SaveDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
@@ -66,20 +68,26 @@
                     
                     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                    <!-- バインダー操作（リボンスタイル） -->
-                    <Button Command="{Binding AppendDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="別のPDFを結合・追加">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="PDF追加結合" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                    <!-- ページ構成・抽出（リボンスタイル） -->
                     <Button Command="{Binding AddBlankPageCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="白紙ページを追加 (Ctrl+B)">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="&#xE7C3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="白紙追加" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    
+                    <Button Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="選択抽出" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SplitAllPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8C8;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
                     <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
                     <!-- ページ編集（リボンスタイル） -->
@@ -103,22 +111,6 @@
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="削除" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-
-                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
-
-                    <!-- 分割エクスポート（リボンスタイル） -->
-                    <Button Command="{Binding ExportSelectedPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="選択したページを別PDFとして保存">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xEDE1;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="選択抽出" FontSize="11" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Command="{Binding SplitAllPagesCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを個別のPDFに分割出力">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE8C8;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                            <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
 
