@@ -145,14 +145,14 @@
                     <Button Command="{Binding ZoomOutThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)"
                             Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE720;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ZoomInThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)"
                             Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
