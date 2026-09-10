@@ -135,35 +135,52 @@ public class ViewModelsTests
     }
 
     [Fact]
-    public void MainViewModel_ThumbnailZoomPercentage_CalculatesAndNotifiesCorrectly()
+    public void MainViewModel_ZoomThumbnailCommands_WorkAndClampCorrectly()
     {
         // Arrange
         var vm = new MainViewModel();
-        var notifiedProperties = new List<string>();
-        vm.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName != null)
-            {
-                notifiedProperties.Add(e.PropertyName);
-            }
-        };
 
         // Assert default
         Assert.Equal(220.0, vm.ThumbnailSize);
-        Assert.Equal(100, vm.ThumbnailZoomPercentage);
+        Assert.True(vm.CanZoomInThumbnail);
+        Assert.True(vm.CanZoomOutThumbnail);
+        Assert.True(vm.ZoomInThumbnailCommand.CanExecute(null));
+        Assert.True(vm.ZoomOutThumbnailCommand.CanExecute(null));
 
-        // Act: minimum slider value
-        vm.ThumbnailSize = 140.0;
-        Assert.Equal(64, vm.ThumbnailZoomPercentage);
-        Assert.Contains(nameof(vm.ThumbnailZoomPercentage), notifiedProperties);
+        // Act: Zoom in once
+        vm.ZoomInThumbnailCommand.Execute(null);
+        Assert.Equal(240.0, vm.ThumbnailSize);
 
-        // Act: maximum slider value
-        vm.ThumbnailSize = 360.0;
-        Assert.Equal(164, vm.ThumbnailZoomPercentage);
+        // Act: Zoom in to maximum (360.0)
+        while (vm.ThumbnailSize < MainViewModel.MaxThumbnailSize)
+        {
+            vm.ZoomInThumbnailCommand.Execute(null);
+        }
+        Assert.Equal(MainViewModel.MaxThumbnailSize, vm.ThumbnailSize);
+        Assert.False(vm.CanZoomInThumbnail);
+        Assert.False(vm.ZoomInThumbnailCommand.CanExecute(null));
 
-        // Act: reset command
-        vm.ResetThumbnailSizeCommand.Execute(null);
-        Assert.Equal(220.0, vm.ThumbnailSize);
-        Assert.Equal(100, vm.ThumbnailZoomPercentage);
+        // Ensure does not exceed maximum
+        vm.ZoomInThumbnailCommand.Execute(null);
+        Assert.Equal(MainViewModel.MaxThumbnailSize, vm.ThumbnailSize);
+
+        // Act: Zoom out to minimum (140.0)
+        while (vm.ThumbnailSize > MainViewModel.MinThumbnailSize)
+        {
+            vm.ZoomOutThumbnailCommand.Execute(null);
+        }
+        Assert.Equal(MainViewModel.MinThumbnailSize, vm.ThumbnailSize);
+        Assert.False(vm.CanZoomOutThumbnail);
+        Assert.False(vm.ZoomOutThumbnailCommand.CanExecute(null));
+
+        // Ensure does not fall below minimum
+        vm.ZoomOutThumbnailCommand.Execute(null);
+        Assert.Equal(MainViewModel.MinThumbnailSize, vm.ThumbnailSize);
+
+        // Act: Zoom in from minimum re-enables zoom out
+        vm.ZoomInThumbnailCommand.Execute(null);
+        Assert.Equal(160.0, vm.ThumbnailSize);
+        Assert.True(vm.CanZoomOutThumbnail);
+        Assert.True(vm.ZoomOutThumbnailCommand.CanExecute(null));
     }
 }
