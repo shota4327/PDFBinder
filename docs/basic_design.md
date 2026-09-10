@@ -95,9 +95,10 @@ PDFファイルの入出力、構造操作を担当。
 - `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
 
 ### 5.2 `IPdfRenderer`
-PDFページの画面表示用ビットマップ生成を担当。
-- `Task<BitmapSource> RenderPageAsync(string filePath, int pageIndex, double dpi, PageRotation rotation)`: サムネイル/詳細画面用レンダリング
-- `Task<BitmapSource> RenderBlankPageAsync(double width, double height, double dpi)`: 白紙レンダリング
+PDFページの画面表示用ビットマップ生成およびストローク合成を担当。
+- `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation)`: サムネイル/詳細画面用レンダリング（サムネイル: 360x504px基準固定生成、詳細画面: 216 DPI相当 / 3.0倍スケール）
+- `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
+- `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
 
 ### 5.3 `IUndoRedoService`
 ページ操作およびインク操作の履歴管理。

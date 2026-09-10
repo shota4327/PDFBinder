@@ -1,3 +1,5 @@
+using System.Windows.Ink;
+using System.Windows.Input;
 using System.Windows.Media;
 using PDFBinder.App.Controls;
 using PDFBinder.App.ViewModels;
@@ -322,5 +324,46 @@ public class ViewModelsTests
 
         // Assert
         Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.SelectedColor);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_EditorRenderScale_IsConfiguredProperly()
+    {
+        // Assert: 216 DPI相当（3.0倍）に設定されていること
+        Assert.Equal(3.0, DetailEditorViewModel.EditorRenderScale);
+    }
+
+    [Fact]
+    public void MainViewModel_ThumbnailRenderConstants_AreConfiguredProperly()
+    {
+        // Assert: 最大サイズ（360px）基準でレンダリング定数が設定されていること
+        Assert.Equal(360, MainViewModel.ThumbnailRenderWidth);
+        Assert.Equal(504, MainViewModel.ThumbnailRenderHeight);
+    }
+
+    [Fact]
+    public void MainViewModel_ClosePageDetail_WithStrokes_UpdatesThumbnailWithStrokes()
+    {
+        // Arrange
+        var renderer = new PdfiumRenderer();
+        var vm = new MainViewModel(pdfRenderer: renderer);
+        vm.AddBlankPage();
+        var page = vm.Document.Pages[0];
+        var initialThumbnail = page.Thumbnail;
+
+        // Act: 詳細エディタを開いてストロークを追加し、詳細エディタを閉じる
+        vm.OpenPageDetail(page);
+        var points = new StylusPointCollection
+        {
+            new StylusPoint(10, 10),
+            new StylusPoint(50, 50)
+        };
+        page.InkStrokes.Add(new Stroke(points));
+
+        vm.ClosePageDetail();
+
+        // Assert: サムネイルが手書きストローク合成後の新しいBitmapSourceに更新されていること
+        Assert.NotNull(page.Thumbnail);
+        Assert.NotSame(initialThumbnail, page.Thumbnail);
     }
 }

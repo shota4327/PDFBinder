@@ -82,13 +82,18 @@ public partial class DetailEditorViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 詳細エディタ表示用の高解像度レンダリングスケール（3.0 = 216 DPI相当）
+    /// </summary>
+    public const double EditorRenderScale = 3.0;
+
+    /// <summary>
     /// ページの背景ビットマップを高DPIでレンダリングします。
     /// </summary>
     public async Task LoadPageBackgroundAsync()
     {
-        // 画面表示用に150 DPI相当のサイズでレンダリング
-        int targetWidth = (int)(CurrentPage.Width * 1.5);
-        int targetHeight = (int)(CurrentPage.Height * 1.5);
+        // ズームイン時にも文字が鮮明に表示されるよう、216 DPI（72 pt * 3.0）相当の高解像度でレンダリング
+        int targetWidth = (int)(CurrentPage.Width * EditorRenderScale);
+        int targetHeight = (int)(CurrentPage.Height * EditorRenderScale);
 
         PageBackground = await _pdfRenderer.RenderPageAsync(
             CurrentPage.SourceFilePath,
