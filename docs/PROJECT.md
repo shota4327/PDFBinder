@@ -43,7 +43,8 @@
 | **F44** | 手書き詳細 | 直線描画ツール（プレビュー付き） | **完了** | CommitStraightLine |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
 | **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 19件全PASS） | **完了** | PDFBinder.Tests |
+| **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム） | **完了** | Issue #9 / EditorInkCanvas & PinchZoomHelper |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 24件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 

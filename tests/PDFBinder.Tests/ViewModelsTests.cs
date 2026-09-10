@@ -132,6 +132,18 @@ public class ViewModelsTests
         vm.ZoomInCommand.Execute(null);
         vm.ZoomResetCommand.Execute(null);
         Assert.Equal(1.0, vm.Zoom);
+
+        // Direct SetZoom
+        vm.SetZoom(1.75);
+        Assert.Equal(1.75, vm.Zoom);
+
+        // Direct SetZoom Clamp Max
+        vm.SetZoom(5.0);
+        Assert.Equal(DetailEditorViewModel.MaxZoom, vm.Zoom);
+
+        // Direct SetZoom Clamp Min
+        vm.SetZoom(0.1);
+        Assert.Equal(DetailEditorViewModel.MinZoom, vm.Zoom);
     }
 
     [Fact]

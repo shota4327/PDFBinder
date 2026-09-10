@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
+using PDFBinder.App.Helpers;
+using PDFBinder.App.ViewModels;
 
 namespace PDFBinder.App.Controls;
 
@@ -52,6 +54,16 @@ public class EditorInkCanvas : InkCanvas
     // 手のひら（パン）用
     private Point? _panStartPoint;
     private ScrollViewer? _parentScrollViewer;
+
+    // スタイラスペン状態およびパームリジェクション管理
+    private bool _isStylusTouching;
+    private bool _isStylusInRange;
+    private DateTime _lastStylusActivityTime = DateTime.MinValue;
+
+    // マルチタッチ（パン・ピンチズーム）管理
+    private readonly Dictionary<int, Point> _activeTouchPoints = new();
+    private double? _initialPinchDistance;
+    private Point? _lastPinchCenter;
 
     public EditorInkCanvas()
     {
@@ -184,6 +196,232 @@ public class EditorInkCanvas : InkCanvas
 
         base.OnPreviewMouseUp(e);
     }
+
+    #region スタイラスペン・パームリジェクション処理
+
+    protected override void OnPreviewStylusDown(StylusDownEventArgs e)
+    {
+        if (IsTouchDevice(e))
+        {
+            // タッチ操作によるインク描画を抑止
+            e.Handled = true;
+            return;
+        }
+
+        if (IsStylusDevice(e))
+        {
+            _isStylusTouching = true;
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+
+        base.OnPreviewStylusDown(e);
+    }
+
+    protected override void OnPreviewStylusMove(StylusEventArgs e)
+    {
+        if (IsTouchDevice(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (IsStylusDevice(e))
+        {
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+
+        base.OnPreviewStylusMove(e);
+    }
+
+    protected override void OnPreviewStylusUp(StylusEventArgs e)
+    {
+        if (IsTouchDevice(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (IsStylusDevice(e))
+        {
+            _isStylusTouching = false;
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+
+        base.OnPreviewStylusUp(e);
+    }
+
+    protected override void OnStylusInAirMove(StylusEventArgs e)
+    {
+        if (IsStylusDevice(e))
+        {
+            _isStylusInRange = true;
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+        base.OnStylusInAirMove(e);
+    }
+
+    protected override void OnStylusInRange(StylusEventArgs e)
+    {
+        if (IsStylusDevice(e))
+        {
+            _isStylusInRange = true;
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+        base.OnStylusInRange(e);
+    }
+
+    protected override void OnStylusOutOfRange(StylusEventArgs e)
+    {
+        if (IsStylusDevice(e))
+        {
+            _isStylusInRange = false;
+            _lastStylusActivityTime = DateTime.UtcNow;
+        }
+        base.OnStylusOutOfRange(e);
+    }
+
+    /// <summary>
+    /// スタイラスペンが接地・近接（ホバー）中か判定し、タッチ操作を抑止すべきか返します。
+    /// </summary>
+    private bool IsStylusSuppressed()
+    {
+        if (_isStylusTouching || _isStylusInRange) return true;
+        return (DateTime.UtcNow - _lastStylusActivityTime).TotalMilliseconds < 350;
+    }
+
+    private static bool IsTouchDevice(StylusEventArgs e) =>
+        e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Touch;
+
+    private static bool IsStylusDevice(StylusEventArgs e) =>
+        e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus;
+
+    #endregion
+
+    #region マルチタッチ（パン・ピンチズーム）処理
+
+    protected override void OnPreviewTouchDown(TouchEventArgs e)
+    {
+        if (IsStylusSuppressed())
+        {
+            // ペン使用中の手のひら接地を完全に抑止
+            e.Handled = true;
+            return;
+        }
+
+        CaptureTouch(e.TouchDevice);
+        _parentScrollViewer ??= FindParentScrollViewer(this);
+
+        if (_parentScrollViewer != null)
+        {
+            Point pos = e.GetTouchPoint(_parentScrollViewer).Position;
+            _activeTouchPoints[e.TouchDevice.Id] = pos;
+
+            // タッチ点数が変化した時はピンチズームの基準点をリセット
+            _initialPinchDistance = null;
+            _lastPinchCenter = null;
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnPreviewTouchMove(TouchEventArgs e)
+    {
+        if (!_activeTouchPoints.ContainsKey(e.TouchDevice.Id)) return;
+
+        _parentScrollViewer ??= FindParentScrollViewer(this);
+        if (_parentScrollViewer == null) return;
+
+        Point newPos = e.GetTouchPoint(_parentScrollViewer).Position;
+
+        if (_activeTouchPoints.Count == 1)
+        {
+            HandleOneFingerPan(e.TouchDevice.Id, newPos);
+        }
+        else if (_activeTouchPoints.Count == 2)
+        {
+            _activeTouchPoints[e.TouchDevice.Id] = newPos;
+            HandleTwoFingerPinchZoom();
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnPreviewTouchUp(TouchEventArgs e)
+    {
+        HandleTouchRelease(e.TouchDevice);
+        e.Handled = true;
+    }
+
+    protected override void OnTouchLeave(TouchEventArgs e)
+    {
+        HandleTouchRelease(e.TouchDevice);
+        base.OnTouchLeave(e);
+    }
+
+    private void HandleOneFingerPan(int touchId, Point newPos)
+    {
+        if (_parentScrollViewer == null) return;
+
+        if (_activeTouchPoints.TryGetValue(touchId, out Point oldPos))
+        {
+            double deltaX = oldPos.X - newPos.X;
+            double deltaY = oldPos.Y - newPos.Y;
+
+            _parentScrollViewer.ScrollToHorizontalOffset(_parentScrollViewer.HorizontalOffset + deltaX);
+            _parentScrollViewer.ScrollToVerticalOffset(_parentScrollViewer.VerticalOffset + deltaY);
+
+            _activeTouchPoints[touchId] = newPos;
+        }
+    }
+
+    private void HandleTwoFingerPinchZoom()
+    {
+        if (_parentScrollViewer == null || _activeTouchPoints.Count < 2) return;
+        if (DataContext is not DetailEditorViewModel vm) return;
+
+        var points = _activeTouchPoints.Values.Take(2).ToArray();
+        Point p1 = points[0];
+        Point p2 = points[1];
+
+        double currentDistance = (p1 - p2).Length;
+        Point currentCenter = new((p1.X + p2.X) / 2.0, (p1.Y + p2.Y) / 2.0);
+
+        if (_initialPinchDistance == null || _lastPinchCenter == null)
+        {
+            _initialPinchDistance = currentDistance;
+            _lastPinchCenter = currentCenter;
+            return;
+        }
+
+        var result = PinchZoomHelper.Calculate(
+            vm.Zoom,
+            _initialPinchDistance.Value,
+            currentDistance,
+            _lastPinchCenter.Value,
+            currentCenter,
+            _parentScrollViewer.HorizontalOffset,
+            _parentScrollViewer.VerticalOffset,
+            DetailEditorViewModel.MinZoom,
+            DetailEditorViewModel.MaxZoom);
+
+        vm.SetZoom(result.NewZoom);
+        _parentScrollViewer.UpdateLayout();
+        _parentScrollViewer.ScrollToHorizontalOffset(result.TargetHorizontalOffset);
+        _parentScrollViewer.ScrollToVerticalOffset(result.TargetVerticalOffset);
+
+        _initialPinchDistance = currentDistance;
+        _lastPinchCenter = currentCenter;
+    }
+
+    private void HandleTouchRelease(TouchDevice device)
+    {
+        ReleaseTouchCapture(device);
+        _activeTouchPoints.Remove(device.Id);
+        _initialPinchDistance = null;
+        _lastPinchCenter = null;
+    }
+
+    #endregion
 
     /// <summary>
     /// 直線プレビューを描画します。
