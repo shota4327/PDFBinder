@@ -29,14 +29,15 @@
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
-| **F20** | レンダリング | PDFiumによるサムネイル生成・非同期キャッシュ | **完了** | PdfiumRenderer (Docnet.Core) |
+| **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
+| **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
 | **F30** | UI・グリッド俯瞰 | ページタイル状グリッド一覧表示（仮想化・カードUI） | **完了** | GridView.xaml |
 | **F31** | UI・グリッド俯瞰 | ドラッグ＆ドロップによるページ並び替え | **完了** | DragDrop.DoDragDrop / MovePage |
 | **F32** | UI・グリッド俯瞰 | 外部PDFのグリッドへのD&D差し込み | **完了** | OnControlDrop / FileDrop |
 | **F33** | UI・グリッド俯瞰 | 複数選択・一括操作（回転・削除・分割） | **完了** | CheckBox / Batch commands |
 | **F34** | UI・グリッド俯瞰 | Undo / Redo（元に戻す・やり直す） | **完了** | UndoRedoService / Ctrl+Z, Ctrl+Y |
 | **F35** | UI・グリッド俯瞰 | メインヘッダーツールバー刷新（リボンタブ化・手書きツール統合・太さ刷新） | **完了** | Issue #3, #7, #15, #17 |
-| **F40** | 手書き詳細 | ページダブルクリックでの詳細エディタ切り替え | **完了** | DetailEditorView.xaml |
+| **F40** | 手書き詳細 | ページダブルクリックでの詳細エディタ切り替え（216 DPI高解像度化） | **完了** | DetailEditorView.xaml / Issue #21 |
 | **F41** | 手書き詳細 | ペンツール（色・太さ変更） | **完了** | EditorInkCanvas / ToolMode |
 | **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・色変更） | **完了** | IsHighlighter = true |
 | **F43** | 手書き詳細 | 消しゴムツール（ストローク消し / 部分消し切替） | **完了** | EraseByStroke / EraseByPoint |
@@ -44,7 +45,7 @@
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
 | **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
 | **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム） | **完了** | Issue #9 / EditorInkCanvas & PinchZoomHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 45件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 54件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 

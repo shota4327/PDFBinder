@@ -22,4 +22,13 @@ public interface IPdfRenderer
     /// 白紙ページのプレビュービットマップを生成します。
     /// </summary>
     BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation);
+
+    /// <summary>
+    /// 指定された基本画像の上に手書きストロークを縮小合成したビットマップを生成します。
+    /// </summary>
+    BitmapSource CompositeStrokes(
+        BitmapSource baseImage,
+        System.Windows.Ink.StrokeCollection strokes,
+        double originalPageWidth,
+        double originalPageHeight);
 }

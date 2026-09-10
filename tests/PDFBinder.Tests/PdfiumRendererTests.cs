@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows.Ink;
+using System.Windows.Input;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 using PdfSharp.Drawing;
@@ -84,5 +86,42 @@ public class PdfiumRendererTests : IDisposable
         Assert.True(bitmap.PixelWidth > 0);
         Assert.True(bitmap.PixelHeight > 0);
         Assert.True(bitmap.IsFrozen);
+    }
+
+    [Fact]
+    public void CompositeStrokes_EmptyStrokes_ReturnsOriginalBaseImage()
+    {
+        // Arrange
+        var baseBitmap = _renderer.CreateBlankPageBitmap(100, 150, PageRotation.Rotate0);
+        var strokes = new StrokeCollection();
+
+        // Act
+        var result = _renderer.CompositeStrokes(baseBitmap, strokes, 100, 150);
+
+        // Assert
+        Assert.Same(baseBitmap, result);
+    }
+
+    [Fact]
+    public void CompositeStrokes_WithStrokes_ReturnsCompositedFrozenBitmap()
+    {
+        // Arrange
+        var baseBitmap = _renderer.CreateBlankPageBitmap(100, 150, PageRotation.Rotate0);
+        var points = new StylusPointCollection
+        {
+            new StylusPoint(10, 10),
+            new StylusPoint(50, 50)
+        };
+        var strokes = new StrokeCollection { new Stroke(points) };
+
+        // Act
+        var result = _renderer.CompositeStrokes(baseBitmap, strokes, 100, 150);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotSame(baseBitmap, result);
+        Assert.Equal(100, result.PixelWidth);
+        Assert.Equal(150, result.PixelHeight);
+        Assert.True(result.IsFrozen);
     }
 }

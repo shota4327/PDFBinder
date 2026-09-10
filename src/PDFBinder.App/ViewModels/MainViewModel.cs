@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -54,6 +55,16 @@ public partial class MainViewModel : ObservableObject
     /// サムネイル基準サイズ（初期値 = 220px）
     /// </summary>
     public const double DefaultThumbnailSize = 220.0;
+
+    /// <summary>
+    /// サムネイル生成基準幅（px）。最大表示サイズ（360px）や高DPI環境でも鮮明に表示します。
+    /// </summary>
+    public const int ThumbnailRenderWidth = 360;
+
+    /// <summary>
+    /// サムネイル生成基準高さ（px）。縦横比約1:1.4に基づきます。
+    /// </summary>
+    public const int ThumbnailRenderHeight = 504;
 
     [ObservableProperty]
     private double _thumbnailSize = DefaultThumbnailSize;
@@ -261,7 +272,7 @@ public partial class MainViewModel : ObservableObject
         var cmd = new InsertPageCommand(Document, blank, insertIdx);
         _undoRedoService.Execute(cmd);
 
-        blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap((int)ThumbnailSize, (int)(ThumbnailSize * 1.4), blank.Rotation);
+        blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap(ThumbnailRenderWidth, ThumbnailRenderHeight, blank.Rotation);
         StatusMessage = "白紙ページを追加しました。";
     }
 
@@ -455,37 +466,64 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     private async Task GenerateThumbnailsAsync(int startIndex = 0)
     {
-        int targetW = (int)ThumbnailSize;
-        int targetH = (int)(ThumbnailSize * 1.4);
-
         for (int i = startIndex; i < Document.Pages.Count; i++)
         {
             var page = Document.Pages[i];
             if (page.Thumbnail == null)
             {
-                page.Thumbnail = await _pdfRenderer.RenderPageAsync(
-                    page.SourceFilePath,
-                    page.OriginalPageIndex,
-                    targetW,
-                    targetH,
-                    page.Rotation);
+                await UpdatePageThumbnailAsync(page);
             }
         }
     }
 
+    /// <summary>
+    /// 指定されたページ群のサムネイル画像を再生成・更新します。
+    /// </summary>
     private async Task RefreshSelectedThumbnailsAsync(IEnumerable<PdfPageModel> pages)
     {
-        int targetW = (int)ThumbnailSize;
-        int targetH = (int)(ThumbnailSize * 1.4);
-
         foreach (var page in pages)
         {
-            page.Thumbnail = await _pdfRenderer.RenderPageAsync(
+            await UpdatePageThumbnailAsync(page);
+        }
+    }
+
+    /// <summary>
+    /// 単一ページのサムネイル画像をレンダリングし、手書きストロークが存在する場合は合成して設定します。
+    /// </summary>
+    private async Task UpdatePageThumbnailAsync(PdfPageModel page)
+    {
+        BitmapSource? baseBitmap;
+        if (string.IsNullOrEmpty(page.SourceFilePath))
+        {
+            baseBitmap = _pdfRenderer.CreateBlankPageBitmap(
+                ThumbnailRenderWidth,
+                ThumbnailRenderHeight,
+                page.Rotation);
+        }
+        else
+        {
+            baseBitmap = await _pdfRenderer.RenderPageAsync(
                 page.SourceFilePath,
                 page.OriginalPageIndex,
-                targetW,
-                targetH,
+                ThumbnailRenderWidth,
+                ThumbnailRenderHeight,
                 page.Rotation);
+        }
+
+        if (baseBitmap != null)
+        {
+            if (page.InkStrokes.Count > 0)
+            {
+                page.Thumbnail = _pdfRenderer.CompositeStrokes(
+                    baseBitmap,
+                    page.InkStrokes,
+                    page.DisplayWidth,
+                    page.DisplayHeight);
+            }
+            else
+            {
+                page.Thumbnail = baseBitmap;
+            }
         }
     }
 }

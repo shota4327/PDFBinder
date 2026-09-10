@@ -91,4 +91,42 @@ public class PdfiumRenderer : IPdfRenderer
         writeable.Freeze();
         return writeable;
     }
+
+    /// <inheritdoc/>
+    public BitmapSource CompositeStrokes(
+        BitmapSource baseImage,
+        System.Windows.Ink.StrokeCollection strokes,
+        double originalPageWidth,
+        double originalPageHeight)
+    {
+        if (baseImage == null) throw new ArgumentNullException(nameof(baseImage));
+        if (strokes == null || strokes.Count == 0 || originalPageWidth <= 0 || originalPageHeight <= 0)
+        {
+            return baseImage;
+        }
+
+        int thumbWidth = baseImage.PixelWidth;
+        int thumbHeight = baseImage.PixelHeight;
+        if (thumbWidth <= 0 || thumbHeight <= 0)
+        {
+            return baseImage;
+        }
+
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawImage(baseImage, new Rect(0, 0, thumbWidth, thumbHeight));
+
+            double scaleX = (double)thumbWidth / originalPageWidth;
+            double scaleY = (double)thumbHeight / originalPageHeight;
+            dc.PushTransform(new ScaleTransform(scaleX, scaleY));
+            strokes.Draw(dc);
+            dc.Pop();
+        }
+
+        var renderTarget = new RenderTargetBitmap(thumbWidth, thumbHeight, 96, 96, PixelFormats.Pbgra32);
+        renderTarget.Render(visual);
+        renderTarget.Freeze();
+        return renderTarget;
+    }
 }
