@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
+using System.Windows.Input.StylusPlugIns;
 using System.Windows.Media;
 using PDFBinder.App.Helpers;
 using PDFBinder.App.ViewModels;
@@ -65,8 +66,12 @@ public class EditorInkCanvas : InkCanvas
     private double? _initialPinchDistance;
     private Point? _lastPinchCenter;
 
+    /// <summary>現在のDynamicRendererを取得します（テスト・検証用）。</summary>
+    public DynamicRenderer? CurrentDynamicRenderer => DynamicRenderer;
+
     public EditorInkCanvas()
     {
+        DynamicRenderer = new PenOnlyDynamicRenderer();
         UpdateEditingMode();
     }
 
@@ -83,6 +88,12 @@ public class EditorInkCanvas : InkCanvas
     /// </summary>
     public void UpdateEditingMode()
     {
+        if (_activeTouchPoints.Count > 0)
+        {
+            EditingMode = InkCanvasEditingMode.None;
+            return;
+        }
+
         switch (ToolMode)
         {
             case EditorToolMode.Select:
@@ -201,13 +212,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewStylusDown(StylusDownEventArgs e)
     {
-        if (IsTouchDevice(e))
-        {
-            // タッチ操作によるインク描画を抑止
-            e.Handled = true;
-            return;
-        }
-
         if (IsStylusDevice(e))
         {
             _isStylusTouching = true;
@@ -219,12 +223,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewStylusMove(StylusEventArgs e)
     {
-        if (IsTouchDevice(e))
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (IsStylusDevice(e))
         {
             _lastStylusActivityTime = DateTime.UtcNow;
@@ -235,12 +233,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewStylusUp(StylusEventArgs e)
     {
-        if (IsTouchDevice(e))
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (IsStylusDevice(e))
         {
             _isStylusTouching = false;
@@ -289,9 +281,6 @@ public class EditorInkCanvas : InkCanvas
         return (DateTime.UtcNow - _lastStylusActivityTime).TotalMilliseconds < 350;
     }
 
-    private static bool IsTouchDevice(StylusEventArgs e) =>
-        e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Touch;
-
     private static bool IsStylusDevice(StylusEventArgs e) =>
         e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus;
 
@@ -307,6 +296,9 @@ public class EditorInkCanvas : InkCanvas
             e.Handled = true;
             return;
         }
+
+        // タッチ操作中はインク収集モードを一時停止してパン・ズームに専念
+        EditingMode = InkCanvasEditingMode.None;
 
         CaptureTouch(e.TouchDevice);
         _parentScrollViewer ??= FindParentScrollViewer(this);
@@ -356,6 +348,12 @@ public class EditorInkCanvas : InkCanvas
     {
         HandleTouchRelease(e.TouchDevice);
         base.OnTouchLeave(e);
+    }
+
+    protected override void OnLostTouchCapture(TouchEventArgs e)
+    {
+        HandleTouchRelease(e.TouchDevice);
+        base.OnLostTouchCapture(e);
     }
 
     private void HandleOneFingerPan(int touchId, Point newPos)
@@ -419,6 +417,19 @@ public class EditorInkCanvas : InkCanvas
         _activeTouchPoints.Remove(device.Id);
         _initialPinchDistance = null;
         _lastPinchCenter = null;
+
+        if (_activeTouchPoints.Count == 0)
+        {
+            UpdateEditingMode();
+            if (IsMouseCaptured)
+            {
+                ReleaseMouseCapture();
+            }
+            if (IsStylusCaptured)
+            {
+                ReleaseStylusCapture();
+            }
+        }
     }
 
     #endregion
