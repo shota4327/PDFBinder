@@ -260,7 +260,7 @@ public class ViewModelsTests
     }
 
     [Fact]
-    public void DetailEditorViewModel_PresetAndCustomThickness_WorksCorrectly()
+    public void DetailEditorViewModel_PresetThickness_WorksCorrectly()
     {
         // Arrange
         var page = new PdfPageModel();
@@ -270,21 +270,38 @@ public class ViewModelsTests
             () => { },
             _ => null);
 
-        // 初期値の確認
-        Assert.False(vm.IsCustomThicknessOpen);
+        // 初期太さ
+        Assert.Equal(2.0, vm.StrokeThickness);
 
-        // Act: 自由選択スライダーのトグル展開
-        vm.ToggleCustomThicknessCommand.Execute(null);
-        Assert.True(vm.IsCustomThicknessOpen);
-
-        // Act: プリセット選択（0.5px）で太さ反映＆展開パネル自動クローズ
+        // Act: プリセット選択（0.5px）
         vm.SetPresetThicknessCommand.Execute(0.5);
         Assert.Equal(0.5, vm.StrokeThickness);
-        Assert.False(vm.IsCustomThicknessOpen);
+
+        // Act: プリセット選択（1.0px）
+        vm.SetPresetThicknessCommand.Execute(1.0);
+        Assert.Equal(1.0, vm.StrokeThickness);
 
         // Act: 文字列引数（"4.0"）でのプリセット選択
         vm.SetPresetThicknessCommand.Execute("4.0");
         Assert.Equal(4.0, vm.StrokeThickness);
-        Assert.False(vm.IsCustomThicknessOpen);
+    }
+
+    [Fact]
+    public void DetailEditorViewModel_ColorPalette_ContainsFourModernColors()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // Assert: 4色（黒、明るい赤、明るい青、明るい緑）
+        Assert.Equal(4, vm.ColorPalette.Count);
+        Assert.Equal(Color.FromRgb(0x00, 0x00, 0x00), vm.ColorPalette[0]);
+        Assert.Equal(Color.FromRgb(0xEF, 0x44, 0x44), vm.ColorPalette[1]);
+        Assert.Equal(Color.FromRgb(0x25, 0x63, 0xEB), vm.ColorPalette[2]);
+        Assert.Equal(Color.FromRgb(0x16, 0xA3, 0x4A), vm.ColorPalette[3]);
     }
 }

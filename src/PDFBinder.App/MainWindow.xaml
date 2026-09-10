@@ -204,7 +204,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Highlighter}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xED64;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="蛍光ペン" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
@@ -213,7 +213,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.StraightLine}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE81E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xED5E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="直線" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
@@ -223,7 +223,7 @@
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.EraserStroke}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE75C;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="全消しゴム" FontSize="11" HorizontalAlignment="Center" />
+                                    <TextBlock Text="全体消し" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
 
@@ -231,7 +231,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserPoint, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.EraserPoint}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xED61;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="部分消し" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
@@ -240,7 +240,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xEDE3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xE7C5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="手のひら" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
@@ -265,28 +265,6 @@
                                     Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 4.0px">
                                 <Ellipse Width="13" Height="13" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
-
-                            <!-- 自由選択トグルボタン -->
-                            <Button Command="{Binding DetailEditor.ToggleCustomThicknessCommand}"
-                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="自由太さ調整スライダーの展開/折りたたみ">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="自由選択" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-
-                            <!-- インライン展開スライダーパネル -->
-                            <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="2,0,6,0"
-                                    VerticalAlignment="Center"
-                                    Visibility="{Binding DetailEditor.IsCustomThicknessOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="太さ:" FontSize="11" Foreground="#475569" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <Slider Width="90" Minimum="0.5" Maximum="24.0" Value="{Binding DetailEditor.StrokeThickness, Mode=TwoWay}"
-                                            TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding DetailEditor.StrokeThickness, StringFormat='{}{0:0.0}px'}" FontSize="11" Foreground="#64748B"
-                                               Width="38" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
 
                             <!-- カラーパレット -->
                             <ItemsControl ItemsSource="{Binding DetailEditor.ColorPalette}" VerticalAlignment="Center" Margin="2,0,6,0">

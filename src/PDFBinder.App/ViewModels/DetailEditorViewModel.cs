@@ -36,9 +36,6 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private double _strokeThickness = 2.0;
 
-    [ObservableProperty]
-    private bool _isCustomThicknessOpen;
-
     /// <summary>最小ズーム倍率</summary>
     public const double MinZoom = 0.5;
 
@@ -54,16 +51,13 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRedoStroke;
 
-    /// <summary>カラーパレットプリセット</summary>
+    /// <summary>カラーパレットプリセット（黒・赤・青・緑）</summary>
     public ObservableCollection<Color> ColorPalette { get; } = new()
     {
-        Colors.Black,
-        Colors.DarkRed,
-        Colors.DarkBlue,
-        Colors.DarkGreen,
-        Colors.DarkOrange,
-        Colors.Purple,
-        Colors.Gold
+        Color.FromRgb(0x00, 0x00, 0x00), // 黒
+        Color.FromRgb(0xEF, 0x44, 0x44), // 赤
+        Color.FromRgb(0x25, 0x63, 0xEB), // 青
+        Color.FromRgb(0x16, 0xA3, 0x4A)  // 緑
     };
 
     public bool HasPreviousPage => _pageLookup(CurrentPage.PageNumber - 2) != null;
@@ -136,7 +130,7 @@ public partial class DetailEditorViewModel : ObservableObject
     }
 
     /// <summary>
-    /// プリセットの太さを設定し、カスタム展開パネルを閉じます。
+    /// プリセットの太さを設定します。
     /// </summary>
     [RelayCommand]
     private void SetPresetThickness(object? parameter)
@@ -150,16 +144,6 @@ public partial class DetailEditorViewModel : ObservableObject
         {
             StrokeThickness = parsed;
         }
-        IsCustomThicknessOpen = false;
-    }
-
-    /// <summary>
-    /// 自由太さ調整スライダーの展開・折りたたみを切り替えます。
-    /// </summary>
-    [RelayCommand]
-    private void ToggleCustomThickness()
-    {
-        IsCustomThicknessOpen = !IsCustomThicknessOpen;
     }
 
     /// <summary>
