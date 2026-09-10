@@ -24,12 +24,13 @@
 - [MainWindow.xaml](file:///c:/Git/PDFBinder/src/PDFBinder.App/MainWindow.xaml):
   - ラベルテキストを「全消しゴム」から「全体消し」に変更。
 
-### 4. ツールアイコンの修正（Windows Ink標準準拠）
+### 4. ツールアイコンおよびラベルの修正
 - [MainWindow.xaml](file:///c:/Git/PDFBinder/src/PDFBinder.App/MainWindow.xaml):
-  - **蛍光ペン**: `&#xED64;`（Windows Ink標準蛍光ペン / チゼル先端マーカー）
+  - **別名保存**: `&#xE792;`（SaveAs アイコン）
+  - **蛍光ペン**: `&#xE7E6;`（Highlight アイコン）
   - **直線**: `&#xED5E;`（Windows Ink標準直線・定規アイコン）
   - **部分消し**: `&#xED61;`（Windows Ink標準ピンポイント消しゴムアイコン）
-  - **手のひら**: `&#xECE9;`（Windows標準PanMode手のひらアイコン）
+  - **移動（旧手のひら）**: `&#xECE9;`（PanMode）、ボタン表示ラベルを「移動」に変更し、より直感的に操作内容を理解できるよう改善。
 
 ### 5. 単体テスト & ドキュメント更新
 - [ViewModelsTests.cs](file:///c:/Git/PDFBinder/tests/PDFBinder.Tests/ViewModelsTests.cs):

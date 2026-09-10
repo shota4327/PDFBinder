@@ -79,7 +79,7 @@
                             </Button>
                             <Button Command="{Binding SaveDocumentAsCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="名前を付けて保存 (Ctrl+Shift+S)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE8AC;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xE792;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="別名保存" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
@@ -204,7 +204,7 @@
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Highlighter}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xED64;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xE7E6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="蛍光ペン" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
@@ -236,12 +236,12 @@
                                 </StackPanel>
                             </RadioButton>
 
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="画面のスクロール・パン"
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="画面のスクロール・移動"
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xECE9;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="手のひら" FontSize="11" HorizontalAlignment="Center" />
+                                    <TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
 
