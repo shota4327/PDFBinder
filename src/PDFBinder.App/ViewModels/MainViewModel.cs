@@ -30,7 +30,22 @@ public partial class MainViewModel : ObservableObject
     private string _statusMessage = "PDFファイルを開くか、ドラッグ＆ドロップしてください。";
 
     /// <summary>
-    /// サムネイル基準サイズ（100%基準 = 220px）
+    /// サムネイル最小表示サイズ（px）
+    /// </summary>
+    public const double MinThumbnailSize = 140.0;
+
+    /// <summary>
+    /// サムネイル最大表示サイズ（px）
+    /// </summary>
+    public const double MaxThumbnailSize = 360.0;
+
+    /// <summary>
+    /// サムネイル拡大縮小ステップ幅（px）
+    /// </summary>
+    public const double ThumbnailSizeStep = 20.0;
+
+    /// <summary>
+    /// サムネイル基準サイズ（初期値 = 220px）
     /// </summary>
     public const double DefaultThumbnailSize = 220.0;
 
@@ -38,22 +53,37 @@ public partial class MainViewModel : ObservableObject
     private double _thumbnailSize = DefaultThumbnailSize;
 
     /// <summary>
-    /// サムネイルの表示拡大率（パーセント）を取得します。
+    /// サムネイルをさらに拡大可能かどうかを取得します。
     /// </summary>
-    public int ThumbnailZoomPercentage => (int)Math.Round(ThumbnailSize / DefaultThumbnailSize * 100);
+    public bool CanZoomInThumbnail => ThumbnailSize < MaxThumbnailSize;
+
+    /// <summary>
+    /// サムネイルをさらに縮小可能かどうかを取得します。
+    /// </summary>
+    public bool CanZoomOutThumbnail => ThumbnailSize > MinThumbnailSize;
 
     partial void OnThumbnailSizeChanged(double value)
     {
-        OnPropertyChanged(nameof(ThumbnailZoomPercentage));
+        ZoomInThumbnailCommand.NotifyCanExecuteChanged();
+        ZoomOutThumbnailCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
-    /// サムネイルの表示サイズをデフォルト（100% = 220px）にリセットします。
+    /// サムネイル表示サイズを1段階拡大します。
     /// </summary>
-    [RelayCommand]
-    public void ResetThumbnailSize()
+    [RelayCommand(CanExecute = nameof(CanZoomInThumbnail))]
+    public void ZoomInThumbnail()
     {
-        ThumbnailSize = DefaultThumbnailSize;
+        ThumbnailSize = Math.Min(MaxThumbnailSize, ThumbnailSize + ThumbnailSizeStep);
+    }
+
+    /// <summary>
+    /// サムネイル表示サイズを1段階縮小します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanZoomOutThumbnail))]
+    public void ZoomOutThumbnail()
+    {
+        ThumbnailSize = Math.Max(MinThumbnailSize, ThumbnailSize - ThumbnailSizeStep);
     }
 
     [ObservableProperty]

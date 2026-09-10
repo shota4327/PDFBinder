@@ -22,6 +22,10 @@
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding RotateClockwiseCommand}" />
         <KeyBinding Key="B" Modifiers="Control" Command="{Binding AddBlankPageCommand}" />
         <KeyBinding Key="Delete" Command="{Binding DeleteSelectedPagesCommand}" />
+        <KeyBinding Key="OemMinus" Modifiers="Control" Command="{Binding ZoomOutThumbnailCommand}" />
+        <KeyBinding Key="Subtract" Modifiers="Control" Command="{Binding ZoomOutThumbnailCommand}" />
+        <KeyBinding Key="OemPlus" Modifiers="Control" Command="{Binding ZoomInThumbnailCommand}" />
+        <KeyBinding Key="Add" Modifiers="Control" Command="{Binding ZoomInThumbnailCommand}" />
     </Window.InputBindings>
 
     <Grid Background="#F1F5F9">
@@ -37,19 +41,6 @@
                 <!-- アプリアイコン（タイトル省略・高解像度表示） -->
                 <Image Source="Assets/icon.png" Width="38" Height="38" Margin="0,0,14,0" VerticalAlignment="Center" DockPanel.Dock="Left"
                        RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" ToolTip="PDF Binder" />
-
-                <!-- ズームスライダー（グリッド俯瞰時のみ表示・％動的表示とリセット機能） -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right" Margin="12,0,0,0"
-                            Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                    <Button Command="{Binding ResetThumbnailSizeCommand}" Background="Transparent" BorderThickness="0" Cursor="Hand" ToolTip="クリックして100%にリセット" Padding="4,2" Margin="0,0,4,0">
-                        <TextBlock FontSize="11" Foreground="#64748B" VerticalAlignment="Center">
-                            <Run Text="表示サイズ:" />
-                            <Run Text="{Binding ThumbnailZoomPercentage, Mode=OneWay, StringFormat='{}{0}%'}" FontWeight="SemiBold" Foreground="#1E293B" />
-                        </TextBlock>
-                    </Button>
-                    <Slider Width="100" Minimum="140" Maximum="360" Value="{Binding ThumbnailSize, Mode=TwoWay}" 
-                            VerticalAlignment="Center" TickFrequency="20" IsSnapToTickEnabled="True" />
-                </StackPanel>
 
                 <!-- アクションボタングループ -->
                 <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -144,6 +135,25 @@
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="&#xE7A6;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                             <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4"
+                               Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
+
+                    <!-- 表示ズーム（リボンスタイル・グリッド俯瞰時のみ表示） -->
+                    <Button Command="{Binding ZoomOutThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)"
+                            Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ZoomInThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)"
+                            Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                            <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </WrapPanel>
