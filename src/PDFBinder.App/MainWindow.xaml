@@ -266,6 +266,8 @@
                                 <Ellipse Width="13" Height="13" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
 
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
                             <!-- カラーパレット -->
                             <ItemsControl ItemsSource="{Binding DetailEditor.ColorPalette}" VerticalAlignment="Center" Margin="2,0,6,0">
                                 <ItemsControl.ItemsPanel>

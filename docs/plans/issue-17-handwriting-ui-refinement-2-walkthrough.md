@@ -5,10 +5,11 @@
 
 ## 実施した変更点
 
-### 1. 太さ選択の整理
+### 1. 太さ選択の整理および区切り線の追加
 - [MainWindow.xaml](file:///c:/Git/PDFBinder/src/PDFBinder.App/MainWindow.xaml):
   - 「自由選択」ボタンおよびインライン展開スライダーパネルを削除。
   - 0.5px、1.0px、2.0px、4.0px の4つのドット（●）選択ボタンのみをすっきりと配置。
+  - 太さプリセットボタン群とカラーパレットの間に区切り線（Separator）を追加し、視覚的なグループ境界を明確化。
 - [DetailEditorViewModel.cs](file:///c:/Git/PDFBinder/src/PDFBinder.App/ViewModels/DetailEditorViewModel.cs):
   - 不要となった `IsCustomThicknessOpen` プロパティおよび `ToggleCustomThicknessCommand` を整理。
 
