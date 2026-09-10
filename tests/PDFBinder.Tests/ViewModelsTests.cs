@@ -195,4 +195,43 @@ public class ViewModelsTests
         Assert.True(vm.CanZoomOutThumbnail);
         Assert.True(vm.ZoomOutThumbnailCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void DetailEditorViewModel_SelectedTool_Changed_UpdatesColorAndThickness()
+    {
+        // Arrange
+        var page = new PdfPageModel();
+        var vm = new DetailEditorViewModel(
+            page,
+            new PDFBinder.Core.Services.PdfiumRenderer(),
+            () => { },
+            _ => null);
+
+        // 初期状態（通常ペン）の確認
+        Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
+        Assert.Equal(Colors.Black, vm.SelectedColor);
+        Assert.Equal(2.0, vm.StrokeThickness);
+
+        // Act: 蛍光ペンに変更（TwoWayバインディング経由のプロパティ直接変更）
+        vm.SelectedTool = EditorToolMode.Highlighter;
+
+        // Assert: 色が黄色、太さが12pxに自動調整される
+        Assert.Equal(EditorToolMode.Highlighter, vm.SelectedTool);
+        Assert.Equal(Colors.Yellow, vm.SelectedColor);
+        Assert.Equal(12.0, vm.StrokeThickness);
+
+        // Act: 再び通常ペンに変更
+        vm.SelectedTool = EditorToolMode.Pen;
+
+        // Assert: 色が黒色、太さが2pxに復帰する
+        Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
+        Assert.Equal(Colors.Black, vm.SelectedColor);
+        Assert.Equal(2.0, vm.StrokeThickness);
+
+        // Act: 全消しゴムに変更
+        vm.SelectedTool = EditorToolMode.EraserStroke;
+
+        // Assert: ツールが正しく切り替わる
+        Assert.Equal(EditorToolMode.EraserStroke, vm.SelectedTool);
+    }
 }

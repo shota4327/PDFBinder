@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using PDFBinder.App.Controls;
 
 namespace PDFBinder.App.Converters;
 
@@ -84,6 +85,13 @@ public class ToolToBooleanConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        throw new NotSupportedException();
+        if (value is true && parameter != null)
+        {
+            if (Enum.TryParse<EditorToolMode>(parameter.ToString(), true, out var mode))
+            {
+                return mode;
+            }
+        }
+        return Binding.DoNothing;
     }
 }
