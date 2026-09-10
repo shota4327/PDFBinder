@@ -23,19 +23,19 @@
 
                 <!-- ツール切り替えボタングループ -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
-                    <RadioButton Content="👆 選択" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select}"
+                    <RadioButton Content="👆 選択" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Select}" />
-                    <RadioButton Content="✏️ ペン" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Pen}"
+                    <RadioButton Content="✏️ ペン" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Pen}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Pen}" />
-                    <RadioButton Content="🖍 蛍光ペン" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter}"
+                    <RadioButton Content="🖍 蛍光ペン" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Highlighter}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Highlighter}" />
-                    <RadioButton Content="📏 直線" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine}"
+                    <RadioButton Content="📏 直線" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.StraightLine}" />
-                    <RadioButton Content="🧹 全消しゴム" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserStroke}"
+                    <RadioButton Content="🧹 全消しゴム" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserStroke}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.EraserStroke}" ToolTip="触れたストローク全体を消去" />
-                    <RadioButton Content="✂️ 部分消し" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserPoint}"
+                    <RadioButton Content="✂️ 部分消し" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserPoint}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.EraserPoint}" ToolTip="なぞった部分のみを消去" />
-                    <RadioButton Content="✋ 手のひら" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand}"
+                    <RadioButton Content="✋ 手のひら" GroupName="EditorToolGroup" IsChecked="{Binding SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand}"
                                  Style="{StaticResource ToolRadioStyle}" Click="OnToolRadioButtonClick" Tag="{x:Static controls:EditorToolMode.Hand}" ToolTip="画面のスクロール・パン" />
                 </StackPanel>
 

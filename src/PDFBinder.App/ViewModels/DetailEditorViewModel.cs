@@ -100,11 +100,9 @@ public partial class DetailEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(HasNextPage));
     }
 
-    [RelayCommand]
-    private void SelectTool(EditorToolMode tool)
+    partial void OnSelectedToolChanged(EditorToolMode value)
     {
-        SelectedTool = tool;
-        if (tool == EditorToolMode.Highlighter)
+        if (value == EditorToolMode.Highlighter)
         {
             if (SelectedColor == Colors.Black)
             {
@@ -112,7 +110,7 @@ public partial class DetailEditorViewModel : ObservableObject
             }
             StrokeThickness = 12.0;
         }
-        else if (tool == EditorToolMode.Pen)
+        else if (value == EditorToolMode.Pen)
         {
             if (SelectedColor == Colors.Yellow)
             {
@@ -120,6 +118,12 @@ public partial class DetailEditorViewModel : ObservableObject
             }
             StrokeThickness = 2.0;
         }
+    }
+
+    [RelayCommand]
+    private void SelectTool(EditorToolMode tool)
+    {
+        SelectedTool = tool;
     }
 
     [RelayCommand]
