@@ -36,6 +36,12 @@ public partial class DetailEditorViewModel : ObservableObject
     [ObservableProperty]
     private double _strokeThickness = 2.0;
 
+    /// <summary>最小ズーム倍率</summary>
+    public const double MinZoom = 0.5;
+
+    /// <summary>最大ズーム倍率</summary>
+    public const double MaxZoom = 3.0;
+
     [ObservableProperty]
     private double _zoom = 1.0;
 
@@ -122,16 +128,24 @@ public partial class DetailEditorViewModel : ObservableObject
         SelectedColor = color;
     }
 
+    /// <summary>
+    /// ズーム倍率を直接設定します（境界値内にクランプ）。
+    /// </summary>
+    public void SetZoom(double zoom)
+    {
+        Zoom = Math.Clamp(Math.Round(zoom, 3), MinZoom, MaxZoom);
+    }
+
     [RelayCommand]
     private void ZoomIn()
     {
-        if (Zoom < 3.0) Zoom = Math.Round(Zoom + 0.25, 2);
+        if (Zoom < MaxZoom) Zoom = Math.Round(Math.Min(Zoom + 0.25, MaxZoom), 2);
     }
 
     [RelayCommand]
     private void ZoomOut()
     {
-        if (Zoom > 0.5) Zoom = Math.Round(Zoom - 0.25, 2);
+        if (Zoom > MinZoom) Zoom = Math.Round(Math.Max(Zoom - 0.25, MinZoom), 2);
     }
 
     [RelayCommand]
