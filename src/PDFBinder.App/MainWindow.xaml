@@ -267,15 +267,6 @@
                                 </StackPanel>
                             </RadioButton>
 
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="直線描画"
-                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=StraightLine, Mode=TwoWay}"
-                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.StraightLine}">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xED5E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="直線" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </RadioButton>
-
                             <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="触れたストローク全体を消去"
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=EraserStroke, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.EraserStroke}">
@@ -305,7 +296,18 @@
 
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                            <!-- グループ3: 【太さ & 色】 -->
+                            <!-- グループ3: 【描画オプション（直線・太さ・色）】 -->
+                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="直線描画（ペン・蛍光ペン使用時のみ）"
+                                          IsChecked="{Binding DetailEditor.IsStraightLine, Mode=TwoWay}"
+                                          IsEnabled="{Binding DetailEditor.CanToggleStraightLine}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xED5E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="直線" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
+
                             <!-- 太さプリセットボタン群（・の大きさで表示） -->
                             <Button Command="{Binding DetailEditor.SetPresetThicknessCommand}" CommandParameter="0.5"
                                     Style="{StaticResource ThicknessButtonStyle}" ToolTip="太さ: 0.5px">

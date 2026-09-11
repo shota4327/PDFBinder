@@ -417,6 +417,43 @@
                 </Setter>
             </Style>
 
+            <!-- リボンツールバー用トグルボタンスタイル（上アイコン・下テキスト・トグル状態） -->
+            <Style TargetType="ToggleButton" x:Key="RibbonToolToggleStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="#1E293B" />
+                <Setter Property="Padding" Value="8,4" />
+                <Setter Property="Margin" Value="2,0" />
+                <Setter Property="Height" Value="48" />
+                <Setter Property="MinWidth" Value="44" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                    BorderBrush="Transparent" BorderThickness="1"
+                                    CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#E2E8F0" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#DBEAFE" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#93C5FD" />
+                                    <Setter Property="Foreground" Value="#1D4ED8" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground" Value="#94A3B8" />
+                                    <Setter Property="Cursor" Value="Arrow" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- 太さ選択用ボタンスタイル -->
             <Style TargetType="Button" x:Key="ThicknessButtonStyle" BasedOn="{StaticResource BaseFont}">
                 <Setter Property="Background" Value="Transparent" />
