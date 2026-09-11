@@ -237,12 +237,16 @@ public class DetailEditorViewModelTests
         Assert.Equal(Colors.Black, vm.SelectedColor);
         Assert.Equal(1.0, vm.StrokeThickness);
 
-        // プリセット（0.5, 1.0, 2.0, 4.0）の確認
+        // プリセット（0.5, 1.0, 2.0, 4.0）および選択状態の確認
         Assert.Equal(4, vm.ActiveThicknessPresets.Count);
         Assert.Equal(0.5, vm.ActiveThicknessPresets[0].Thickness);
+        Assert.False(vm.ActiveThicknessPresets[0].IsSelected);
         Assert.Equal(1.0, vm.ActiveThicknessPresets[1].Thickness);
+        Assert.True(vm.ActiveThicknessPresets[1].IsSelected);
         Assert.Equal(2.0, vm.ActiveThicknessPresets[2].Thickness);
+        Assert.False(vm.ActiveThicknessPresets[2].IsSelected);
         Assert.Equal(4.0, vm.ActiveThicknessPresets[3].Thickness);
+        Assert.False(vm.ActiveThicknessPresets[3].IsSelected);
 
         // 有効化フラグの確認
         Assert.True(vm.CanChangeThickness);
@@ -271,6 +275,7 @@ public class DetailEditorViewModelTests
         Assert.Equal(4, vm.ActiveThicknessPresets.Count);
         Assert.Equal(8.0, vm.ActiveThicknessPresets[0].Thickness);
         Assert.Equal(12.0, vm.ActiveThicknessPresets[1].Thickness);
+        Assert.True(vm.ActiveThicknessPresets[1].IsSelected);
         Assert.Equal(16.0, vm.ActiveThicknessPresets[2].Thickness);
         Assert.Equal(24.0, vm.ActiveThicknessPresets[3].Thickness);
 
@@ -278,6 +283,7 @@ public class DetailEditorViewModelTests
         var blueColor = Color.FromRgb(0x25, 0x63, 0xEB);
         vm.SelectedColor = blueColor;
         vm.StrokeThickness = 16.0;
+        Assert.True(vm.ActiveThicknessPresets[2].IsSelected);
 
         // Act: ペンに復帰
         vm.SelectedTool = EditorToolMode.Pen;
@@ -309,12 +315,14 @@ public class DetailEditorViewModelTests
         Assert.Equal(12.0, vm.StrokeThickness);
         Assert.Equal(4, vm.ActiveThicknessPresets.Count);
         Assert.Equal(8.0, vm.ActiveThicknessPresets[0].Thickness);
+        Assert.True(vm.ActiveThicknessPresets[1].IsSelected); // 12.0px
         Assert.Equal(24.0, vm.ActiveThicknessPresets[3].Thickness);
         Assert.True(vm.CanChangeThickness);
         Assert.False(vm.CanChangeColor);
 
         // Act: 太さを24.0pxに変更
         vm.StrokeThickness = 24.0;
+        Assert.True(vm.ActiveThicknessPresets[3].IsSelected); // 24.0px
 
         // Act: ペンに切り替え
         vm.SelectedTool = EditorToolMode.Pen;
@@ -325,6 +333,7 @@ public class DetailEditorViewModelTests
 
         // Assert: 部分消しゴムの太さ24.0pxが保持されていること
         Assert.Equal(24.0, vm.StrokeThickness);
+        Assert.True(vm.ActiveThicknessPresets[3].IsSelected);
     }
 
     [Fact]

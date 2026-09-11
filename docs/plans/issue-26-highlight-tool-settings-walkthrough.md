@@ -3,6 +3,7 @@
 ## 概要
 Issue #26「太さ、色は現在使用しているものを強調表示する」の実装を完了しました。
 手書き詳細エディタにおける太さプリセットおよびカラーパレットの現在選択値の視覚的強調表示、ペン・蛍光ペン・部分消しゴムそれぞれの初期値設定および直前状態（色・太さ）の独立保持、ツールごとの専用太さプリセット切り替え、そしてツール選択状態に応じた太さ・色の有効/無効制御（IsEnabled）を実装しました。
+太さボタンの強調表示については、`ThicknessPresetOption` モデルに `IsSelected` プロパティを持たせ、ViewModelの太さ変更通知と連動して `DataTrigger` により確実に薄青背景・青枠線のアクティブ状態が反映されるよう改修しました。
 
 ---
 
@@ -19,7 +20,8 @@ Issue #26「太さ、色は現在使用しているものを強調表示する�
 - **専用太さプリセット (`ActiveThicknessPresets`)**:
   - ペン選択時: `0.5px`, `1.0px`, `2.0px`, `4.0px`
   - 蛍光ペン・部分消しゴム選択時: `8.0px`, `12.0px`, `16.0px`, `24.0px`
-  - ツール切り替え時に自動的にコレクションが更新される。
+  - `ThicknessPresetOption` は `ObservableObject` を継承し、`IsSelected` プロパティを提供。
+  - `UpdatePresetSelection`: 太さ変更時およびツール切り替え時に、現在の太さに一致するプリセットの `IsSelected` を `true`（他は `false`）に自動同期。
 - **有効/無効フラグの分離**:
   - `CanChangeThickness`: ペン、蛍光ペン、部分消しゴム選択時に `true`
   - `CanChangeColor`: ペン、蛍光ペン選択時のみ `true`
@@ -34,8 +36,9 @@ Issue #26「太さ、色は現在使用しているものを強調表示する�
 
 ### 4. ツールバーUIの強調表示と制御 (`MainWindow.xaml`, `App.xaml`)
 - **太さボタンの強調**:
-  - `ThicknessButtonStyle` に `Tag="True"` 時のトリガーを追加し、選択中の太さボタンの背景を薄青（`#DBEAFE`）、枠線をアクセントブルー（`#2563EB`）で強調。
-  - 無効時は透明度 `0.4` でグレーアウト。
+  - `ThicknessButtonStyle` のテンプレートトリガーに `<DataTrigger Binding="{Binding IsSelected}" Value="True">` を実装。
+  - 選択中の太さボタンの背景を薄青（`#DBEAFE`）、枠線をアクセントブルー（`#2563EB`）で確実に強調表示。
+  - ホバー時は `#BFDBFE`、無効時は透明度 `0.4` でグレーアウト。
 - **カラーパレットの強調**:
   - 選択中の色サークルの中心にチェックマーク（✓）を表示。
   - 無効時は透明度 `0.4` でグレーアウト。
@@ -51,16 +54,16 @@ Issue #26「太さ、色は現在使用しているものを強調表示する�
 ## 検証結果
 
 ### 1. 自動テスト（Unit Tests）
-新規テスト7件を含む全89件のテストが正常に PASS しました。
+新規テスト7件を含む全89件のテストが正常に PASS しました。各プリセットの `IsSelected` フラグの動作検証もテストスイートに追加・合格しています。
 
 ```powershell
 dotnet test
 ```
-- **実行結果**: 成功（合格: 89、失敗: 0、スキップ: 0、所要時間: 734 ms）
-- **追加テスト項目**:
-  - `InitialValues_PenDefaultIsBlackAnd1px`: ペンの初期値（黒、1.0px）およびプリセット検証
-  - `ToolStatePreservation_PenAndHighlighterRetainIndependentColorAndThickness`: ペン ⇔ 蛍光ペンの独立状態保持検証
-  - `ToolStatePreservation_EraserPointRetainsThicknessAndSharesHighlighterPresets`: 部分消しゴムの太さ保持およびプリセット共有検証
+- **実行結果**: 成功（合格: 89、失敗: 0、スキップ: 0、所要時間: 756 ms）
+- **追加・更新テスト項目**:
+  - `InitialValues_PenDefaultIsBlackAnd1px`: ペンの初期値（黒、1.0px）およびプリセット `1.0px` の `IsSelected == true` 検証
+  - `ToolStatePreservation_PenAndHighlighterRetainIndependentColorAndThickness`: ペン ⇔ 蛍光ペンの独立状態保持および各選択プリセット（12px, 16px）の `IsSelected` 検証
+  - `ToolStatePreservation_EraserPointRetainsThicknessAndSharesHighlighterPresets`: 部分消しゴムの太さ保持、プリセット共有、および `IsSelected` 検証
   - `ToolAvailability_CanChangeThicknessAndCanChangeColor_ReflectsSelectedTool`: 全ツールにおける太さ・色変更フラグの正常性検証
   - `Converters_DoubleEqualsToBooleanConverter_WorksCorrectly`: 太さ一致判定コンバーター検証
   - `Converters_ColorEqualsToVisibilityConverter_WorksCorrectly`: 色一致判定コンバーター検証

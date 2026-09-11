@@ -52,22 +52,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private double _highlighterThickness = 12.0;
     private double _eraserPointThickness = 12.0;
 
-    private static readonly ThicknessPresetOption[] PenThicknessPresets =
-    [
-        new(0.5, 3, "太さ: 0.5px"),
-        new(1.0, 5, "太さ: 1.0px"),
-        new(2.0, 8, "太さ: 2.0px"),
-        new(4.0, 13, "太さ: 4.0px")
-    ];
-
-    private static readonly ThicknessPresetOption[] HighlighterThicknessPresets =
-    [
-        new(8.0, 8, "太さ: 8.0px"),
-        new(12.0, 12, "太さ: 12.0px"),
-        new(16.0, 16, "太さ: 16.0px"),
-        new(24.0, 20, "太さ: 24.0px")
-    ];
-
     [ObservableProperty]
     private PdfPageModel _currentPage;
 
@@ -257,6 +241,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             _eraserPointThickness = value;
         }
+
+        UpdatePresetSelection(value);
     }
 
     partial void OnSelectedToolChanged(EditorToolMode value)
@@ -266,8 +252,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanToggleStraightLine));
         OnPropertyChanged(nameof(CanChangeThickness));
         OnPropertyChanged(nameof(CanChangeColor));
-
-        UpdateThicknessPresets(value);
 
         switch (value)
         {
@@ -283,6 +267,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 StrokeThickness = _eraserPointThickness;
                 break;
         }
+
+        UpdateThicknessPresets(value);
     }
 
     /// <summary>
@@ -290,14 +276,33 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     private void UpdateThicknessPresets(EditorToolMode tool)
     {
-        var targetPresets = (tool == EditorToolMode.Highlighter || tool == EditorToolMode.EraserPoint)
-            ? HighlighterThicknessPresets
-            : PenThicknessPresets;
-
         ActiveThicknessPresets.Clear();
-        foreach (var preset in targetPresets)
+        if (tool == EditorToolMode.Highlighter || tool == EditorToolMode.EraserPoint)
         {
-            ActiveThicknessPresets.Add(preset);
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(8.0, 8, "太さ: 8.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(12.0, 12, "太さ: 12.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(16.0, 16, "太さ: 16.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(24.0, 20, "太さ: 24.0px"));
+        }
+        else
+        {
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(0.5, 3, "太さ: 0.5px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(1.0, 5, "太さ: 1.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(2.0, 8, "太さ: 2.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(4.0, 13, "太さ: 4.0px"));
+        }
+
+        UpdatePresetSelection(StrokeThickness);
+    }
+
+    /// <summary>
+    /// 現在の太さに合致するプリセットの選択状態を更新します。
+    /// </summary>
+    private void UpdatePresetSelection(double thickness)
+    {
+        foreach (var preset in ActiveThicknessPresets)
+        {
+            preset.IsSelected = Math.Abs(preset.Thickness - thickness) < 0.05;
         }
     }
 
@@ -412,7 +417,30 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 /// <summary>
 /// ツールバーに表示する太さプリセットのオプション定義
 /// </summary>
-/// <param name="Thickness">線の太さ（px）</param>
-/// <param name="DotSize">アイコン表示用の円サイズ（幅・高さ）</param>
-/// <param name="ToolTip">ツールチップテキスト</param>
-public record ThicknessPresetOption(double Thickness, double DotSize, string ToolTip);
+public class ThicknessPresetOption : ObservableObject
+{
+    /// <summary>線の太さ（px）</summary>
+    public double Thickness { get; }
+
+    /// <summary>アイコン表示用の円サイズ（幅・高さ）</summary>
+    public double DotSize { get; }
+
+    /// <summary>ツールチップテキスト</summary>
+    public string ToolTip { get; }
+
+    private bool _isSelected;
+    /// <summary>現在選択されているかどうか</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
+    public ThicknessPresetOption(double thickness, double dotSize, string toolTip, bool isSelected = false)
+    {
+        Thickness = thickness;
+        DotSize = dotSize;
+        ToolTip = toolTip;
+        _isSelected = isSelected;
+    }
+}

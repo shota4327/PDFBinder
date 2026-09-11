@@ -323,12 +323,6 @@
                                                 CommandParameter="{Binding Thickness}"
                                                 Style="{StaticResource ThicknessButtonStyle}"
                                                 ToolTip="{Binding ToolTip}">
-                                            <Button.Tag>
-                                                <MultiBinding Converter="{StaticResource DoubleEqualsToBooleanConverter}">
-                                                    <Binding Path="DataContext.DetailEditor.StrokeThickness" RelativeSource="{RelativeSource AncestorType=Window}" />
-                                                    <Binding Path="Thickness" />
-                                                </MultiBinding>
-                                            </Button.Tag>
                                             <Ellipse Width="{Binding DotSize}" Height="{Binding DotSize}" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                     </DataTemplate>
