@@ -44,10 +44,12 @@
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding RotateClockwiseCommand}" />
         <KeyBinding Key="B" Modifiers="Control" Command="{Binding AddBlankPageCommand}" />
         <KeyBinding Key="Delete" Command="{Binding DeleteSelectedPagesCommand}" />
-        <KeyBinding Key="OemMinus" Modifiers="Control" Command="{Binding ZoomOutThumbnailCommand}" />
-        <KeyBinding Key="Subtract" Modifiers="Control" Command="{Binding ZoomOutThumbnailCommand}" />
-        <KeyBinding Key="OemPlus" Modifiers="Control" Command="{Binding ZoomInThumbnailCommand}" />
-        <KeyBinding Key="Add" Modifiers="Control" Command="{Binding ZoomInThumbnailCommand}" />
+        <KeyBinding Key="OemMinus" Modifiers="Control" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Key="Subtract" Modifiers="Control" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Key="OemPlus" Modifiers="Control" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Key="Add" Modifiers="Control" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Key="D0" Modifiers="Control" Command="{Binding ZoomResetCommand}" />
+        <KeyBinding Key="NumPad0" Modifiers="Control" Command="{Binding ZoomResetCommand}" />
     </Window.InputBindings>
 
     <Grid Background="#F1F5F9">
@@ -76,6 +78,9 @@
                         <RadioButton Content="手書き" GroupName="RibbonTabs"
                                      IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=1, Mode=TwoWay}"
                                      IsEnabled="{Binding IsDetailViewActive}"
+                                     Style="{StaticResource RibbonTabRadioButtonStyle}" />
+                        <RadioButton Content="表示" GroupName="RibbonTabs"
+                                     IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=2, Mode=TwoWay}"
                                      Style="{StaticResource RibbonTabRadioButtonStyle}" />
                     </StackPanel>
                 </StackPanel>
@@ -205,41 +210,12 @@
                                     <TextBlock Text="やり直す" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-
-                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4"
-                                       Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
-
-                            <!-- 表示ズーム（リボンスタイル・グリッド俯瞰時のみ表示） -->
-                            <Button Command="{Binding ZoomOutThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)"
-                                    Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ZoomInThumbnailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)"
-                                    Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
                         </WrapPanel>
 
                         <!-- 手書きタブコンテンツ -->
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
                                    Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=1}">
-                            <!-- グループ1: 【戻る】 -->
-                            <Button Command="{Binding ClosePageDetailCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="グリッド一覧に戻る">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="一覧に戻る" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-
-                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
-
-                            <!-- グループ2: 【ツール】 -->
+                            <!-- ツール -->
                             <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="選択ツール"
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Select}">
@@ -376,46 +352,46 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
+                        </WrapPanel>
+
+                        <!-- 表示タブコンテンツ -->
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                   Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=2}">
+                            <!-- グループ1: 【表示モード】 -->
+                            <RadioButton GroupName="RibbonViewModeGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="詳細ビュー (縦連続表示)"
+                                         IsChecked="{Binding IsDetailViewActive, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE8A5;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="詳細" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton GroupName="RibbonViewModeGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="グリッドビュー (ページ一覧)"
+                                         IsChecked="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE80A;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="グリッド" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                            <!-- グループ4: 【表示・移動】 -->
-                            <Button Command="{Binding DetailEditor.ZoomOutCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小">
+                            <!-- グループ2: 【ズーム】 -->
+                            <Button Command="{Binding ZoomOutCommand}" IsEnabled="{Binding CanZoomOut}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="縮小 (Ctrl+-)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE71F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="縮小" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button Command="{Binding DetailEditor.ZoomResetCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="等倍表示 (100%)">
+                            <Button Command="{Binding ZoomResetCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="等倍表示 / 標準リセット (Ctrl+0)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding DetailEditor.Zoom, StringFormat='{}{0:P0}'}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4,0,3" />
+                                    <TextBlock Text="{Binding CurrentZoomText}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,4,0,3" />
                                     <TextBlock Text="100%" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button Command="{Binding DetailEditor.ZoomInCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大">
+                            <Button Command="{Binding ZoomInCommand}" IsEnabled="{Binding CanZoomIn}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="拡大 (Ctrl++)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE8A3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="拡大" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-
-                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
-
-                            <Button Command="{Binding DetailEditor.GoToPreviousPageCommand}" IsEnabled="{Binding DetailEditor.HasPreviousPage}"
-                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="前のページ">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE76B;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="前ページ" FontSize="11" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                            <Border VerticalAlignment="Center" Padding="4,0">
-                                <TextBlock Text="{Binding DetailEditor.CurrentPage.PageNumber, StringFormat='P.{0}'}"
-                                           FontSize="13" FontWeight="Bold" Foreground="#1E293B" VerticalAlignment="Center" />
-                            </Border>
-                            <Button Command="{Binding DetailEditor.GoToNextPageCommand}" IsEnabled="{Binding DetailEditor.HasNextPage}"
-                                    Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="次のページ">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="次ページ" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                         </WrapPanel>

@@ -61,6 +61,32 @@ public class EditorInkCanvas : InkCanvas
         set => SetValue(IsStraightLineProperty, value);
     }
 
+    public static readonly DependencyProperty DrawingColorProperty = DependencyProperty.Register(
+        nameof(DrawingColor),
+        typeof(Color),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(Colors.Black, OnDrawingColorChanged));
+
+    /// <summary>ペンの描画色</summary>
+    public Color DrawingColor
+    {
+        get => (Color)GetValue(DrawingColorProperty);
+        set => SetValue(DrawingColorProperty, value);
+    }
+
+    public static readonly DependencyProperty StrokeThicknessProperty = DependencyProperty.Register(
+        nameof(StrokeThickness),
+        typeof(double),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(1.0, OnStrokeThicknessChanged));
+
+    /// <summary>ペンの描画太さ</summary>
+    public double StrokeThickness
+    {
+        get => (double)GetValue(StrokeThicknessProperty);
+        set => SetValue(StrokeThicknessProperty, value);
+    }
+
     /// <summary>
     /// 現在直線描画モードがアクティブであるか（直線ツール選択時、またはペン/蛍光ペン選択中に直線トグルが有効な場合）
     /// </summary>
@@ -111,6 +137,22 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
+    private static void OnDrawingColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.ApplyDrawingAttributes();
+        }
+    }
+
+    private static void OnStrokeThicknessChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.ApplyDrawingAttributes();
+        }
+    }
+
     /// <summary>
     /// 現在のToolModeに合わせてInkCanvasのEditingModeやカーソルを更新します。
     /// </summary>
@@ -152,6 +194,30 @@ public class EditorInkCanvas : InkCanvas
                 EditingMode = InkCanvasEditingMode.None;
                 Cursor = Cursors.Hand;
                 break;
+        }
+
+        ApplyDrawingAttributes();
+    }
+
+    /// <summary>
+    /// 現在の描画色、太さ、およびツールに応じた描画属性と消しゴム形状を設定します。
+    /// </summary>
+    public void ApplyDrawingAttributes()
+    {
+        var attr = new DrawingAttributes
+        {
+            Color = DrawingColor,
+            Width = StrokeThickness,
+            Height = StrokeThickness,
+            FitToCurve = true,
+            IsHighlighter = ToolMode == EditorToolMode.Highlighter
+        };
+
+        DefaultDrawingAttributes = attr;
+
+        if (ToolMode == EditorToolMode.EraserPoint)
+        {
+            EraserShape = new EllipseStylusShape(StrokeThickness, StrokeThickness);
         }
     }
 
@@ -418,7 +484,8 @@ public class EditorInkCanvas : InkCanvas
     private void HandleTwoFingerPinchZoom()
     {
         if (_parentScrollViewer == null || _activeTouchPoints.Count < 2) return;
-        if (DataContext is not DetailEditorViewModel vm) return;
+        var vm = (DataContext as DetailEditorViewModel) ?? FindParentViewModel<DetailEditorViewModel>(this);
+        if (vm == null) return;
 
         var points = _activeTouchPoints.Values.Take(2).ToArray();
         Point p1 = points[0];
@@ -523,6 +590,19 @@ public class EditorInkCanvas : InkCanvas
         while (current != null)
         {
             if (current is ScrollViewer sv) return sv;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private static T? FindParentViewModel<T>(DependencyObject? current) where T : class
+    {
+        while (current != null)
+        {
+            if (current is FrameworkElement fe && fe.DataContext is T match)
+            {
+                return match;
+            }
             current = VisualTreeHelper.GetParent(current);
         }
         return null;

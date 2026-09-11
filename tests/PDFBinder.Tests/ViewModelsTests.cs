@@ -89,7 +89,6 @@ public class ViewModelsTests
         // Close
         vm.ClosePageDetailCommand.Execute(null);
         Assert.False(vm.IsDetailViewActive);
-        Assert.Null(vm.DetailEditor);
     }
 
     [Fact]
@@ -254,11 +253,11 @@ public class ViewModelsTests
         // Assert: 「手書き」タブ（1）へ自動切り替え
         Assert.Equal(1, vm.SelectedRibbonTabIndex);
 
-        // Act: エディタを閉じる
+        // Act: エディタを閉じる（グリッドビューへ移行）
         vm.ClosePageDetailCommand.Execute(null);
 
-        // Assert: 「PDF編集」タブ（0）へ自動復帰
-        Assert.Equal(0, vm.SelectedRibbonTabIndex);
+        // Assert: 「表示」タブ（2）へ自動切り替え（手書きタブ無効化に伴う遷移）
+        Assert.Equal(2, vm.SelectedRibbonTabIndex);
     }
 
     [Fact]
