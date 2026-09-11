@@ -70,12 +70,20 @@ dotnet test
 dotnet run --project src/PDFBinder.App
 ```
 
-### 単一実行ファイル（Self-Contained Single-File EXE）の発行
-.NET 10 ランタイムを内包したポータブルな単一ファイル（`dist/PDFBinder.exe`）を発行します。
+### 単一実行ファイル（Single-File EXE）の発行
+用途に合わせて、完全ポータブルな「自己完結版」と、軽量・高速起動な「フレームワーク依存版」を発行できます。
 ```powershell
+# 両方のバージョンを一括発行（デフォルト）
 .\build.ps1
+
+# 自己完結版のみ発行（約66MB: .NETランタイム内包・完全オフラインポータブル）
+.\build.ps1 -Target self-contained
+
+# フレームワーク依存版のみ発行（約8.4MB: OSの.NET 10デスクトップランタイムを利用・超軽量＆高速起動）
+.\build.ps1 -Target framework-dependent
 ```
-発行された `dist/PDFBinder.exe` は、.NETがインストールされていないWindows PCでも単体で起動可能です。
+- 自己完結版（`dist/self-contained/PDFBinder.exe` および `dist/PDFBinder.exe`）: .NET未インストールのPCでも単体で起動可能。
+- フレームワーク依存版（`dist/framework-dependent/PDFBinder.exe` および `dist/PDFBinder-FrameworkDependent.exe`）: .NET 10 デスクトップランタイム導入済みPCで高速起動。
 
 ---
 
