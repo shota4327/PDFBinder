@@ -21,7 +21,13 @@ public partial class PdfPageModel : ObservableObject
     /// <summary>白紙ページかどうかのフラグ</summary>
     public bool IsBlankPage => string.IsNullOrEmpty(SourceFilePath);
 
+    /// <summary>元PDF読み込み時の初期回転角度</summary>
+    public PageRotation OriginalRotation { get; set; } = PageRotation.Rotate0;
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RenderRotation))]
+    [NotifyPropertyChangedFor(nameof(DisplayWidth))]
+    [NotifyPropertyChangedFor(nameof(DisplayHeight))]
     private PageRotation _rotation = PageRotation.Rotate0;
 
     [ObservableProperty]
@@ -82,4 +88,12 @@ public partial class PdfPageModel : ObservableObject
     /// </summary>
     public double DisplayHeight =>
         Rotation is PageRotation.Rotate90 or PageRotation.Rotate270 ? Width : Height;
+
+    /// <summary>
+    /// 元PDFの初期回転（OriginalRotation）に対する現在の回転（Rotation）の差分回転角度を取得します。
+    /// PDFium（DocLib）は元PDFの内部回転を自動的に反映してレンダリングするため、
+    /// アプリ側で重ねて適用すべき回転量は差分角度のみとなります。
+    /// </summary>
+    public PageRotation RenderRotation =>
+        PageRotationExtensions.FromDegrees(((int)Rotation - (int)OriginalRotation + 360) % 360);
 }

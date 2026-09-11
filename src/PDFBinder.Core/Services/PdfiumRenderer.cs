@@ -31,7 +31,10 @@ public class PdfiumRenderer : IPdfRenderer
             try
             {
                 byte[] bytes = File.ReadAllBytes(filePath);
-                var dimensions = new PageDimensions(targetWidth, targetHeight);
+                // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
+                int minDim = Math.Min(targetWidth, targetHeight);
+                int maxDim = Math.Max(targetWidth, targetHeight);
+                var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
 
                 using var docReader = DocLib.Instance.GetDocReader(bytes, dimensions);
                 if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())

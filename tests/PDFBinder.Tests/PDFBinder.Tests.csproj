@@ -24,4 +24,10 @@
     <ProjectReference Include="..\..\src\PDFBinder.App\PDFBinder.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

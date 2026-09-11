@@ -92,15 +92,15 @@ public partial class DetailEditorViewModel : ObservableObject
     public async Task LoadPageBackgroundAsync()
     {
         // ズームイン時にも文字が鮮明に表示されるよう、216 DPI（72 pt * 3.0）相当の高解像度でレンダリング
-        int targetWidth = (int)(CurrentPage.Width * EditorRenderScale);
-        int targetHeight = (int)(CurrentPage.Height * EditorRenderScale);
+        int targetWidth = (int)(CurrentPage.DisplayWidth * EditorRenderScale);
+        int targetHeight = (int)(CurrentPage.DisplayHeight * EditorRenderScale);
 
         PageBackground = await _pdfRenderer.RenderPageAsync(
             CurrentPage.SourceFilePath,
             CurrentPage.OriginalPageIndex,
             targetWidth,
             targetHeight,
-            CurrentPage.Rotation);
+            CurrentPage.RenderRotation);
 
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));

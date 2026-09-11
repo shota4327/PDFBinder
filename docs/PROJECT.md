@@ -46,7 +46,8 @@
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
 | **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
 | **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム） | **完了** | Issue #9 / EditorInkCanvas & PinchZoomHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 58件全PASS） | **完了** | PDFBinder.Tests |
+| **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 64件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 
