@@ -16,7 +16,8 @@ public interface IPdfRenderer
         int pageIndex,
         int targetWidth,
         int targetHeight,
-        PageRotation rotation);
+        PageRotation rotation,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 白紙ページのプレビュービットマップを生成します。

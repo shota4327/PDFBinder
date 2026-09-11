@@ -22,7 +22,8 @@
 
                 <Grid Width="{Binding CurrentPage.DisplayWidth}" Height="{Binding CurrentPage.DisplayHeight}">
                     <!-- 背景PDFレンダリング画像 -->
-                    <Image Source="{Binding PageBackground}" Stretch="Fill" />
+                    <Image Source="{Binding PageBackground}" Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
 
                     <!-- 前面手書きInkCanvas -->
                     <controls:EditorInkCanvas x:Name="InkCanvas"
