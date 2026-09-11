@@ -20,7 +20,7 @@
 | **F01** | プロジェクト基盤 | ソリューション初期化 & プロジェクト分割 (.App, .Core, .Tests) | **完了** | .NET 10.0 / WPF / xUnit |
 | **F02** | プロジェクト基盤 | アプリアイコン設定 (`icon.png` / `.ico`) | **完了** | Assets/icon.ico & icon.png |
 | **F03** | プロジェクト基盤 | CI・コーディング規約 (`GEMINI.md`) 整備 | **完了** | 初期コミット済 |
-| **F04** | プロジェクト基盤 | 単一EXE発行環境（Self-Contained / `build.ps1`） | **完了** | `dist/PDFBinder.exe` (約66MB) |
+| **F04** | プロジェクト基盤 | 単一EXE発行環境（Self-Contained & Framework-Dependent / `build.ps1`） | **完了** | `dist/PDFBinder.exe` (約66MB) & `PDFBinder-FrameworkDependent.exe` (約8.4MB) |
 | **F10** | PDF操作コア | 非破壊ドキュメント読み込み（メモリ展開/ファイルロック回避） | **完了** | PdfService (PdfSharp) |
 | **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°） | **完了** | PdfPageModel / PageRotation |
 | **F12** | PDF操作コア | ページ削除 | **完了** | PdfDocumentModel.RemovePage |
