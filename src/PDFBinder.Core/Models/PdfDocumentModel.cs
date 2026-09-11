@@ -11,6 +11,7 @@ namespace PDFBinder.Core.Models;
 public partial class PdfDocumentModel : ObservableObject
 {
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FileName))]
     private string? _filePath;
 
     [ObservableProperty]
