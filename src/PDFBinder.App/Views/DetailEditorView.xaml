@@ -28,7 +28,8 @@
                     <!-- 前面手書きInkCanvas -->
                     <controls:EditorInkCanvas x:Name="InkCanvas"
                                               Background="Transparent"
-                                              ToolMode="{Binding SelectedTool, Mode=TwoWay}" />
+                                              ToolMode="{Binding SelectedTool, Mode=TwoWay}"
+                                              IsStraightLine="{Binding IsStraightLine, Mode=TwoWay}" />
                 </Grid>
             </Border>
         </ScrollViewer>

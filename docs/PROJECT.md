@@ -41,14 +41,14 @@
 | **F41** | 手書き詳細 | ペンツール（色・太さ変更） | **完了** | EditorInkCanvas / ToolMode |
 | **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・色変更） | **完了** | IsHighlighter = true |
 | **F43** | 手書き詳細 | 消しゴムツール（ストローク消し / 部分消し切替） | **完了** | EraseByStroke / EraseByPoint |
-| **F44** | 手書き詳細 | 直線描画ツール（プレビュー付き） | **完了** | CommitStraightLine |
+| **F44** | 手書き詳細 | 直線トグル描画（ペン・蛍光ペン連動トグル化・十字カーソルプレビュー） | **完了** | Issue #25 / IsStraightLine & CommitStraightLine |
 | **F36** | UI・タイトルバー | タイトルバー廃止とタブバー統合（Chrome/Edgeスタイル・WindowChrome） | **完了** | Issue #28 / WindowChrome |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
 | **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
 | **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム） | **完了** | Issue #9 / EditorInkCanvas & PinchZoomHelper |
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 71件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 82件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 

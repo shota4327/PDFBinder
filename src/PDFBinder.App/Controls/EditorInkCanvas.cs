@@ -48,6 +48,26 @@ public class EditorInkCanvas : InkCanvas
         set => SetValue(ToolModeProperty, value);
     }
 
+    public static readonly DependencyProperty IsStraightLineProperty = DependencyProperty.Register(
+        nameof(IsStraightLine),
+        typeof(bool),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(false, OnIsStraightLineChanged));
+
+    /// <summary>直線描画モードが有効かどうか</summary>
+    public bool IsStraightLine
+    {
+        get => (bool)GetValue(IsStraightLineProperty);
+        set => SetValue(IsStraightLineProperty, value);
+    }
+
+    /// <summary>
+    /// 現在直線描画モードがアクティブであるか（直線ツール選択時、またはペン/蛍光ペン選択中に直線トグルが有効な場合）
+    /// </summary>
+    public bool IsStraightLineActive =>
+        ToolMode == EditorToolMode.StraightLine ||
+        (IsStraightLine && (ToolMode == EditorToolMode.Pen || ToolMode == EditorToolMode.Highlighter));
+
     private Point? _lineStartPoint;
     private Point? _currentLinePoint;
     private bool _isDrawingLine;
@@ -83,6 +103,14 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
+    private static void OnIsStraightLineChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.UpdateEditingMode();
+        }
+    }
+
     /// <summary>
     /// 現在のToolModeに合わせてInkCanvasのEditingModeやカーソルを更新します。
     /// </summary>
@@ -101,14 +129,12 @@ public class EditorInkCanvas : InkCanvas
                 Cursor = Cursors.Arrow;
                 break;
             case EditorToolMode.Pen:
-                EditingMode = InkCanvasEditingMode.Ink;
                 DefaultDrawingAttributes.IsHighlighter = false;
-                Cursor = Cursors.Pen;
+                ApplyDrawingOrStraightLineMode();
                 break;
             case EditorToolMode.Highlighter:
-                EditingMode = InkCanvasEditingMode.Ink;
                 DefaultDrawingAttributes.IsHighlighter = true;
-                Cursor = Cursors.Pen;
+                ApplyDrawingOrStraightLineMode();
                 break;
             case EditorToolMode.EraserStroke:
                 EditingMode = InkCanvasEditingMode.EraseByStroke;
@@ -129,11 +155,28 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
+    /// <summary>
+    /// ペンまたは蛍光ペンにおいて、直線トグル状態に応じたEditingModeとCursorを設定します。
+    /// </summary>
+    private void ApplyDrawingOrStraightLineMode()
+    {
+        if (IsStraightLine)
+        {
+            EditingMode = InkCanvasEditingMode.None;
+            Cursor = Cursors.Cross;
+        }
+        else
+        {
+            EditingMode = InkCanvasEditingMode.Ink;
+            Cursor = Cursors.Pen;
+        }
+    }
+
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Pressed)
         {
-            if (ToolMode == EditorToolMode.StraightLine)
+            if (IsStraightLineActive)
             {
                 _lineStartPoint = e.GetPosition(this);
                 _currentLinePoint = _lineStartPoint;

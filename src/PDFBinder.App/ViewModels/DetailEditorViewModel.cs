@@ -61,6 +61,14 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private double _strokeThickness = 2.0;
 
+    [ObservableProperty]
+    private bool _isStraightLine;
+
+    /// <summary>
+    /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
+    /// </summary>
+    public bool CanToggleStraightLine => SelectedTool == EditorToolMode.Pen || SelectedTool == EditorToolMode.Highlighter;
+
     /// <summary>最小ズーム倍率</summary>
     public const double MinZoom = 0.5;
 
@@ -187,6 +195,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedToolChanged(EditorToolMode value)
     {
+        // ツール切り替え時は直線トグルを自動的にオフへリセット
+        IsStraightLine = false;
+        OnPropertyChanged(nameof(CanToggleStraightLine));
+
         if (value == EditorToolMode.Highlighter)
         {
             if (SelectedColor == Colors.Black)
