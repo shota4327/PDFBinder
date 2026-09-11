@@ -52,11 +52,45 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private double _highlighterThickness = 12.0;
     private double _eraserPointThickness = 12.0;
 
-    [ObservableProperty]
-    private PdfPageModel _currentPage;
+    /// <summary>
+    /// 全ページの表示状態を管理するコレクション
+    /// </summary>
+    public ObservableCollection<DetailPageItemViewModel> Pages { get; } = new();
 
+    /// <summary>
+    /// 現在表示中・操作対象のページ
+    /// </summary>
     [ObservableProperty]
-    private BitmapSource? _pageBackground;
+    [NotifyPropertyChangedFor(nameof(PageBackground))]
+    [NotifyPropertyChangedFor(nameof(CurrentPageItem))]
+    private PdfPageModel? _currentPage;
+
+    /// <summary>
+    /// 現在表示中ページの背景画像（後方互換用）
+    /// </summary>
+    public BitmapSource? PageBackground
+    {
+        get => CurrentPageItem?.PageBackground;
+        set
+        {
+            if (CurrentPageItem != null)
+            {
+                CurrentPageItem.PageBackground = value;
+                OnPropertyChanged(nameof(PageBackground));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 現在アクティブなページのDetailPageItemViewModelを取得します。
+    /// </summary>
+    public DetailPageItemViewModel? CurrentPageItem =>
+        Pages.FirstOrDefault(p => p.Page == CurrentPage) ?? Pages.FirstOrDefault();
+
+    /// <summary>
+    /// 指定ページへのスクロール要求を通知するイベント
+    /// </summary>
+    public event Action<PdfPageModel>? ScrollToPageRequested;
 
     [ObservableProperty]
     private EditorToolMode _selectedTool = EditorToolMode.Pen;
@@ -118,9 +152,31 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         YellowPresetColor                // 黄
     };
 
-    public bool HasPreviousPage => _pageLookup(CurrentPage.PageNumber - 2) != null;
-    public bool HasNextPage => _pageLookup(CurrentPage.PageNumber) != null;
+    public bool HasPreviousPage => CurrentPage != null && _pageLookup(CurrentPage.PageNumber - 2) != null;
+    public bool HasNextPage => CurrentPage != null && _pageLookup(CurrentPage.PageNumber) != null;
 
+    /// <summary>
+    /// ドキュメントを指定して初期化するメインコンストラクタ
+    /// </summary>
+    public DetailEditorViewModel(
+        IPdfRenderer pdfRenderer,
+        PdfDocumentModel? document = null)
+    {
+        _pdfRenderer = pdfRenderer;
+        _onBackToGrid = () => { };
+        _pageLookup = _ => null;
+
+        UpdateThicknessPresets(_selectedTool);
+
+        if (document != null)
+        {
+            InitializeDocument(document);
+        }
+    }
+
+    /// <summary>
+    /// 単一ページを対象とする初期化コンストラクタ（後方互換・単体テスト用）
+    /// </summary>
     public DetailEditorViewModel(
         PdfPageModel initialPage,
         IPdfRenderer pdfRenderer,
@@ -132,8 +188,43 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _onBackToGrid = onBackToGrid;
         _pageLookup = pageLookup;
 
+        Pages.Add(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
+
         UpdateThicknessPresets(_selectedTool);
         _ = LoadPageBackgroundAsync();
+    }
+
+    /// <summary>
+    /// PDFドキュメントのページ構成と同期して全ページのアイテムを生成します。
+    /// </summary>
+    public void InitializeDocument(PdfDocumentModel document)
+    {
+        Pages.Clear();
+        foreach (var page in document.Pages)
+        {
+            Pages.Add(new DetailPageItemViewModel(page));
+        }
+
+        CurrentPage = document.Pages.FirstOrDefault();
+        if (Pages.Count > 0)
+        {
+            Pages[0].IsCurrent = true;
+        }
+
+        _ = LoadPageBackgroundAsync();
+    }
+
+    /// <summary>
+    /// 指定されたページへスクロールを要求し、カレントページを更新します。
+    /// </summary>
+    public void ScrollToPage(PdfPageModel page)
+    {
+        CurrentPage = page;
+        foreach (var item in Pages)
+        {
+            item.IsCurrent = (item.Page == page);
+        }
+        ScrollToPageRequested?.Invoke(page);
     }
 
     partial void OnZoomChanged(double value)
@@ -142,14 +233,24 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 現在のズーム倍率およびページ寸法から最適なレンダリングピクセル寸法を算出します。
+    /// 指定されたページ寸法およびズーム倍率から最適なレンダリングピクセル寸法を算出します。
+    /// </summary>
+    public (int width, int height) CalculateRenderDimensions(PdfPageModel page, double zoom)
+    {
+        double scale = PtToDipScale * zoom;
+        int targetWidth = Math.Clamp((int)Math.Round(page.DisplayWidth * scale), MinRenderDimension, MaxRenderDimension);
+        int targetHeight = Math.Clamp((int)Math.Round(page.DisplayHeight * scale), MinRenderDimension, MaxRenderDimension);
+        return (targetWidth, targetHeight);
+    }
+
+    /// <summary>
+    /// 現在のズーム倍率および現在ページ寸法から最適なレンダリングピクセル寸法を算出します。
     /// </summary>
     public (int width, int height) CalculateRenderDimensions(double zoom)
     {
-        double scale = PtToDipScale * zoom;
-        int targetWidth = Math.Clamp((int)Math.Round(CurrentPage.DisplayWidth * scale), MinRenderDimension, MaxRenderDimension);
-        int targetHeight = Math.Clamp((int)Math.Round(CurrentPage.DisplayHeight * scale), MinRenderDimension, MaxRenderDimension);
-        return (targetWidth, targetHeight);
+        var page = CurrentPage ?? Pages.FirstOrDefault()?.Page;
+        if (page == null) return (MinRenderDimension, MinRenderDimension);
+        return CalculateRenderDimensions(page, zoom);
     }
 
     /// <summary>
@@ -179,21 +280,29 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             token.ThrowIfCancellationRequested();
             if (generation != Volatile.Read(ref _renderGeneration)) return;
 
-            var (targetWidth, targetHeight) = CalculateRenderDimensions(Zoom);
-            var rendered = await _pdfRenderer.RenderPageAsync(
-                CurrentPage.SourceFilePath,
-                CurrentPage.OriginalPageIndex,
-                targetWidth,
-                targetHeight,
-                CurrentPage.RenderRotation,
-                token);
-
-            token.ThrowIfCancellationRequested();
-            if (generation == Volatile.Read(ref _renderGeneration) && rendered != null)
+            foreach (var item in Pages.ToList())
             {
-                // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え、チラつき（白飛び）を完全防止
-                PageBackground = rendered;
+                token.ThrowIfCancellationRequested();
+                if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+                var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
+                var rendered = await _pdfRenderer.RenderPageAsync(
+                    item.Page.SourceFilePath,
+                    item.Page.OriginalPageIndex,
+                    targetWidth,
+                    targetHeight,
+                    item.Page.RenderRotation,
+                    token);
+
+                token.ThrowIfCancellationRequested();
+                if (generation == Volatile.Read(ref _renderGeneration) && rendered != null)
+                {
+                    // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
+                    item.PageBackground = rendered;
+                }
             }
+
+            OnPropertyChanged(nameof(PageBackground));
         }
         catch (OperationCanceledException)
         {
@@ -364,6 +473,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task GoToPreviousPageAsync()
     {
+        if (CurrentPage == null) return;
         var prev = _pageLookup(CurrentPage.PageNumber - 2);
         if (prev != null)
         {
@@ -375,6 +485,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task GoToNextPageAsync()
     {
+        if (CurrentPage == null) return;
         var next = _pageLookup(CurrentPage.PageNumber);
         if (next != null)
         {

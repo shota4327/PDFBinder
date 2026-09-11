@@ -31,10 +31,10 @@ public partial class MainViewModel : ObservableObject
         : Path.GetFileName(Document.FilePath);
 
     [ObservableProperty]
-    private bool _isDetailViewActive;
+    private bool _isDetailViewActive = true;
 
     /// <summary>
-    /// 現在選択中のリボンタブのインデックス（0: PDF編集, 1: 手書き）
+    /// 現在選択中のリボンタブのインデックス（0: PDF編集, 1: 手書き, 2: 表示）
     /// </summary>
     [ObservableProperty]
     private int _selectedRibbonTabIndex = 0;
@@ -44,6 +44,12 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statusMessage = "PDFファイルを開くか、ドラッグ＆ドロップしてください。";
+
+    /// <summary>
+    /// 外部ファイルドラッグ中にドロップ案内オーバーレイを表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDragOver;
 
     /// <summary>
     /// サムネイル最小表示サイズ（px）
@@ -92,6 +98,107 @@ public partial class MainViewModel : ObservableObject
     {
         ZoomInThumbnailCommand.NotifyCanExecuteChanged();
         ZoomOutThumbnailCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
+    }
+
+    partial void OnIsDetailViewActiveChanged(bool value)
+    {
+        if (!value)
+        {
+            // グリッドビューに切り替わった場合
+            // 1. 手書きタブ（1）を開いていた場合は表示タブ（2）へ自動切り替え
+            if (SelectedRibbonTabIndex == 1)
+            {
+                SelectedRibbonTabIndex = 2;
+            }
+
+            // 2. 未生成または編集済みのサムネイルがあればオンデマンド生成
+            _ = EnsureThumbnailsGeneratedAsync();
+        }
+
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
+    }
+
+    /// <summary>
+    /// 現在のアクティブビューに応じた拡大率表示文字列を取得します。
+    /// </summary>
+    public string CurrentZoomText => IsDetailViewActive
+        ? (DetailEditor != null ? $"{DetailEditor.Zoom:P0}" : "100%")
+        : $"{(ThumbnailSize / DefaultThumbnailSize):P0}";
+
+    /// <summary>
+    /// 現在のビューでさらに拡大可能かどうかを取得します。
+    /// </summary>
+    public bool CanZoomIn => IsDetailViewActive
+        ? (DetailEditor != null && DetailEditor.Zoom < DetailEditorViewModel.MaxZoom)
+        : CanZoomInThumbnail;
+
+    /// <summary>
+    /// 現在のビューでさらに縮小可能かどうかを取得します。
+    /// </summary>
+    public bool CanZoomOut => IsDetailViewActive
+        ? (DetailEditor != null && DetailEditor.Zoom > DetailEditorViewModel.MinZoom)
+        : CanZoomOutThumbnail;
+
+    /// <summary>
+    /// 現在のアクティブビューを1段階拡大します。
+    /// </summary>
+    [RelayCommand]
+    public void ZoomIn()
+    {
+        if (IsDetailViewActive)
+        {
+            DetailEditor?.ZoomInCommand.Execute(null);
+        }
+        else
+        {
+            ZoomInThumbnail();
+        }
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
+    }
+
+    /// <summary>
+    /// 現在のアクティブビューを1段階縮小します。
+    /// </summary>
+    [RelayCommand]
+    public void ZoomOut()
+    {
+        if (IsDetailViewActive)
+        {
+            DetailEditor?.ZoomOutCommand.Execute(null);
+        }
+        else
+        {
+            ZoomOutThumbnail();
+        }
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
+    }
+
+    /// <summary>
+    /// 現在のアクティブビューの拡大率を等倍（100% / 標準サイズ）にリセットします。
+    /// </summary>
+    [RelayCommand]
+    public void ZoomReset()
+    {
+        if (IsDetailViewActive)
+        {
+            DetailEditor?.ZoomResetCommand.Execute(null);
+        }
+        else
+        {
+            ThumbnailSize = DefaultThumbnailSize;
+        }
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
     }
 
     /// <summary>
@@ -127,6 +234,9 @@ public partial class MainViewModel : ObservableObject
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _undoRedoService = undoRedoService ?? new UndoRedoService();
 
+        _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
+        _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
+
         _document.PropertyChanged += OnDocumentPropertyChanged;
 
         _undoRedoService.StateChanged += (s, e) =>
@@ -136,6 +246,23 @@ public partial class MainViewModel : ObservableObject
         };
     }
 
+    private void OnDetailEditorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DetailEditorViewModel.Zoom))
+        {
+            OnPropertyChanged(nameof(CurrentZoomText));
+            OnPropertyChanged(nameof(CanZoomIn));
+            OnPropertyChanged(nameof(CanZoomOut));
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPage))
+        {
+            if (DetailEditor?.CurrentPage != null && IsDetailViewActive)
+            {
+                StatusMessage = $"ページ {DetailEditor.CurrentPage.PageNumber} / {Document.PageCount}";
+            }
+        }
+    }
+
     partial void OnDocumentChanged(PdfDocumentModel? oldValue, PdfDocumentModel newValue)
     {
         if (oldValue != null)
@@ -143,6 +270,7 @@ public partial class MainViewModel : ObservableObject
             oldValue.PropertyChanged -= OnDocumentPropertyChanged;
         }
         newValue.PropertyChanged += OnDocumentPropertyChanged;
+        DetailEditor?.InitializeDocument(newValue);
         OnPropertyChanged(nameof(DisplayFileName));
     }
 
@@ -181,8 +309,9 @@ public partial class MainViewModel : ObservableObject
             Document = doc;
             _undoRedoService.Clear();
 
+            IsDetailViewActive = true;
+            DetailEditor?.InitializeDocument(doc);
             StatusMessage = $"{Document.FileName} を読み込みました（全 {Document.PageCount} ページ）";
-            _ = GenerateThumbnailsAsync();
         }
         catch (Exception ex)
         {
@@ -220,8 +349,12 @@ public partial class MainViewModel : ObservableObject
             int prevCount = Document.PageCount;
             await _pdfService.AppendDocumentAsync(Document, filePath);
 
+            DetailEditor?.InitializeDocument(Document);
             StatusMessage = $"{Path.GetFileName(filePath)} を結合しました（合計 {Document.PageCount} ページ）";
-            _ = GenerateThumbnailsAsync(prevCount);
+            if (!IsDetailViewActive)
+            {
+                _ = GenerateThumbnailsAsync(prevCount);
+            }
         }
         catch (Exception ex)
         {
@@ -230,6 +363,34 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// ドロップされた外部ファイル群（PDFファイル）を順次読み込み・結合処理します。
+    /// 未読み込み時は先頭ファイルを新規オープンし、以降のファイルを末尾に順次結合します。
+    /// </summary>
+    /// <param name="filePaths">ドロップされたファイルパス一覧</param>
+    public async Task HandleFileDropAsync(IEnumerable<string>? filePaths)
+    {
+        if (filePaths == null) return;
+
+        var pdfFiles = filePaths
+            .Where(f => !string.IsNullOrWhiteSpace(f) && f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (pdfFiles.Count == 0) return;
+
+        foreach (var file in pdfFiles)
+        {
+            if (Document.Pages.Count == 0)
+            {
+                await OpenDocumentAsync(file);
+            }
+            else
+            {
+                await AppendDocumentAsync(file);
+            }
         }
     }
 
@@ -291,7 +452,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void AddBlankPage()
     {
-        var selected = Document.Pages.FirstOrDefault(p => p.IsSelected);
+        var selected = Document.Pages.FirstOrDefault(p => p.IsSelected) ?? (IsDetailViewActive ? DetailEditor?.CurrentPage : null);
         double w = selected?.Width ?? 595.28;
         double h = selected?.Height ?? 841.89;
 
@@ -301,7 +462,11 @@ public partial class MainViewModel : ObservableObject
         var cmd = new InsertPageCommand(Document, blank, insertIdx);
         _undoRedoService.Execute(cmd);
 
-        blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap(ThumbnailRenderWidth, ThumbnailRenderHeight, blank.Rotation);
+        if (!IsDetailViewActive)
+        {
+            blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap(ThumbnailRenderWidth, ThumbnailRenderHeight, blank.Rotation);
+        }
+        DetailEditor?.InitializeDocument(Document);
         StatusMessage = "白紙ページを追加しました。";
     }
 
@@ -320,7 +485,11 @@ public partial class MainViewModel : ObservableObject
     private void RotateSelected(Func<PdfPageModel, PageRotation> nextRotation)
     {
         var targets = Document.Pages.Where(p => p.IsSelected).ToList();
-        if (targets.Count == 0 && Document.Pages.Count > 0)
+        if (targets.Count == 0 && IsDetailViewActive && DetailEditor?.CurrentPage != null)
+        {
+            targets = new List<PdfPageModel> { DetailEditor.CurrentPage };
+        }
+        else if (targets.Count == 0 && Document.Pages.Count > 0)
         {
             targets = Document.Pages.ToList();
         }
@@ -336,7 +505,14 @@ public partial class MainViewModel : ObservableObject
         if (commands.Count > 0)
         {
             _undoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの回転"));
-            _ = RefreshSelectedThumbnailsAsync(targets);
+            if (!IsDetailViewActive)
+            {
+                _ = RefreshSelectedThumbnailsAsync(targets);
+            }
+            else
+            {
+                _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+            }
             StatusMessage = $"{targets.Count} ページを回転しました。";
         }
     }
@@ -348,6 +524,10 @@ public partial class MainViewModel : ObservableObject
     public void DeleteSelectedPages()
     {
         var targets = Document.Pages.Where(p => p.IsSelected).ToList();
+        if (targets.Count == 0 && IsDetailViewActive && DetailEditor?.CurrentPage != null)
+        {
+            targets = new List<PdfPageModel> { DetailEditor.CurrentPage };
+        }
         if (targets.Count == 0) return;
 
         var commands = new List<IUndoableCommand>();
@@ -358,6 +538,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         _undoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの削除"));
+        DetailEditor?.InitializeDocument(Document);
         StatusMessage = $"{targets.Count} ページを削除しました。";
     }
 
@@ -444,18 +625,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// ページ詳細エディタを開きます。
+    /// ページ詳細エディタを開き、指定ページへスクロールします。
     /// </summary>
     [RelayCommand]
     public void OpenPageDetail(PdfPageModel page)
     {
-        DetailEditor = new DetailEditorViewModel(
-            page,
-            _pdfRenderer,
-            ClosePageDetail,
-            index => index >= 0 && index < Document.Pages.Count ? Document.Pages[index] : null);
-
         IsDetailViewActive = true;
+        DetailEditor?.ScrollToPage(page);
         SelectedRibbonTabIndex = 1;
         StatusMessage = $"ページ {page.PageNumber} を編集しています。";
     }
@@ -466,14 +642,39 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void ClosePageDetail()
     {
-        if (DetailEditor != null)
-        {
-            _ = RefreshSelectedThumbnailsAsync(new[] { DetailEditor.CurrentPage });
-        }
         IsDetailViewActive = false;
-        SelectedRibbonTabIndex = 0;
-        DetailEditor = null;
         StatusMessage = "グリッド表示に戻りました。";
+    }
+
+    /// <summary>
+    /// グリッド表示に必要なサムネイルのうち、未生成または変更されたページを非同期で生成します。
+    /// </summary>
+    public async Task EnsureThumbnailsGeneratedAsync()
+    {
+        var targets = Document.Pages.Where(p => p.Thumbnail == null || p.IsModified).ToList();
+        if (targets.Count == 0) return;
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "サムネイルを生成しています...";
+
+            foreach (var page in targets)
+            {
+                await UpdatePageThumbnailAsync(page);
+                page.IsModified = false;
+            }
+
+            StatusMessage = $"グリッド表示（全 {Document.PageCount} ページ）";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"サムネイル生成エラー: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     [RelayCommand]

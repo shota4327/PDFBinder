@@ -2,9 +2,11 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Ink;
+using System.Windows.Input;
 using System.Windows.Media;
 using PDFBinder.App.Controls;
 using PDFBinder.App.ViewModels;
+using PDFBinder.Core.Models;
 
 namespace PDFBinder.App.Views;
 
@@ -25,54 +27,70 @@ public partial class DetailEditorView : UserControl
     {
         if (e.OldValue is DetailEditorViewModel oldVm)
         {
-            oldVm.PropertyChanged -= OnViewModelPropertyChanged;
+            oldVm.ScrollToPageRequested -= OnScrollToPageRequested;
         }
 
         if (e.NewValue is DetailEditorViewModel newVm)
         {
-            newVm.PropertyChanged += OnViewModelPropertyChanged;
-            BindPageStrokes(newVm);
-            ApplyDrawingAttributes(newVm);
+            newVm.ScrollToPageRequested += OnScrollToPageRequested;
         }
     }
 
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnScrollToPageRequested(PdfPageModel page)
     {
-        if (ViewModel == null) return;
+        Dispatcher.InvokeAsync(() =>
+        {
+            var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
+            if (itemVm != null)
+            {
+                var container = PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) as FrameworkElement;
+                container?.BringIntoView();
+            }
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
 
-        if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPage))
+    private void OnPagePreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is DetailPageItemViewModel itemVm && ViewModel != null)
         {
-            BindPageStrokes(ViewModel);
-        }
-        else if (e.PropertyName is nameof(DetailEditorViewModel.SelectedColor) or
-                                   nameof(DetailEditorViewModel.StrokeThickness) or
-                                   nameof(DetailEditorViewModel.SelectedTool))
-        {
-            ApplyDrawingAttributes(ViewModel);
+            ViewModel.CurrentPage = itemVm.Page;
+            foreach (var p in ViewModel.Pages)
+            {
+                p.IsCurrent = (p == itemVm);
+            }
         }
     }
 
-    private void BindPageStrokes(DetailEditorViewModel vm)
+    private void OnScrollViewerScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        InkCanvas.Strokes = vm.CurrentPage.InkStrokes;
-    }
+        if (ViewModel == null || ViewModel.Pages.Count == 0) return;
 
-    private void ApplyDrawingAttributes(DetailEditorViewModel vm)
-    {
-        var attr = new DrawingAttributes
+        double targetCenterY = DetailScrollViewer.ViewportHeight / 2.0;
+        DetailPageItemViewModel? bestMatch = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var itemVm in ViewModel.Pages)
         {
-            Color = vm.SelectedColor,
-            Width = vm.StrokeThickness,
-            Height = vm.StrokeThickness,
-            FitToCurve = true,
-            IsHighlighter = vm.SelectedTool == EditorToolMode.Highlighter
-        };
+            if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+            {
+                var transform = container.TransformToVisual(DetailScrollViewer);
+                Point pt = transform.Transform(new Point(0, container.ActualHeight / 2.0));
+                double dist = Math.Abs(pt.Y - targetCenterY);
+                if (dist < minDistance)
+                {
+                    minDistance = dist;
+                    bestMatch = itemVm;
+                }
+            }
+        }
 
-        InkCanvas.DefaultDrawingAttributes = attr;
-
-        if (vm.SelectedTool == EditorToolMode.EraserPoint)
+        if (bestMatch != null && ViewModel.CurrentPage != bestMatch.Page)
         {
-            InkCanvas.EraserShape = new EllipseStylusShape(vm.StrokeThickness, vm.StrokeThickness);
+            ViewModel.CurrentPage = bestMatch.Page;
+            foreach (var p in ViewModel.Pages)
+            {
+                p.IsCurrent = (p == bestMatch);
+            }
         }
     }
 }

@@ -90,41 +90,6 @@ public partial class GridView : UserControl
         }
     }
 
-    private void OnControlDragOver(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
-            e.Effects = DragDropEffects.Copy;
-            e.Handled = true;
-        }
-    }
-
-    private async void OnControlDrop(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetDataPresent(DataFormats.FileDrop) && ViewModel != null)
-        {
-            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-            if (files != null && files.Length > 0)
-            {
-                foreach (var file in files)
-                {
-                    if (file.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (ViewModel.Document.Pages.Count == 0)
-                        {
-                            await ViewModel.OpenDocumentCommand.ExecuteAsync(file);
-                        }
-                        else
-                        {
-                            await ViewModel.AppendDocumentCommand.ExecuteAsync(file);
-                        }
-                    }
-                }
-            }
-            e.Handled = true;
-        }
-    }
-
     private void OnRotateCounterClockwiseClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement elem && elem.DataContext is PdfPageModel page && ViewModel != null)

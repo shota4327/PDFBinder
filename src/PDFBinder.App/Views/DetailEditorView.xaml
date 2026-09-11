@@ -9,29 +9,70 @@
              d:DesignHeight="700" d:DesignWidth="900">
     
     <Grid Background="#E2E8F0">
-        <!-- メインキャンバス領域（上部ツールバーはメインウィンドウのリボン「手書き」タブに統合） -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="30">
-            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Background="White"
-                    CornerRadius="4" BorderThickness="1" BorderBrush="#CBD5E1">
-                <Border.LayoutTransform>
+        <!-- 空白時のウェルカム表示 -->
+        <Border Visibility="{Binding Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="White" CornerRadius="12" Padding="40,30" BorderBrush="#CBD5E1" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.1" />
+            </Border.Effect>
+            <StackPanel HorizontalAlignment="Center">
+                <TextBlock Text="📄" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
+                           FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
+                <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 
+                           FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,6,0,16" />
+                <Button Content="ファイルを開く..." 
+                        Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                        Padding="20,8" HorizontalAlignment="Center" Style="{StaticResource PrimaryButtonStyle}" />
+            </StackPanel>
+        </Border>
+
+        <!-- メインキャンバス領域（縦連続スクロール表示） -->
+        <ScrollViewer x:Name="DetailScrollViewer"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      ScrollChanged="OnScrollViewerScrollChanged"
+                      Padding="30">
+            <ItemsControl x:Name="PagesItemsControl" ItemsSource="{Binding Pages}" HorizontalAlignment="Center">
+                <ItemsControl.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
-                </Border.LayoutTransform>
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
-                </Border.Effect>
+                </ItemsControl.LayoutTransform>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:DetailPageItemViewModel}">
+                        <Border Margin="0,15"
+                                HorizontalAlignment="Center"
+                                Background="White"
+                                CornerRadius="4"
+                                BorderThickness="1"
+                                BorderBrush="#CBD5E1"
+                                PreviewMouseDown="OnPagePreviewMouseDown">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
+                            </Border.Effect>
 
-                <Grid Width="{Binding CurrentPage.DisplayWidth}" Height="{Binding CurrentPage.DisplayHeight}">
-                    <!-- 背景PDFレンダリング画像 -->
-                    <Image Source="{Binding PageBackground}" Stretch="Fill"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
+                            <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}">
+                                <!-- 背景PDFレンダリング画像 -->
+                                <Image Source="{Binding PageBackground}" Stretch="Fill"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
 
-                    <!-- 前面手書きInkCanvas -->
-                    <controls:EditorInkCanvas x:Name="InkCanvas"
-                                              Background="Transparent"
-                                              ToolMode="{Binding SelectedTool, Mode=TwoWay}"
-                                              IsStraightLine="{Binding IsStraightLine, Mode=TwoWay}" />
-                </Grid>
-            </Border>
+                                <!-- 前面手書きInkCanvas -->
+                                <controls:EditorInkCanvas Strokes="{Binding Page.InkStrokes}"
+                                                          ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          Background="Transparent" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </ScrollViewer>
     </Grid>
 </UserControl>
