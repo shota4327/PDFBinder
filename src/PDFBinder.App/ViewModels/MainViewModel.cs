@@ -46,6 +46,12 @@ public partial class MainViewModel : ObservableObject
     private string _statusMessage = "PDFファイルを開くか、ドラッグ＆ドロップしてください。";
 
     /// <summary>
+    /// 外部ファイルドラッグ中にドロップ案内オーバーレイを表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDragOver;
+
+    /// <summary>
     /// サムネイル最小表示サイズ（px）
     /// </summary>
     public const double MinThumbnailSize = 140.0;
@@ -357,6 +363,34 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// ドロップされた外部ファイル群（PDFファイル）を順次読み込み・結合処理します。
+    /// 未読み込み時は先頭ファイルを新規オープンし、以降のファイルを末尾に順次結合します。
+    /// </summary>
+    /// <param name="filePaths">ドロップされたファイルパス一覧</param>
+    public async Task HandleFileDropAsync(IEnumerable<string>? filePaths)
+    {
+        if (filePaths == null) return;
+
+        var pdfFiles = filePaths
+            .Where(f => !string.IsNullOrWhiteSpace(f) && f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (pdfFiles.Count == 0) return;
+
+        foreach (var file in pdfFiles)
+        {
+            if (Document.Pages.Count == 0)
+            {
+                await OpenDocumentAsync(file);
+            }
+            else
+            {
+                await AppendDocumentAsync(file);
+            }
         }
     }
 

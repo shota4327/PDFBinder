@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using PDFBinder.App.ViewModels;
@@ -52,6 +53,78 @@ public partial class MainWindow : Window
         else
         {
             SystemCommands.MaximizeWindow(this);
+        }
+    }
+
+    /// <summary>
+    /// メイン領域へのドラッグ進入時の処理を行います。
+    /// </summary>
+    private void OnMainAreaDragEnter(object sender, DragEventArgs e)
+    {
+        UpdateDragState(e);
+    }
+
+    /// <summary>
+    /// メイン領域上でのドラッグ移動中の処理を行います。
+    /// </summary>
+    private void OnMainAreaDragOver(object sender, DragEventArgs e)
+    {
+        UpdateDragState(e);
+    }
+
+    /// <summary>
+    /// ドラッグ離脱時の処理を行います。
+    /// </summary>
+    private void OnMainAreaDragLeave(object sender, DragEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.IsDragOver = false;
+        }
+    }
+
+    /// <summary>
+    /// メイン領域への外部ファイルドロップを処理します。
+    /// </summary>
+    private async void OnMainAreaDrop(object sender, DragEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.IsDragOver = false;
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                await vm.HandleFileDropAsync(files);
+                e.Handled = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// ドラッグ中のデータ種別を判定し、ドロップ効果およびオーバーレイ表示状態を更新します。
+    /// </summary>
+    private void UpdateDragState(DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && DataContext is MainViewModel vm)
+        {
+            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            bool hasPdf = files != null && files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+            if (hasPdf)
+            {
+                e.Effects = DragDropEffects.Copy;
+                if (vm.Document.Pages.Count > 0)
+                {
+                    vm.IsDragOver = true;
+                }
+                e.Handled = true;
+                return;
+            }
+        }
+
+        e.Effects = DragDropEffects.None;
+        if (DataContext is MainViewModel vmReset)
+        {
+            vmReset.IsDragOver = false;
         }
     }
 }

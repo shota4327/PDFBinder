@@ -6,10 +6,7 @@
              xmlns:models="clr-namespace:PDFBinder.Core.Models;assembly=PDFBinder.Core"
              xmlns:vm="clr-namespace:PDFBinder.App.ViewModels"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="800"
-             AllowDrop="True"
-             Drop="OnControlDrop"
-             DragOver="OnControlDragOver">
+             d:DesignHeight="600" d:DesignWidth="800">
     
     <Grid Background="#F8FAFC">
         <!-- 空白時のウェルカム表示 -->

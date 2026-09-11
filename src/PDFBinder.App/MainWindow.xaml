@@ -399,13 +399,45 @@
                 </Border>
 
         <!-- メイン画面切り替えエリア -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2"
+              AllowDrop="True"
+              PreviewDragEnter="OnMainAreaDragEnter"
+              PreviewDragOver="OnMainAreaDragOver"
+              PreviewDragLeave="OnMainAreaDragLeave"
+              PreviewDrop="OnMainAreaDrop">
             <!-- グリッド俯瞰ビュー -->
             <views:GridView Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
 
             <!-- 詳細手書きエディタビュー -->
             <views:DetailEditorView DataContext="{Binding DetailEditor}"
                                    Visibility="{Binding DataContext.IsDetailViewActive, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <!-- ドロップ案内オーバーレイ（読み込み済みのファイルドラッグ中に表示） -->
+            <Grid Visibility="{Binding IsDragOver, Converter={StaticResource BooleanToVisibilityConverter}}"
+                  Background="#E6FFFFFF"
+                  IsHitTestVisible="False">
+                <Border Margin="24"
+                        Background="#F0F7FF"
+                        CornerRadius="16"
+                        BorderBrush="#2563EB"
+                        BorderThickness="2"
+                        SnapsToDevicePixels="True">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Width="64" Height="64" Background="#DBEAFE" CornerRadius="32"
+                                HorizontalAlignment="Center" Margin="0,0,0,16">
+                            <TextBlock Text="&#xE8F1;" FontFamily="{StaticResource IconFontFamily}"
+                                       FontSize="32" Foreground="#2563EB"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="ここにPDFをドロップして末尾に追加・結合"
+                                   FontSize="18" FontWeight="Bold" Foreground="#1E3A8A"
+                                   HorizontalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBlock Text="ドロップすると現在のドキュメントの末尾にページが追加されます"
+                                   FontSize="13" Foreground="#3B82F6"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- 下部ステータスバー -->

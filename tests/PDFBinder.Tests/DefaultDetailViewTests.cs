@@ -181,4 +181,94 @@ public class DefaultDetailViewTests
         Assert.True(vm.Pages[1].IsCurrent);
         Assert.False(vm.Pages[0].IsCurrent);
     }
+
+    [Fact]
+    public async Task MainViewModel_HandleFileDrop_WhenNoDocument_OpensFirstAndAppendsSubsequent()
+    {
+        // Arrange
+        var mockService = new MockPdfService();
+        var vm = new MainViewModel(pdfService: mockService);
+        Assert.Equal(0, vm.Document.PageCount);
+
+        var dropFiles = new[] { "c:\\sample1.pdf", "c:\\sample2.pdf" };
+
+        // Act
+        await vm.HandleFileDropAsync(dropFiles);
+
+        // Assert
+        Assert.Single(mockService.OpenedFiles);
+        Assert.Equal("c:\\sample1.pdf", mockService.OpenedFiles[0]);
+        Assert.Single(mockService.AppendedFiles);
+        Assert.Equal("c:\\sample2.pdf", mockService.AppendedFiles[0]);
+        Assert.Equal(2, vm.Document.PageCount);
+    }
+
+    [Fact]
+    public async Task MainViewModel_HandleFileDrop_WhenDocumentLoaded_AppendsAllFiles()
+    {
+        // Arrange
+        var mockService = new MockPdfService();
+        var vm = new MainViewModel(pdfService: mockService);
+        vm.AddBlankPage(); // 既存ページ1枚
+        Assert.Equal(1, vm.Document.PageCount);
+
+        var dropFiles = new[] { "c:\\sample1.pdf", "c:\\sample2.pdf" };
+
+        // Act
+        await vm.HandleFileDropAsync(dropFiles);
+
+        // Assert
+        Assert.Empty(mockService.OpenedFiles);
+        Assert.Equal(2, mockService.AppendedFiles.Count);
+        Assert.Equal("c:\\sample1.pdf", mockService.AppendedFiles[0]);
+        Assert.Equal("c:\\sample2.pdf", mockService.AppendedFiles[1]);
+        Assert.Equal(3, vm.Document.PageCount);
+    }
+
+    [Fact]
+    public async Task MainViewModel_HandleFileDrop_FiltersNonPdfFiles()
+    {
+        // Arrange
+        var mockService = new MockPdfService();
+        var vm = new MainViewModel(pdfService: mockService);
+        var dropFiles = new[] { "c:\\document.docx", "c:\\image.png", "c:\\data.txt" };
+
+        // Act
+        await vm.HandleFileDropAsync(dropFiles);
+
+        // Assert
+        Assert.Empty(mockService.OpenedFiles);
+        Assert.Empty(mockService.AppendedFiles);
+        Assert.Equal(0, vm.Document.PageCount);
+    }
+
+    private class MockPdfService : IPdfService
+    {
+        public List<string> OpenedFiles { get; } = new();
+        public List<string> AppendedFiles { get; } = new();
+
+        public Task<PdfDocumentModel> LoadDocumentAsync(string filePath)
+        {
+            OpenedFiles.Add(filePath);
+            var doc = new PdfDocumentModel { FilePath = filePath };
+            doc.Pages.Add(new PdfPageModel { PageNumber = 1, SourceFilePath = filePath });
+            return Task.FromResult(doc);
+        }
+
+        public Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex = -1)
+        {
+            AppendedFiles.Add(filePath);
+            targetDoc.Pages.Add(new PdfPageModel { PageNumber = targetDoc.Pages.Count + 1, SourceFilePath = filePath });
+            return Task.CompletedTask;
+        }
+
+        public PdfPageModel CreateBlankPage(double width = 595.28, double height = 841.89)
+        {
+            return new PdfPageModel { Width = width, Height = height };
+        }
+
+        public Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath) => Task.CompletedTask;
+        public Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath) => Task.CompletedTask;
+        public Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName) => Task.FromResult(0);
+    }
 }

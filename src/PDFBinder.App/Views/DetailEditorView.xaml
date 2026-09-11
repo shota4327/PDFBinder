@@ -9,6 +9,25 @@
              d:DesignHeight="700" d:DesignWidth="900">
     
     <Grid Background="#E2E8F0">
+        <!-- 空白時のウェルカム表示 -->
+        <Border Visibility="{Binding Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="White" CornerRadius="12" Padding="40,30" BorderBrush="#CBD5E1" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.1" />
+            </Border.Effect>
+            <StackPanel HorizontalAlignment="Center">
+                <TextBlock Text="📄" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
+                           FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
+                <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 
+                           FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,6,0,16" />
+                <Button Content="ファイルを開く..." 
+                        Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                        Padding="20,8" HorizontalAlignment="Center" Style="{StaticResource PrimaryButtonStyle}" />
+            </StackPanel>
+        </Border>
+
         <!-- メインキャンバス領域（縦連続スクロール表示） -->
         <ScrollViewer x:Name="DetailScrollViewer"
                       HorizontalScrollBarVisibility="Auto"
