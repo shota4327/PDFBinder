@@ -19,7 +19,16 @@ public partial class MainViewModel : ObservableObject
     private readonly IUndoRedoService _undoRedoService;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayFileName))]
     private PdfDocumentModel _document = new();
+
+    /// <summary>
+    /// タイトルバー中央に表示するファイル名を取得します。
+    /// 未読み込み時は空文字を返します。
+    /// </summary>
+    public string DisplayFileName => string.IsNullOrEmpty(Document.FilePath)
+        ? string.Empty
+        : Path.GetFileName(Document.FilePath);
 
     [ObservableProperty]
     private bool _isDetailViewActive;
@@ -118,11 +127,31 @@ public partial class MainViewModel : ObservableObject
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _undoRedoService = undoRedoService ?? new UndoRedoService();
 
+        _document.PropertyChanged += OnDocumentPropertyChanged;
+
         _undoRedoService.StateChanged += (s, e) =>
         {
             OnPropertyChanged(nameof(CanUndo));
             OnPropertyChanged(nameof(CanRedo));
         };
+    }
+
+    partial void OnDocumentChanged(PdfDocumentModel? oldValue, PdfDocumentModel newValue)
+    {
+        if (oldValue != null)
+        {
+            oldValue.PropertyChanged -= OnDocumentPropertyChanged;
+        }
+        newValue.PropertyChanged += OnDocumentPropertyChanged;
+        OnPropertyChanged(nameof(DisplayFileName));
+    }
+
+    private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfDocumentModel.FilePath) || e.PropertyName == nameof(PdfDocumentModel.FileName))
+        {
+            OnPropertyChanged(nameof(DisplayFileName));
+        }
     }
 
     /// <summary>

@@ -12,6 +12,27 @@
         Icon="Assets/icon.png"
         WindowStartupLocation="CenterScreen">
     
+    <!-- ウィンドウクローム設定（標準タイトルバー廃止・タブバー統合） -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="38"
+                      ResizeBorderThickness="6"
+                      CornerRadius="0"
+                      GlassFrameThickness="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <!-- 最大化時の画面外はみ出し防止パディング補正 -->
+    <Window.Style>
+        <Style TargetType="Window">
+            <Setter Property="Padding" Value="0" />
+            <Style.Triggers>
+                <Trigger Property="WindowState" Value="Maximized">
+                    <Setter Property="Padding" Value="7" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Style>
+    
     <!-- キーボードショートカット -->
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenDocumentCommand}" />
@@ -31,17 +52,24 @@
 
     <Grid Background="#F1F5F9">
         <Grid.RowDefinitions>
+            <RowDefinition Height="38" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 上部メインリボンエリア -->
-        <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1">
-            <StackPanel>
-                <!-- リボンタブヘッダーバー -->
-                <Border Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,4,12,0">
-                    <StackPanel Orientation="Horizontal">
+        <!-- 最上段：統合タイトルバー＆タブバー -->
+        <Border Grid.Row="0" Height="38" Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1">
+            <Grid>
+                <!-- 左側：アプリアイコン ＋ タブ -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+                    <!-- アプリアイコン（装飾・ドラッグ領域として機能） -->
+                    <Image Source="Assets/icon.png" Width="18" Height="18" Margin="12,0,10,0"
+                           VerticalAlignment="Center" IsHitTestVisible="False" />
+
+                    <!-- タブ（クリック可能にするため IsHitTestVisibleInChrome="True"） -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"
+                                WindowChrome.IsHitTestVisibleInChrome="True">
                         <RadioButton Content="PDF編集" GroupName="RibbonTabs"
                                      IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
                                      Style="{StaticResource RibbonTabRadioButtonStyle}" />
@@ -50,10 +78,40 @@
                                      IsEnabled="{Binding IsDetailViewActive}"
                                      Style="{StaticResource RibbonTabRadioButtonStyle}" />
                     </StackPanel>
-                </Border>
+                </StackPanel>
 
-                <!-- ツールバーコンテンツ領域 -->
-                <Border Background="White" Padding="12,6">
+                <!-- 中央：開いているファイル名（ドラッグ可能・クリック透過） -->
+                <TextBlock Text="{Binding DisplayFileName}"
+                           Foreground="#64748B" FontSize="12"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsHitTestVisible="False" TextTrimming="CharacterEllipsis"
+                           MaxWidth="500" />
+
+                <!-- 右側：ウィンドウキャプションボタン（最小化・最大化・閉じる） -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button Style="{StaticResource CaptionButtonStyle}"
+                            Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                            ToolTip="最小化">
+                        <TextBlock Text="&#xE921;" FontFamily="{StaticResource IconFontFamily}" FontSize="10" />
+                    </Button>
+                    <Button Style="{StaticResource CaptionButtonStyle}"
+                            x:Name="MaximizeRestoreButton"
+                            Click="OnMaximizeRestoreClicked"
+                            ToolTip="最大化">
+                        <TextBlock x:Name="MaximizeRestoreGlyph" Text="&#xE922;" FontFamily="{StaticResource IconFontFamily}" FontSize="10" />
+                    </Button>
+                    <Button Style="{StaticResource CloseCaptionButtonStyle}"
+                            Command="{x:Static SystemCommands.CloseWindowCommand}"
+                            ToolTip="閉じる">
+                        <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource IconFontFamily}" FontSize="10" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ツールバーコンテンツ領域 -->
+        <Border Grid.Row="1" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,6">
                     <Grid>
                         <!-- PDF編集タブコンテンツ -->
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
@@ -339,11 +397,9 @@
                         </WrapPanel>
                     </Grid>
                 </Border>
-            </StackPanel>
-        </Border>
 
         <!-- メイン画面切り替えエリア -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <!-- グリッド俯瞰ビュー -->
             <views:GridView Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
 
@@ -353,7 +409,7 @@
         </Grid>
 
         <!-- 下部ステータスバー -->
-        <Border Grid.Row="2" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="12,5">
+        <Border Grid.Row="3" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="12,5">
             <DockPanel LastChildFill="True">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                     <ProgressBar IsIndeterminate="{Binding IsLoading}" Width="80" Height="10" Margin="0,0,10,0"
