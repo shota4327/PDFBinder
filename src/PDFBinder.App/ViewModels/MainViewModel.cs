@@ -536,7 +536,7 @@ public partial class MainViewModel : ObservableObject
                 page.OriginalPageIndex,
                 ThumbnailRenderWidth,
                 ThumbnailRenderHeight,
-                page.Rotation);
+                page.RenderRotation);
         }
 
         if (baseBitmap != null)

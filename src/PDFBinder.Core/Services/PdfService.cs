@@ -35,13 +35,15 @@ public class PdfService : IPdfService
         for (int i = 0; i < pdfDoc.PageCount; i++)
         {
             var pdfPage = pdfDoc.Pages[i];
+            var pageRotation = PageRotationExtensions.FromDegrees(pdfPage.Rotate);
             var pageModel = new PdfPageModel
             {
                 SourceFilePath = filePath,
                 OriginalPageIndex = i,
                 Width = pdfPage.Width.Point,
                 Height = pdfPage.Height.Point,
-                Rotation = PageRotationExtensions.FromDegrees(pdfPage.Rotate)
+                OriginalRotation = pageRotation,
+                Rotation = pageRotation
             };
             model.AddPage(pageModel);
         }
@@ -205,13 +207,13 @@ public class PdfService : IPdfService
         }
 
         destPage.Rotate = (int)pageModel.Rotation;
-        DrawInkStrokesOnPage(destPage, pageModel.InkStrokes);
+        DrawInkStrokesOnPage(destPage, pageModel.InkStrokes, pageModel.Rotation);
     }
 
     /// <summary>
     /// PDFページ上に手書きストロークを描画します。
     /// </summary>
-    private void DrawInkStrokesOnPage(PdfPage page, StrokeCollection strokes)
+    private void DrawInkStrokesOnPage(PdfPage page, StrokeCollection strokes, PageRotation rotation)
     {
         if (strokes == null || strokes.Count == 0)
         {
@@ -219,17 +221,24 @@ public class PdfService : IPdfService
         }
 
         using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+        double pageWidth = page.Width.Point;
+        double pageHeight = page.Height.Point;
 
         foreach (var stroke in strokes)
         {
-            DrawSingleStroke(gfx, stroke);
+            DrawSingleStroke(gfx, stroke, rotation, pageWidth, pageHeight);
         }
     }
 
     /// <summary>
     /// 1本のストロークをXGraphicsに描画します。
     /// </summary>
-    private void DrawSingleStroke(XGraphics gfx, Stroke stroke)
+    private void DrawSingleStroke(
+        XGraphics gfx,
+        Stroke stroke,
+        PageRotation rotation,
+        double pageWidth,
+        double pageHeight)
     {
         var points = stroke.StylusPoints;
         if (points.Count < 2)
@@ -251,10 +260,35 @@ public class PdfService : IPdfService
         var xPoints = new XPoint[points.Count];
         for (int i = 0; i < points.Count; i++)
         {
-            xPoints[i] = new XPoint(points[i].X, points[i].Y);
+            xPoints[i] = TransformDisplayToPagePoint(
+                points[i].X,
+                points[i].Y,
+                rotation,
+                pageWidth,
+                pageHeight);
         }
 
         gfx.DrawLines(pen, xPoints);
+    }
+
+    /// <summary>
+    /// 画面表示座標系（DisplayWidth × DisplayHeight）の点を、
+    /// PDFページの未回転用紙座標系（Width × Height）へ逆回転変換します。
+    /// </summary>
+    private static XPoint TransformDisplayToPagePoint(
+        double x,
+        double y,
+        PageRotation rotation,
+        double pageWidth,
+        double pageHeight)
+    {
+        return rotation switch
+        {
+            PageRotation.Rotate90 => new XPoint(y, pageHeight - x),
+            PageRotation.Rotate180 => new XPoint(pageWidth - x, pageHeight - y),
+            PageRotation.Rotate270 => new XPoint(pageWidth - y, x),
+            _ => new XPoint(x, y)
+        };
     }
 
     /// <summary>
