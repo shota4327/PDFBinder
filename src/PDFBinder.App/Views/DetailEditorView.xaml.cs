@@ -69,5 +69,10 @@ public partial class DetailEditorView : UserControl
         };
 
         InkCanvas.DefaultDrawingAttributes = attr;
+
+        if (vm.SelectedTool == EditorToolMode.EraserPoint)
+        {
+            InkCanvas.EraserShape = new EllipseStylusShape(vm.StrokeThickness, vm.StrokeThickness);
+        }
     }
 }

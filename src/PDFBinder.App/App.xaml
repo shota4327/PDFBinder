@@ -14,6 +14,9 @@
             <converters:ToolToBooleanConverter x:Key="ToolToBooleanConverter" />
             <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter" />
             <converters:EqualityToBooleanConverter x:Key="EqualityToBooleanConverter" />
+            <converters:DoubleEqualsToBooleanConverter x:Key="DoubleEqualsToBooleanConverter" />
+            <converters:ColorEqualsToVisibilityConverter x:Key="ColorEqualsToVisibilityConverter" />
+            <converters:ColorToContrastingBrushConverter x:Key="ColorToContrastingBrushConverter" />
 
             <!-- アイコンフォント -->
             <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
@@ -476,6 +479,20 @@
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Setter TargetName="border" Property="Background" Value="#CBD5E1" />
+                                </Trigger>
+                                <Trigger Property="Tag" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#DBEAFE" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#2563EB" />
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="Tag" Value="True" />
+                                        <Condition Property="IsMouseOver" Value="True" />
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="border" Property="Background" Value="#BFDBFE" />
+                                </MultiTrigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.4" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

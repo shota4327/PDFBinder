@@ -1,4 +1,7 @@
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using PDFBinder.App.Controls;
+using PDFBinder.App.Converters;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
@@ -219,5 +222,193 @@ public class DetailEditorViewModelTests
         await Task.Delay(100);
         Assert.NotNull(vm.PageBackground);
         Assert.NotSame(initialBackground, vm.PageBackground);
+    }
+
+    [Fact]
+    public void InitialValues_PenDefaultIsBlackAnd1px()
+    {
+        // Arrange & Act
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Assert: ペンの初期値は黒色・太さ1.0px
+        Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
+        Assert.Equal(Colors.Black, vm.SelectedColor);
+        Assert.Equal(1.0, vm.StrokeThickness);
+
+        // プリセット（0.5, 1.0, 2.0, 4.0）の確認
+        Assert.Equal(4, vm.ActiveThicknessPresets.Count);
+        Assert.Equal(0.5, vm.ActiveThicknessPresets[0].Thickness);
+        Assert.Equal(1.0, vm.ActiveThicknessPresets[1].Thickness);
+        Assert.Equal(2.0, vm.ActiveThicknessPresets[2].Thickness);
+        Assert.Equal(4.0, vm.ActiveThicknessPresets[3].Thickness);
+
+        // 有効化フラグの確認
+        Assert.True(vm.CanChangeThickness);
+        Assert.True(vm.CanChangeColor);
+    }
+
+    [Fact]
+    public void ToolStatePreservation_PenAndHighlighterRetainIndependentColorAndThickness()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Act: ペンの色を赤、太さを2.0pxに変更
+        var redColor = Color.FromRgb(0xEF, 0x44, 0x44);
+        vm.SelectedColor = redColor;
+        vm.StrokeThickness = 2.0;
+
+        // Act: 蛍光ペンに切り替え
+        vm.SelectedTool = EditorToolMode.Highlighter;
+
+        // Assert: 蛍光ペンの初期値（黄色、12.0px）が適用され、プリセットが蛍光ペン用になる
+        Assert.Equal(DetailEditorViewModel.YellowPresetColor, vm.SelectedColor);
+        Assert.Equal(12.0, vm.StrokeThickness);
+        Assert.Equal(4, vm.ActiveThicknessPresets.Count);
+        Assert.Equal(8.0, vm.ActiveThicknessPresets[0].Thickness);
+        Assert.Equal(12.0, vm.ActiveThicknessPresets[1].Thickness);
+        Assert.Equal(16.0, vm.ActiveThicknessPresets[2].Thickness);
+        Assert.Equal(24.0, vm.ActiveThicknessPresets[3].Thickness);
+
+        // Act: 蛍光ペンの色を青、太さを16.0pxに変更
+        var blueColor = Color.FromRgb(0x25, 0x63, 0xEB);
+        vm.SelectedColor = blueColor;
+        vm.StrokeThickness = 16.0;
+
+        // Act: ペンに復帰
+        vm.SelectedTool = EditorToolMode.Pen;
+
+        // Assert: ペンの直前状態（赤、2.0px）が完全に保持されていること
+        Assert.Equal(redColor, vm.SelectedColor);
+        Assert.Equal(2.0, vm.StrokeThickness);
+
+        // Act: 蛍光ペンに再切り替え
+        vm.SelectedTool = EditorToolMode.Highlighter;
+
+        // Assert: 蛍光ペンの直前状態（青、16.0px）が完全に保持されていること
+        Assert.Equal(blueColor, vm.SelectedColor);
+        Assert.Equal(16.0, vm.StrokeThickness);
+    }
+
+    [Fact]
+    public void ToolStatePreservation_EraserPointRetainsThicknessAndSharesHighlighterPresets()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Act: 部分消しゴムに切り替え
+        vm.SelectedTool = EditorToolMode.EraserPoint;
+
+        // Assert: 初期太さ12.0px、プリセットは8, 12, 16, 24px
+        Assert.Equal(12.0, vm.StrokeThickness);
+        Assert.Equal(4, vm.ActiveThicknessPresets.Count);
+        Assert.Equal(8.0, vm.ActiveThicknessPresets[0].Thickness);
+        Assert.Equal(24.0, vm.ActiveThicknessPresets[3].Thickness);
+        Assert.True(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+
+        // Act: 太さを24.0pxに変更
+        vm.StrokeThickness = 24.0;
+
+        // Act: ペンに切り替え
+        vm.SelectedTool = EditorToolMode.Pen;
+        Assert.Equal(1.0, vm.StrokeThickness);
+
+        // Act: 再度部分消しゴムに切り替え
+        vm.SelectedTool = EditorToolMode.EraserPoint;
+
+        // Assert: 部分消しゴムの太さ24.0pxが保持されていること
+        Assert.Equal(24.0, vm.StrokeThickness);
+    }
+
+    [Fact]
+    public void ToolAvailability_CanChangeThicknessAndCanChangeColor_ReflectsSelectedTool()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Pen
+        vm.SelectedTool = EditorToolMode.Pen;
+        Assert.True(vm.CanChangeThickness);
+        Assert.True(vm.CanChangeColor);
+
+        // Highlighter
+        vm.SelectedTool = EditorToolMode.Highlighter;
+        Assert.True(vm.CanChangeThickness);
+        Assert.True(vm.CanChangeColor);
+
+        // EraserPoint
+        vm.SelectedTool = EditorToolMode.EraserPoint;
+        Assert.True(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+
+        // EraserStroke
+        vm.SelectedTool = EditorToolMode.EraserStroke;
+        Assert.False(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+
+        // Select
+        vm.SelectedTool = EditorToolMode.Select;
+        Assert.False(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+
+        // Hand
+        vm.SelectedTool = EditorToolMode.Hand;
+        Assert.False(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+    }
+
+    [Fact]
+    public void Converters_DoubleEqualsToBooleanConverter_WorksCorrectly()
+    {
+        var converter = new DoubleEqualsToBooleanConverter();
+
+        // 一致ケース (1.0 vs 1.0, 1.0001 vs 1.0)
+        Assert.True((bool)converter.Convert([1.0, 1.0], typeof(bool), null!, null!));
+        Assert.True((bool)converter.Convert([1.001, 1.0], typeof(bool), null!, null!));
+
+        // 不一致ケース (1.0 vs 2.0)
+        Assert.False((bool)converter.Convert([1.0, 2.0], typeof(bool), null!, null!));
+
+        // 境界・UnsetValue
+        Assert.False((bool)converter.Convert([System.Windows.DependencyProperty.UnsetValue, 1.0], typeof(bool), null!, null!));
+    }
+
+    [Fact]
+    public void Converters_ColorEqualsToVisibilityConverter_WorksCorrectly()
+    {
+        var converter = new ColorEqualsToVisibilityConverter();
+
+        // 一致ケース -> Visible
+        Assert.Equal(
+            System.Windows.Visibility.Visible,
+            converter.Convert([Colors.Black, Colors.Black], typeof(System.Windows.Visibility), null!, null!));
+
+        // 不一致ケース -> Collapsed
+        Assert.Equal(
+            System.Windows.Visibility.Collapsed,
+            converter.Convert([Colors.Black, Colors.Red], typeof(System.Windows.Visibility), null!, null!));
+    }
+
+    [Fact]
+    public void Converters_ColorToContrastingBrushConverter_WorksCorrectly()
+    {
+        var converter = new ColorToContrastingBrushConverter();
+
+        // 暗い色（黒、濃い青） -> 白ブラシ
+        var blackBrush = converter.Convert(Colors.Black, typeof(Brush), null!, null!);
+        Assert.Same(Brushes.White, blackBrush);
+
+        // 明るい色（黄、白） -> 黒ブラシ
+        var yellowBrush = converter.Convert(DetailEditorViewModel.YellowPresetColor, typeof(Brush), null!, null!);
+        Assert.Same(Brushes.Black, yellowBrush);
     }
 }
