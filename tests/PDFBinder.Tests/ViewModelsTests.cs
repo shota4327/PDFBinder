@@ -109,7 +109,7 @@ public class ViewModelsTests
         // Act: Pen
         vm.SelectToolCommand.Execute(EditorToolMode.Pen);
         Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
-        Assert.Equal(2.0, vm.StrokeThickness);
+        Assert.Equal(1.0, vm.StrokeThickness);
         Assert.Equal(Colors.Black, vm.SelectedColor);
     }
 
@@ -212,7 +212,7 @@ public class ViewModelsTests
         // 初期状態（通常ペン）の確認
         Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
         Assert.Equal(Colors.Black, vm.SelectedColor);
-        Assert.Equal(2.0, vm.StrokeThickness);
+        Assert.Equal(1.0, vm.StrokeThickness);
 
         // Act: 蛍光ペンに変更（TwoWayバインディング経由のプロパティ直接変更）
         vm.SelectedTool = EditorToolMode.Highlighter;
@@ -225,10 +225,10 @@ public class ViewModelsTests
         // Act: 再び通常ペンに変更
         vm.SelectedTool = EditorToolMode.Pen;
 
-        // Assert: 色が黒色、太さが2pxに復帰する
+        // Assert: 色が黒色、太さが1pxに復帰する
         Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
         Assert.Equal(Colors.Black, vm.SelectedColor);
-        Assert.Equal(2.0, vm.StrokeThickness);
+        Assert.Equal(1.0, vm.StrokeThickness);
 
         // Act: 全消しゴムに変更
         vm.SelectedTool = EditorToolMode.EraserStroke;
@@ -273,7 +273,7 @@ public class ViewModelsTests
             _ => null);
 
         // 初期太さ
-        Assert.Equal(2.0, vm.StrokeThickness);
+        Assert.Equal(1.0, vm.StrokeThickness);
 
         // Act: プリセット選択（0.5px）
         vm.SetPresetThicknessCommand.Execute(0.5);

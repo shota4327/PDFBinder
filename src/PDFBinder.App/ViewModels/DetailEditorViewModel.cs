@@ -46,6 +46,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>レンダリング最大ピクセル寸法（過大メモリ確保防止の上限保護）</summary>
     public const int MaxRenderDimension = 4096;
 
+    private Color _penColor = Colors.Black;
+    private double _penThickness = 1.0;
+    private Color _highlighterColor = YellowPresetColor;
+    private double _highlighterThickness = 12.0;
+    private double _eraserPointThickness = 12.0;
+
     [ObservableProperty]
     private PdfPageModel _currentPage;
 
@@ -59,7 +65,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private Color _selectedColor = Colors.Black;
 
     [ObservableProperty]
-    private double _strokeThickness = 2.0;
+    private double _strokeThickness = 1.0;
 
     [ObservableProperty]
     private bool _isStraightLine;
@@ -68,6 +74,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
     /// </summary>
     public bool CanToggleStraightLine => SelectedTool == EditorToolMode.Pen || SelectedTool == EditorToolMode.Highlighter;
+
+    /// <summary>
+    /// 太さプリセットを変更できるか（ペン、蛍光ペン、部分消しゴム選択時のみtrue）
+    /// </summary>
+    public bool CanChangeThickness => SelectedTool == EditorToolMode.Pen ||
+                                      SelectedTool == EditorToolMode.Highlighter ||
+                                      SelectedTool == EditorToolMode.EraserPoint;
+
+    /// <summary>
+    /// カラーパレットの色を変更できるか（ペンまたは蛍光ペン選択時のみtrue）
+    /// </summary>
+    public bool CanChangeColor => SelectedTool == EditorToolMode.Pen || SelectedTool == EditorToolMode.Highlighter;
+
+    /// <summary>現在選択中のツールに応じた太さプリセット一覧</summary>
+    public ObservableCollection<ThicknessPresetOption> ActiveThicknessPresets { get; } = new();
 
     /// <summary>最小ズーム倍率</summary>
     public const double MinZoom = 0.5;
@@ -111,6 +132,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _onBackToGrid = onBackToGrid;
         _pageLookup = pageLookup;
 
+        UpdateThicknessPresets(_selectedTool);
         _ = LoadPageBackgroundAsync();
     }
 
@@ -193,27 +215,94 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasNextPage));
     }
 
+    partial void OnSelectedColorChanged(Color value)
+    {
+        if (SelectedTool == EditorToolMode.Pen)
+        {
+            _penColor = value;
+        }
+        else if (SelectedTool == EditorToolMode.Highlighter)
+        {
+            _highlighterColor = value;
+        }
+    }
+
+    partial void OnStrokeThicknessChanged(double value)
+    {
+        if (SelectedTool == EditorToolMode.Pen)
+        {
+            _penThickness = value;
+        }
+        else if (SelectedTool == EditorToolMode.Highlighter)
+        {
+            _highlighterThickness = value;
+        }
+        else if (SelectedTool == EditorToolMode.EraserPoint)
+        {
+            _eraserPointThickness = value;
+        }
+
+        UpdatePresetSelection(value);
+    }
+
     partial void OnSelectedToolChanged(EditorToolMode value)
     {
         // ツール切り替え時は直線トグルを自動的にオフへリセット
         IsStraightLine = false;
         OnPropertyChanged(nameof(CanToggleStraightLine));
+        OnPropertyChanged(nameof(CanChangeThickness));
+        OnPropertyChanged(nameof(CanChangeColor));
 
-        if (value == EditorToolMode.Highlighter)
+        switch (value)
         {
-            if (SelectedColor == Colors.Black)
-            {
-                SelectedColor = YellowPresetColor;
-            }
-            StrokeThickness = 12.0;
+            case EditorToolMode.Pen:
+                SelectedColor = _penColor;
+                StrokeThickness = _penThickness;
+                break;
+            case EditorToolMode.Highlighter:
+                SelectedColor = _highlighterColor;
+                StrokeThickness = _highlighterThickness;
+                break;
+            case EditorToolMode.EraserPoint:
+                StrokeThickness = _eraserPointThickness;
+                break;
         }
-        else if (value == EditorToolMode.Pen)
+
+        UpdateThicknessPresets(value);
+    }
+
+    /// <summary>
+    /// 指定されたツールモードに応じた太さプリセット一覧を更新します。
+    /// </summary>
+    private void UpdateThicknessPresets(EditorToolMode tool)
+    {
+        ActiveThicknessPresets.Clear();
+        if (tool == EditorToolMode.Highlighter || tool == EditorToolMode.EraserPoint)
         {
-            if (SelectedColor == YellowPresetColor)
-            {
-                SelectedColor = Colors.Black;
-            }
-            StrokeThickness = 2.0;
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(8.0, 8, "太さ: 8.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(12.0, 12, "太さ: 12.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(16.0, 16, "太さ: 16.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(24.0, 20, "太さ: 24.0px"));
+        }
+        else
+        {
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(0.5, 3, "太さ: 0.5px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(1.0, 5, "太さ: 1.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(2.0, 8, "太さ: 2.0px"));
+            ActiveThicknessPresets.Add(new ThicknessPresetOption(4.0, 13, "太さ: 4.0px"));
+        }
+
+        UpdatePresetSelection(StrokeThickness);
+    }
+
+    /// <summary>
+    /// 現在の太さに合致するプリセットの選択状態を更新します。
+    /// </summary>
+    private void UpdatePresetSelection(double thickness)
+    {
+        foreach (var preset in ActiveThicknessPresets)
+        {
+            preset.IsSelected = Math.Abs(preset.Thickness - thickness) < 0.05;
         }
     }
 
@@ -322,5 +411,36 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             }
             _isDisposed = true;
         }
+    }
+}
+
+/// <summary>
+/// ツールバーに表示する太さプリセットのオプション定義
+/// </summary>
+public class ThicknessPresetOption : ObservableObject
+{
+    /// <summary>線の太さ（px）</summary>
+    public double Thickness { get; }
+
+    /// <summary>アイコン表示用の円サイズ（幅・高さ）</summary>
+    public double DotSize { get; }
+
+    /// <summary>ツールチップテキスト</summary>
+    public string ToolTip { get; }
+
+    private bool _isSelected;
+    /// <summary>現在選択されているかどうか</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
+    public ThicknessPresetOption(double thickness, double dotSize, string toolTip, bool isSelected = false)
+    {
+        Thickness = thickness;
+        DotSize = dotSize;
+        ToolTip = toolTip;
+        _isSelected = isSelected;
     }
 }

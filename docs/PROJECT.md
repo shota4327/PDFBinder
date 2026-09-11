@@ -38,9 +38,9 @@
 | **F34** | UI・グリッド俯瞰 | Undo / Redo（元に戻す・やり直す） | **完了** | UndoRedoService / Ctrl+Z, Ctrl+Y |
 | **F35** | UI・グリッド俯瞰 | メインヘッダーツールバー刷新（リボンタブ化・手書きツール統合・太さ刷新） | **完了** | Issue #3, #7, #15, #17 |
 | **F40** | 手書き詳細 | ページダブルクリックでの詳細エディタ切り替え（216 DPI高解像度化） | **完了** | DetailEditorView.xaml / Issue #21 |
-| **F41** | 手書き詳細 | ペンツール（色・太さ変更） | **完了** | EditorInkCanvas / ToolMode |
-| **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・色変更） | **完了** | IsHighlighter = true |
-| **F43** | 手書き詳細 | 消しゴムツール（ストローク消し / 部分消し切替） | **完了** | EraseByStroke / EraseByPoint |
+| **F41** | 手書き詳細 | ペンツール（色・太さ変更・現在値強調・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel |
+| **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・専用太さプリセット・現在値強調・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel |
+| **F43** | 手書き詳細 | 消しゴムツール（ストローク消し / 部分消し切替・部分消し太さ変更・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel & EraserShape |
 | **F44** | 手書き詳細 | 直線トグル描画（ペン・蛍光ペン連動トグル化・十字カーソルプレビュー） | **完了** | Issue #25 / IsStraightLine & CommitStraightLine |
 | **F36** | UI・タイトルバー | タイトルバー廃止とタブバー統合（Chrome/Edgeスタイル・WindowChrome） | **完了** | Issue #28 / WindowChrome |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひらツール） | **完了** | ScaleTransform & Hand tool |
