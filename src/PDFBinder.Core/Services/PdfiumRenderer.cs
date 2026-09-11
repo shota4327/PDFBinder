@@ -19,8 +19,11 @@ public class PdfiumRenderer : IPdfRenderer
         int pageIndex,
         int targetWidth,
         int targetHeight,
-        PageRotation rotation)
+        PageRotation rotation,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
             return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
@@ -28,9 +31,12 @@ public class PdfiumRenderer : IPdfRenderer
 
         return await Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 byte[] bytes = File.ReadAllBytes(filePath);
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
                 int minDim = Math.Min(targetWidth, targetHeight);
                 int maxDim = Math.Max(targetWidth, targetHeight);
@@ -42,11 +48,13 @@ public class PdfiumRenderer : IPdfRenderer
                     return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 using var pageReader = docReader.GetPageReader(pageIndex);
                 int actualWidth = pageReader.GetPageWidth();
                 int actualHeight = pageReader.GetPageHeight();
                 byte[] rawBytes = pageReader.GetImage();
 
+                cancellationToken.ThrowIfCancellationRequested();
                 var bitmap = BitmapSource.Create(
                     actualWidth,
                     actualHeight,
@@ -68,11 +76,15 @@ public class PdfiumRenderer : IPdfRenderer
 
                 return bitmap;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
             }
-        });
+        }, cancellationToken);
     }
 
     /// <inheritdoc/>

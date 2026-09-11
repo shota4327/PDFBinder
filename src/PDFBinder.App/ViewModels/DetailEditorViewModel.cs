@@ -13,13 +13,38 @@ namespace PDFBinder.App.ViewModels;
 /// <summary>
 /// ページ詳細手書きエディタのViewModel
 /// </summary>
-public partial class DetailEditorViewModel : ObservableObject
+public partial class DetailEditorViewModel : ObservableObject, IDisposable
 {
     private readonly IPdfRenderer _pdfRenderer;
     private readonly Action _onBackToGrid;
     private readonly Func<int, PdfPageModel?> _pageLookup;
     private readonly Stack<StrokeCollection> _strokeUndoStack = new();
     private readonly Stack<StrokeCollection> _strokeRedoStack = new();
+
+    private CancellationTokenSource? _renderCts;
+    private long _renderGeneration;
+    private bool _isDisposed;
+
+    /// <summary>
+    /// ズーム操作後の動的レンダリング遅延（デバウンス）時間（ミリ秒）
+    /// </summary>
+    public int DebounceDelayMs { get; set; } = 150;
+
+    /// <summary>
+    /// ポイント単位（72pt/inch）をWPF論理ピクセル（96DIP/inch）に変換する標準基準スケール係数（約1.333）
+    /// </summary>
+    public const double PtToDipScale = 96.0 / 72.0;
+
+    /// <summary>
+    /// （後方互換用）詳細エディタ表示用の最大高解像度スケール係数
+    /// </summary>
+    public const double EditorRenderScale = 3.0;
+
+    /// <summary>レンダリング最小ピクセル寸法（極端な縮小時の下限保護）</summary>
+    public const int MinRenderDimension = 200;
+
+    /// <summary>レンダリング最大ピクセル寸法（過大メモリ確保防止の上限保護）</summary>
+    public const int MaxRenderDimension = 4096;
 
     [ObservableProperty]
     private PdfPageModel _currentPage;
@@ -81,27 +106,81 @@ public partial class DetailEditorViewModel : ObservableObject
         _ = LoadPageBackgroundAsync();
     }
 
-    /// <summary>
-    /// 詳細エディタ表示用の高解像度レンダリングスケール（3.0 = 216 DPI相当）
-    /// </summary>
-    public const double EditorRenderScale = 3.0;
+    partial void OnZoomChanged(double value)
+    {
+        _ = ScheduleDynamicRender(immediate: false);
+    }
 
     /// <summary>
-    /// ページの背景ビットマップを高DPIでレンダリングします。
+    /// 現在のズーム倍率およびページ寸法から最適なレンダリングピクセル寸法を算出します。
+    /// </summary>
+    public (int width, int height) CalculateRenderDimensions(double zoom)
+    {
+        double scale = PtToDipScale * zoom;
+        int targetWidth = Math.Clamp((int)Math.Round(CurrentPage.DisplayWidth * scale), MinRenderDimension, MaxRenderDimension);
+        int targetHeight = Math.Clamp((int)Math.Round(CurrentPage.DisplayHeight * scale), MinRenderDimension, MaxRenderDimension);
+        return (targetWidth, targetHeight);
+    }
+
+    /// <summary>
+    /// ズームまたはページ変更に応じた動的レンダリングをスケジュールします。
+    /// </summary>
+    public Task ScheduleDynamicRender(bool immediate = false)
+    {
+        _renderCts?.Cancel();
+        _renderCts?.Dispose();
+        _renderCts = new CancellationTokenSource();
+
+        var token = _renderCts.Token;
+        long generation = Interlocked.Increment(ref _renderGeneration);
+
+        return PerformDynamicRenderAsync(generation, token, immediate);
+    }
+
+    private async Task PerformDynamicRenderAsync(long generation, CancellationToken token, bool immediate)
+    {
+        try
+        {
+            if (!immediate && DebounceDelayMs > 0)
+            {
+                await Task.Delay(DebounceDelayMs, token);
+            }
+
+            token.ThrowIfCancellationRequested();
+            if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+            var (targetWidth, targetHeight) = CalculateRenderDimensions(Zoom);
+            var rendered = await _pdfRenderer.RenderPageAsync(
+                CurrentPage.SourceFilePath,
+                CurrentPage.OriginalPageIndex,
+                targetWidth,
+                targetHeight,
+                CurrentPage.RenderRotation,
+                token);
+
+            token.ThrowIfCancellationRequested();
+            if (generation == Volatile.Read(ref _renderGeneration) && rendered != null)
+            {
+                // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え、チラつき（白飛び）を完全防止
+                PageBackground = rendered;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセル時は正常終了
+        }
+        catch
+        {
+            // レンダリング例外時もクラッシュを防止
+        }
+    }
+
+    /// <summary>
+    /// ページの背景ビットマップを現在のズーム倍率に合わせて即座にレンダリングします。
     /// </summary>
     public async Task LoadPageBackgroundAsync()
     {
-        // ズームイン時にも文字が鮮明に表示されるよう、216 DPI（72 pt * 3.0）相当の高解像度でレンダリング
-        int targetWidth = (int)(CurrentPage.DisplayWidth * EditorRenderScale);
-        int targetHeight = (int)(CurrentPage.DisplayHeight * EditorRenderScale);
-
-        PageBackground = await _pdfRenderer.RenderPageAsync(
-            CurrentPage.SourceFilePath,
-            CurrentPage.OriginalPageIndex,
-            targetWidth,
-            targetHeight,
-            CurrentPage.RenderRotation);
-
+        await ScheduleDynamicRender(immediate: true);
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
     }
@@ -207,5 +286,29 @@ public partial class DetailEditorViewModel : ObservableObject
     private void BackToGrid()
     {
         _onBackToGrid();
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// アンマネージリソースおよびマネージリソースを解放します。
+    /// </summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_isDisposed)
+        {
+            if (disposing)
+            {
+                _renderCts?.Cancel();
+                _renderCts?.Dispose();
+                _renderCts = null;
+            }
+            _isDisposed = true;
+        }
     }
 }

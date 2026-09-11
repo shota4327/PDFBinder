@@ -124,4 +124,19 @@ public class PdfiumRendererTests : IDisposable
         Assert.Equal(150, result.PixelHeight);
         Assert.True(result.IsFrozen);
     }
+
+    [Fact]
+    public async Task RenderPageAsync_WithCancelledToken_ThrowsOperationCanceledException()
+    {
+        // Arrange
+        string pdfPath = CreateSamplePdf("test_cancel.pdf");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act & Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await _renderer.RenderPageAsync(pdfPath, 0, 200, 300, PageRotation.Rotate0, cts.Token);
+        });
+    }
 }
