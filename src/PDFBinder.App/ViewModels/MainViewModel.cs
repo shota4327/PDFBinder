@@ -122,6 +122,11 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CurrentZoomText));
         OnPropertyChanged(nameof(CanZoomIn));
         OnPropertyChanged(nameof(CanZoomOut));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(CanGoToNextPage));
+        OnPropertyChanged(nameof(CanNavigatePages));
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -220,6 +225,64 @@ public partial class MainViewModel : ObservableObject
         ThumbnailSize = Math.Max(MinThumbnailSize, ThumbnailSize - ThumbnailSizeStep);
     }
 
+    /// <summary>
+    /// 前のページへ移動可能かどうかを取得します（詳細ビューかつ先頭ページ以外）。
+    /// </summary>
+    public bool CanGoToPreviousPage => IsDetailViewActive && (DetailEditor?.CanGoToPreviousPage ?? false);
+
+    /// <summary>
+    /// 次のページへ移動可能かどうかを取得します（詳細ビューかつ末尾ページ以外）。
+    /// </summary>
+    public bool CanGoToNextPage => IsDetailViewActive && (DetailEditor?.CanGoToNextPage ?? false);
+
+    /// <summary>
+    /// ページ移動操作が可能かどうかを取得します（詳細ビューかつ1ページ以上存在）。
+    /// </summary>
+    public bool CanNavigatePages => IsDetailViewActive && Document.PageCount > 0;
+
+    /// <summary>
+    /// 現在表示中のページ番号（1-based）を取得または設定します。
+    /// </summary>
+    public int CurrentPageNumber
+    {
+        get => DetailEditor?.CurrentPageNumber ?? (Document.PageCount > 0 ? 1 : 0);
+        set
+        {
+            if (DetailEditor != null && value != DetailEditor.CurrentPageNumber)
+            {
+                DetailEditor.CurrentPageNumber = value;
+                OnPropertyChanged(nameof(CurrentPageNumber));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 1つ前のページへ移動します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGoToPreviousPage))]
+    public void GoToPreviousPage()
+    {
+        DetailEditor?.GoToPreviousPageCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// 1つ次のページへ移動します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGoToNextPage))]
+    public void GoToNextPage()
+    {
+        DetailEditor?.GoToNextPageCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// 指定された表示フィットモードを設定します。
+    /// </summary>
+    [RelayCommand]
+    public void SetFitMode(DetailViewFitMode mode)
+    {
+        DetailEditor?.SetFitMode(mode);
+    }
+
     [ObservableProperty]
     private bool _isLoading;
 
@@ -262,6 +325,20 @@ public partial class MainViewModel : ObservableObject
                 StatusMessage = $"ページ {DetailEditor.CurrentPage.PageNumber} / {Document.PageCount}";
             }
         }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.CanGoToPreviousPage))
+        {
+            OnPropertyChanged(nameof(CanGoToPreviousPage));
+            GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.CanGoToNextPage))
+        {
+            OnPropertyChanged(nameof(CanGoToNextPage));
+            GoToNextPageCommand.NotifyCanExecuteChanged();
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPageNumber))
+        {
+            OnPropertyChanged(nameof(CurrentPageNumber));
+        }
     }
 
     partial void OnDocumentChanged(PdfDocumentModel? oldValue, PdfDocumentModel newValue)
@@ -273,6 +350,12 @@ public partial class MainViewModel : ObservableObject
         newValue.PropertyChanged += OnDocumentPropertyChanged;
         DetailEditor?.InitializeDocument(newValue);
         OnPropertyChanged(nameof(DisplayFileName));
+        OnPropertyChanged(nameof(CanNavigatePages));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(CanGoToNextPage));
+        OnPropertyChanged(nameof(CurrentPageNumber));
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
     }
 
     private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
