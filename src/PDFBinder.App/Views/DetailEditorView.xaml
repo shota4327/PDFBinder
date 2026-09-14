@@ -29,7 +29,7 @@
         </Border>
 
         <!-- メインキャンバス領域（縦連続スクロール表示） -->
-        <ScrollViewer x:Name="DetailScrollViewer"
+        <controls:NoAutoScrollScrollViewer x:Name="DetailScrollViewer"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
                       ScrollChanged="OnScrollViewerScrollChanged"
@@ -73,6 +73,6 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </ScrollViewer>
+        </controls:NoAutoScrollScrollViewer>
     </Grid>
 </UserControl>
