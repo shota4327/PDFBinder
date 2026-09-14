@@ -25,6 +25,18 @@ public partial class DetailPageItemViewModel : ObservableObject
     private bool _isCurrent;
 
     /// <summary>
+    /// ドキュメント内の先頭ページであるかどうか（連続表示時の上部余白制御用）
+    /// </summary>
+    [ObservableProperty]
+    private bool _isFirstPage;
+
+    /// <summary>
+    /// ドキュメント内の最終ページであるかどうか（連続表示時の下部余白制御用）
+    /// </summary>
+    [ObservableProperty]
+    private bool _isLastPage;
+
+    /// <summary>
     /// コンストラクタ
     /// </summary>
     /// <param name="page">対象のPDFページモデル</param>

@@ -108,7 +108,13 @@
                               Visibility="{Binding PageViewMode, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=Continuous}">
                     <ItemsControl.ItemContainerStyle>
                         <Style TargetType="ContentPresenter">
-                            <Setter Property="Margin" Value="0,15" />
+                            <!-- 先頭ページ上部および最終ページ下部の余白を除去し、中間ページ間余白のみを30pxに統一 -->
+                            <Setter Property="Margin" Value="0,0,0,30" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLastPage}" Value="True">
+                                    <Setter Property="Margin" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemsPanel>

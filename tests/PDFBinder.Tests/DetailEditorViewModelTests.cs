@@ -629,4 +629,29 @@ public class DetailEditorViewModelTests
         // コンテンツ高さ + Padding(60) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
         Assert.True(renderedHeight + 60.0 <= viewportH);
     }
+
+    [Fact]
+    public void InitializeDocument_SetsFirstAndLastPageFlagsCorrectly()
+    {
+        // 3ページのドキュメントを作成
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        doc.Pages.Add(CreateSamplePage(500, 700));
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+
+        // 1ページ目: 先頭=true, 最終=false
+        Assert.True(vm.Pages[0].IsFirstPage);
+        Assert.False(vm.Pages[0].IsLastPage);
+
+        // 2ページ目: 先頭=false, 最終=false
+        Assert.False(vm.Pages[1].IsFirstPage);
+        Assert.False(vm.Pages[1].IsLastPage);
+
+        // 3ページ目: 先頭=false, 最終=true
+        Assert.False(vm.Pages[2].IsFirstPage);
+        Assert.True(vm.Pages[2].IsLastPage);
+    }
 }

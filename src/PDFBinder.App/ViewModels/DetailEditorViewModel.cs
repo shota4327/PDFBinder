@@ -302,6 +302,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _pageLookup = pageLookup;
 
         Pages.Add(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
+        UpdatePageEdgeFlags();
 
         UpdateThicknessPresets(_selectedTool);
         _ = LoadPageBackgroundAsync();
@@ -324,6 +325,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             Pages[0].IsCurrent = true;
         }
 
+        UpdatePageEdgeFlags();
         ApplyFitMode();
         _ = LoadPageBackgroundAsync();
     }
@@ -685,10 +687,25 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     {
         if (PageViewMode == DetailPageViewMode.Continuous && Pages.Count > 1)
         {
-            double totalHeight = Pages.Sum(p => (p.Page.DisplayHeight + 30.0) * scale);
+            // 連続表示時は先頭上部・最終下部の余白を除外し、ページ間マージン (N - 1) * 30.0 のみを加算して正確に判定
+            double totalPageHeight = Pages.Sum(p => p.Page.DisplayHeight);
+            double totalSpacing = (Pages.Count - 1) * 30.0;
+            double totalHeight = (totalPageHeight + totalSpacing) * scale;
             return totalHeight > availableHeight;
         }
         return (page.DisplayHeight * scale) > availableHeight;
+    }
+
+    /// <summary>
+    /// 連続表示時の余白制御（先頭上部・最終下部の余白除去）用に各ページの端点フラグを更新します。
+    /// </summary>
+    private void UpdatePageEdgeFlags()
+    {
+        for (int i = 0; i < Pages.Count; i++)
+        {
+            Pages[i].IsFirstPage = (i == 0);
+            Pages[i].IsLastPage = (i == Pages.Count - 1);
+        }
     }
 
     [RelayCommand]
