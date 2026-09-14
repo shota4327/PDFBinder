@@ -33,13 +33,19 @@ Issue #52 の要件に基づき、下部ステータスバーを約1.5倍に拡�
 - **「表示」タブ（リボン）**:
   - 詳細・グリッド表示切り替えボタンとズームボタンの間に、3つの独立したラジオボタングループ（「1:1 100%」「ウィンドウ」「幅」）を新設（詳細ビュー時のみ有効）。
 
+### 4. 起動時例外（XamlParseException）の修正と再発防止
+- **不具合原因**: 表示タブ内「100%」ボタンのアイコン用 TextBlock に誤って `FontFamily="{StaticResource BaseFont}"`（Styleリソース）が指定されており、起動時のBAMLパース時に `ArgumentException` が発生していた。
+- **対応**: 該当プロパティ指定を削除し、正常起動を確認。
+- **再発防止テストの追加**: `App.xaml` および `MainWindow.xaml` の全XAMLパース・テンプレート・スタイル・リソース解決が正常に完了することをSTAスレッドで自動検証する `MainWindowInitializationTests.cs` を追加。
+
 ---
 
 ## 検証結果
 
 ### 1. 単体テスト（xUnit）
-新規テストファイル `PageNavigationAndViewOptionsTests.cs` を作成し、以下を含む全143件のテストが100%合格することを確認しました。
+新規テストファイル `PageNavigationAndViewOptionsTests.cs` および `MainWindowInitializationTests.cs` を作成し、以下を含む全144件のテストが100%合格することを確認しました。
 
+- `MainWindow_ShouldInitializeWithoutXamlParseException`: MainWindowとAppリソースの初期化が例外なく正常に完了すること
 - `InitialFitMode_ShouldBeFitToWindow`: 初期状態のフィットモードが `FitToWindow` であること
 - `SetFitModeCommand_ShouldUpdateFitModeAndRecalculate`: フィットモード切り替え時の倍率再計算
 - `ManualZoom_ShouldSwitchFitModeToNone`: 手動ズーム時にフィットモードが解除されること
@@ -51,7 +57,7 @@ Issue #52 の要件に基づき、下部ステータスバーを約1.5倍に拡�
 - `EqualityToBooleanConverter_ShouldHandleDetailViewFitModeEnum`: Enum型のTwoWayバインディング
 
 ```text
-成功!   -失敗:     0、合格:   143、スキップ:     0、合計:   143、期間: 913 ms - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗:     0、合格:   144、スキップ:     0、合計:   144、期間: 845 ms - PDFBinder.Tests.dll (net10.0)
 ```
 
 ### 2. ビルド検証

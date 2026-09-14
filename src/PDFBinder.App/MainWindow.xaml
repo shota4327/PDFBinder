@@ -380,7 +380,7 @@
                                          IsEnabled="{Binding IsDetailViewActive}"
                                          IsChecked="{Binding DetailEditor.FitMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=ActualSize, Mode=TwoWay}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="1:1" FontFamily="{StaticResource BaseFont}" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,2,0,3" Foreground="#475569" />
+                                    <TextBlock Text="1:1" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,2,0,3" Foreground="#475569" />
                                     <TextBlock Text="100%" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
