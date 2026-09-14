@@ -28,6 +28,30 @@ public partial class MainWindow : Window
     private bool _isClosingConfirmed;
 
     /// <summary>
+    /// キー入力を先行検知し、保存確認ダイアログ表示中のキーボード操作（Escによるキャンセル等）を処理します。
+    /// </summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        if (DataContext is MainViewModel vm && vm.IsSaveConfirmationVisible)
+        {
+            if (e.Key == Key.Escape)
+            {
+                vm.ConfirmSave(SaveConfirmationResult.Cancel);
+                e.Handled = true;
+                return;
+            }
+
+            // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+            if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+            {
+                e.Handled = true;
+            }
+        }
+    }
+
+    /// <summary>
     /// ウィンドウ終了時に未保存の変更がある場合、確認ダイアログを表示して終了処理を制御します。
     /// </summary>
     protected override async void OnClosing(CancelEventArgs e)
@@ -41,26 +65,37 @@ public partial class MainWindow : Window
             return;
         }
 
-        var choice = vm.PromptSaveConfirmation(vm.Document.FileName);
-        if (choice == SaveConfirmationResult.Cancel)
+        // 既に確認ダイアログが表示中の場合は多重呼び出しを防止
+        if (vm.IsSaveConfirmationVisible)
         {
             e.Cancel = true;
             return;
         }
 
-        if (choice == SaveConfirmationResult.Discard)
+        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、インアプリオーバーレイを表示
+        e.Cancel = true;
+
+        var choice = await vm.PromptSaveConfirmationAsync(vm.Document.FileName);
+        if (choice == SaveConfirmationResult.Cancel)
         {
-            // 保存せずにそのまま終了（e.Cancel = false のまま終了処理を続行）
             return;
         }
 
-        // 保存（Save）が選択された場合
-        e.Cancel = true;
-        bool saved = await vm.SaveDocumentAsync();
-        if (saved)
+        if (choice == SaveConfirmationResult.Discard)
         {
             _isClosingConfirmed = true;
-            _ = Dispatcher.BeginInvoke(new Action(Close));
+            Close();
+            return;
+        }
+
+        if (choice == SaveConfirmationResult.Save)
+        {
+            bool saved = await vm.SaveDocumentAsync();
+            if (saved)
+            {
+                _isClosingConfirmed = true;
+                Close();
+            }
         }
     }
 

@@ -452,5 +452,68 @@
                 <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#475569" TextTrimming="CharacterEllipsis" />
             </DockPanel>
         </Border>
+
+        <!-- 未保存変更確認ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="4"
+              Visibility="{Binding IsSaveConfirmationVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              Background="#500F172A"
+              Focusable="False"
+              Panel.ZIndex="1000">
+            <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
+            <Border Width="460"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="White"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="28" Color="#0F172A" Direction="270" Opacity="0.18" ShadowDepth="8" />
+                </Border.Effect>
+                <StackPanel>
+                    <!-- ヘッダー（アイコンとタイトル） -->
+                    <DockPanel LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="36" Height="36" Background="#FEF3C7" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#D97706"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="変更内容を保存しますか？" FontSize="16" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- 本文メッセージ -->
+                    <TextBlock FontSize="13" Foreground="#475569" TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,24">
+                        <Run Text="「" /><Run Text="{Binding SaveConfirmationFileName, Mode=OneWay}" FontWeight="SemiBold" Foreground="#1E293B" /><Run Text="」への変更内容を保存しますか？" /><LineBreak />
+                        <Run Text="保存しない場合、編集内容は失われます。" Foreground="#64748B" FontSize="12" />
+                    </TextBlock>
+
+                    <!-- アクションボタンエリア -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <!-- 保存ボタン -->
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Content="保存"
+                                MinWidth="84"
+                                Margin="0,0,8,0"
+                                Command="{Binding ConfirmSaveCommand}"
+                                CommandParameter="{x:Static vm:SaveConfirmationResult.Save}" />
+
+                        <!-- 保存しないボタン -->
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Content="保存しない"
+                                MinWidth="84"
+                                Margin="0,0,8,0"
+                                Command="{Binding ConfirmSaveCommand}"
+                                CommandParameter="{x:Static vm:SaveConfirmationResult.Discard}" />
+
+                        <!-- キャンセルボタン -->
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Content="キャンセル"
+                                MinWidth="84"
+                                Command="{Binding ConfirmSaveCommand}"
+                                CommandParameter="{x:Static vm:SaveConfirmationResult.Cancel}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
