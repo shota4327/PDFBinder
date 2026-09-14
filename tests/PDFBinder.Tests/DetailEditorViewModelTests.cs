@@ -530,15 +530,15 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.SinglePage;
-        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 = 800
+        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 - 2 = 798
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        // page1 の幅500 -> scale = 800 / 500 = 1.6
-        Assert.Equal(1.6, vm.Zoom, 2);
+        // page1 の幅500, 高さ800 -> 縦スクロール発生のため 780 / 500 = 1.56
+        Assert.Equal(1.56, vm.Zoom, 2);
 
         // page2 へ移動
         vm.GoToNextPage();
-        // page2 の幅1000 -> scale = 800 / 1000 = 0.8
+        // page2 の幅1000, 高さ800 -> 縦スクロールなしのため 798 / 1000 = 0.798 ≒ 0.80
         Assert.Equal(0.8, vm.Zoom, 2);
     }
 
@@ -558,10 +558,10 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.Continuous;
-        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 = 800
+        vm.UpdateViewportSize(860, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        double initialZoom = vm.Zoom; // page1基準: 1.6
+        double initialZoom = vm.Zoom; // page1基準（スクロールバー考慮）: 1.56
 
         // スクロール等で CurrentPage が page2 に変わった場合
         vm.CurrentPage = page2;
@@ -585,17 +585,48 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.Continuous;
-        vm.UpdateViewportSize(860, 1000); // availableWidth = 800
+        vm.UpdateViewportSize(860, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        Assert.Equal(1.6, vm.Zoom, 2);
+        Assert.Equal(1.56, vm.Zoom, 2);
 
         // カレントページを page2 にしてウィンドウをリサイズ
         vm.CurrentPage = page2;
-        // リサイズ発生 (ViewportWidth = 1060 -> availableWidth = 1000)
+        // リサイズ発生 (ViewportWidth = 1060 -> availableWidth = 1060 - 62 = 998, 縦スクロール考慮で 980)
         vm.UpdateViewportSize(1060, 1000);
 
-        // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 1000 / 1000 = 1.0
-        Assert.Equal(1.0, vm.Zoom, 2);
+        // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 980 / 1000 = 0.98
+        Assert.Equal(0.98, vm.Zoom, 2);
+    }
+
+    [Fact]
+    public void FitMode_SinglePageMode_FitToWindow_FitsCompletelyInsideViewport()
+    {
+        // 縦長ページ（A4比率: 595 x 842）
+        var page = CreateSamplePage(595, 842);
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+
+        // ビューポートサイズ: 800 x 600
+        double viewportW = 800.0;
+        double viewportH = 600.0;
+        vm.UpdateViewportSize(viewportW, viewportH);
+
+        // FitToWindow 適用
+        vm.FitMode = DetailViewFitMode.FitToWindow;
+
+        // 計算後のコンテンツサイズ（マージンなし、Padding=60、SafetyBuffer=2 を考慮）
+        double renderedWidth = page.DisplayWidth * vm.Zoom;
+        double renderedHeight = page.DisplayHeight * vm.Zoom;
+
+        // コンテンツ幅 + Padding(60) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
+        Assert.True(renderedWidth + 60.0 <= viewportW);
+
+        // コンテンツ高さ + Padding(60) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
+        Assert.True(renderedHeight + 60.0 <= viewportH);
     }
 }
