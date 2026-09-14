@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PDFBinder.App.Controls;
 using PDFBinder.App.Converters;
+using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
@@ -424,6 +425,19 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
+    public void Converters_CountToVisibilityConverter_WorksCorrectly()
+    {
+        var converter = new CountToVisibilityConverter();
+
+        // 0件 -> Collapsed
+        Assert.Equal(System.Windows.Visibility.Collapsed, converter.Convert(0, typeof(System.Windows.Visibility), null!, null!));
+
+        // 1件以上 -> Visible
+        Assert.Equal(System.Windows.Visibility.Visible, converter.Convert(1, typeof(System.Windows.Visibility), null!, null!));
+        Assert.Equal(System.Windows.Visibility.Visible, converter.Convert(5, typeof(System.Windows.Visibility), null!, null!));
+    }
+
+    [Fact]
     public void UpdatePageStrokeCache_GeneratesCacheBitmap_WhenStrokesExist()
     {
         // Arrange
@@ -460,5 +474,128 @@ public class DetailEditorViewModelTests
 
         // Assert
         Assert.Null(item.StrokeCache);
+    }
+
+    [Fact]
+    public void PageViewMode_DefaultIsSinglePage()
+    {
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        Assert.Equal(DetailPageViewMode.SinglePage, vm.PageViewMode);
+    }
+
+    [Fact]
+    public void InitialState_WithoutDocument_PagesEmptyAndCurrentPageItemNull()
+    {
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, (PdfDocumentModel?)null);
+
+        Assert.Empty(vm.Pages);
+        Assert.Null(vm.CurrentPageItem);
+        Assert.Null(vm.CurrentPage);
+        Assert.Equal(DetailPageViewMode.SinglePage, vm.PageViewMode);
+    }
+
+    [Fact]
+    public void PageViewMode_SwitchToContinuous_TriggersScrollRequest()
+    {
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        PdfPageModel? requestedPage = null;
+        vm.ScrollToPageRequested += p => requestedPage = p;
+
+        vm.SetPageViewMode(DetailPageViewMode.Continuous);
+
+        Assert.Equal(DetailPageViewMode.Continuous, vm.PageViewMode);
+        Assert.Same(page, requestedPage);
+    }
+
+    [Fact]
+    public void FitMode_SinglePageMode_RecalculatesFitOnPageChange()
+    {
+        // 異なる幅を持つ2ページ
+        var page1 = CreateSamplePage(500, 800);
+        page1.PageNumber = 1;
+        var page2 = CreateSamplePage(1000, 800);
+        page2.PageNumber = 2;
+
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page1);
+        doc.Pages.Add(page2);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 = 800
+
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+        // page1 の幅500 -> scale = 800 / 500 = 1.6
+        Assert.Equal(1.6, vm.Zoom, 2);
+
+        // page2 へ移動
+        vm.GoToNextPage();
+        // page2 の幅1000 -> scale = 800 / 1000 = 0.8
+        Assert.Equal(0.8, vm.Zoom, 2);
+    }
+
+    [Fact]
+    public void FitMode_ContinuousMode_DoesNotRecalculateFitOnCurrentPageChange()
+    {
+        // 異なる幅を持つ2ページ
+        var page1 = CreateSamplePage(500, 800);
+        page1.PageNumber = 1;
+        var page2 = CreateSamplePage(1000, 800);
+        page2.PageNumber = 2;
+
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page1);
+        doc.Pages.Add(page2);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.PageViewMode = DetailPageViewMode.Continuous;
+        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 = 800
+
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+        double initialZoom = vm.Zoom; // page1基準: 1.6
+
+        // スクロール等で CurrentPage が page2 に変わった場合
+        vm.CurrentPage = page2;
+
+        // 連続表示モードではスクロール途中で拡大率は固定維持されるべき
+        Assert.Equal(initialZoom, vm.Zoom, 2);
+    }
+
+    [Fact]
+    public void FitMode_ContinuousMode_RecalculatesFitOnWindowResize()
+    {
+        var page1 = CreateSamplePage(500, 800);
+        page1.PageNumber = 1;
+        var page2 = CreateSamplePage(1000, 800);
+        page2.PageNumber = 2;
+
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page1);
+        doc.Pages.Add(page2);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.PageViewMode = DetailPageViewMode.Continuous;
+        vm.UpdateViewportSize(860, 1000); // availableWidth = 800
+
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+        Assert.Equal(1.6, vm.Zoom, 2);
+
+        // カレントページを page2 にしてウィンドウをリサイズ
+        vm.CurrentPage = page2;
+        // リサイズ発生 (ViewportWidth = 1060 -> availableWidth = 1000)
+        vm.UpdateViewportSize(1060, 1000);
+
+        // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 1000 / 1000 = 1.0
+        Assert.Equal(1.0, vm.Zoom, 2);
     }
 }

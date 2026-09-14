@@ -8,6 +8,45 @@
              mc:Ignorable="d" 
              d:DesignHeight="700" d:DesignWidth="900">
     
+    <UserControl.Resources>
+        <!-- ページ描画用共通データテンプレート -->
+        <DataTemplate x:Key="DetailPageItemTemplate" DataType="{x:Type vm:DetailPageItemViewModel}">
+            <!-- 影とページコンテンツを分離したレイアウトコンテナ -->
+            <Grid Margin="0,15"
+                  HorizontalAlignment="Center"
+                  PreviewMouseDown="OnPagePreviewMouseDown">
+                <!-- 影専用の背景要素（子要素を持たないため、InkCanvas描画中にシェーダー再計算・再ラスタライズが発生しない） -->
+                <Border Background="White"
+                        CornerRadius="4"
+                        BorderThickness="1"
+                        BorderBrush="#CBD5E1">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
+                    </Border.Effect>
+                </Border>
+
+                <!-- ページ描画コンテナ（Effectがかかっていないため超高速描画） -->
+                <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}" ClipToBounds="True">
+                    <!-- 背景PDFレンダリング画像 -->
+                    <Image Source="{Binding PageBackground}" Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- 確定済みストロークの透過ビットマップキャッシュ画像 -->
+                    <Image Source="{Binding StrokeCache}" Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- 前面手書きInkCanvas（ペン描画中は現在描画中の1画のみを保持して超高速動作） -->
+                    <controls:EditorInkCanvas PageItem="{Binding}"
+                                              ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Background="Transparent" />
+                </Grid>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <Grid Background="#E2E8F0">
         <!-- 空白時のウェルカム表示 -->
         <Border Visibility="{Binding Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
@@ -19,68 +58,62 @@
             <StackPanel HorizontalAlignment="Center">
                 <TextBlock Text="📄" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
-                           FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
+                            FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
                 <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 
-                           FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,6,0,16" />
+                            FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,6,0,16" />
                 <Button Content="ファイルを開く..." 
                         Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                         Padding="20,8" HorizontalAlignment="Center" Style="{StaticResource PrimaryButtonStyle}" />
             </StackPanel>
         </Border>
 
-        <!-- メインキャンバス領域（縦連続スクロール表示） -->
+        <!-- メインキャンバス領域（単一ページ / 縦連続スクロール表示） -->
         <controls:NoAutoScrollScrollViewer x:Name="DetailScrollViewer"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
                       ScrollChanged="OnScrollViewerScrollChanged"
+                      PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"
+                      Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
                       Padding="30">
-            <ItemsControl x:Name="PagesItemsControl" ItemsSource="{Binding Pages}" HorizontalAlignment="Center">
-                <ItemsControl.LayoutTransform>
+            <Grid HorizontalAlignment="Center">
+                <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
-                </ItemsControl.LayoutTransform>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:DetailPageItemViewModel}">
-                        <!-- 影とページコンテンツを分離したレイアウトコンテナ -->
-                        <Grid Margin="0,15"
+                </Grid.LayoutTransform>
+
+                <!-- 単一ページ表示（カレントページが存在する場合のみ表示） -->
+                <ContentControl x:Name="SinglePageContainer"
+                                Content="{Binding CurrentPageItem}"
+                                ContentTemplate="{StaticResource DetailPageItemTemplate}"
+                                HorizontalAlignment="Center">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=SinglePage}" Value="True" />
+                                        <Condition Binding="{Binding CurrentPageItem, Converter={StaticResource NullToVisibilityConverter}}" Value="Visible" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
+
+                <!-- 連続表示（縦連続スクロール表示） -->
+                <ItemsControl x:Name="PagesItemsControl"
+                              ItemsSource="{Binding Pages}"
+                              ItemTemplate="{StaticResource DetailPageItemTemplate}"
                               HorizontalAlignment="Center"
-                              PreviewMouseDown="OnPagePreviewMouseDown">
-                            <!-- 影専用の背景要素（子要素を持たないため、InkCanvas描画中にシェーダー再計算・再ラスタライズが発生しない） -->
-                            <Border Background="White"
-                                    CornerRadius="4"
-                                    BorderThickness="1"
-                                    BorderBrush="#CBD5E1">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
-                                </Border.Effect>
-                            </Border>
-
-                            <!-- ページ描画コンテナ（Effectがかかっていないため超高速描画） -->
-                            <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}" ClipToBounds="True">
-                                <!-- 背景PDFレンダリング画像 -->
-                                <Image Source="{Binding PageBackground}" Stretch="Fill"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-
-                                <!-- 確定済みストロークの透過ビットマップキャッシュ画像 -->
-                                <Image Source="{Binding StrokeCache}" Stretch="Fill"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-
-                                <!-- 前面手書きInkCanvas（ペン描画中は現在描画中の1画のみを保持して超高速動作） -->
-                                <controls:EditorInkCanvas PageItem="{Binding}"
-                                                          ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          Background="Transparent" />
-                            </Grid>
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                              Visibility="{Binding PageViewMode, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=Continuous}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Grid>
         </controls:NoAutoScrollScrollViewer>
     </Grid>
 </UserControl>

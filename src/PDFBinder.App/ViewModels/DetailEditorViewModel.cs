@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PDFBinder.App.Controls;
+using PDFBinder.App.Models;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 
@@ -216,6 +217,36 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// 現在のページ表示モード（単一ページ表示 / 連続表示）
+    /// </summary>
+    [ObservableProperty]
+    private DetailPageViewMode _pageViewMode = DetailPageViewMode.SinglePage;
+
+    partial void OnPageViewModeChanged(DetailPageViewMode value)
+    {
+        // モード切り替え時は現在のFitModeに合わせて拡大率を再計算
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
+        }
+
+        // 連続表示へ切り替えた場合は、現在ページ位置へスクロール移動
+        if (value == DetailPageViewMode.Continuous && CurrentPage != null)
+        {
+            ScrollToPageRequested?.Invoke(CurrentPage);
+        }
+    }
+
+    /// <summary>
+    /// ページ表示モードを変更します。
+    /// </summary>
+    [RelayCommand]
+    public void SetPageViewMode(DetailPageViewMode mode)
+    {
+        PageViewMode = mode;
+    }
+
+    /// <summary>
     /// スクロールビューアの表示領域幅（px）
     /// </summary>
     [ObservableProperty]
@@ -311,7 +342,9 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
         GoToNextPageCommand.NotifyCanExecuteChanged();
 
-        if (FitMode != DetailViewFitMode.None)
+        // 単一ページ表示時のみ、FitModeが有効であれば新しいページの寸法に合わせて拡大率を再計算
+        // 連続表示時はスクロール途中で拡大率を変更しない
+        if (PageViewMode == DetailPageViewMode.SinglePage && FitMode != DetailViewFitMode.None)
         {
             ApplyFitMode();
         }
