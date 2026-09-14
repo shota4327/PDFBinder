@@ -74,6 +74,22 @@ public class InverseCountToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
+/// カウントが1以上の時にVisible、0の時にCollapsedを返すコンバーター
+/// </summary>
+public class CountToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is int count && count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotSupportedException();
+    }
+}
+
+/// <summary>
 /// ツールモードのEnum値と文字列パラメータの一致を判定するコンバーター
 /// </summary>
 public class ToolToBooleanConverter : IValueConverter

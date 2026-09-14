@@ -425,6 +425,19 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
+    public void Converters_CountToVisibilityConverter_WorksCorrectly()
+    {
+        var converter = new CountToVisibilityConverter();
+
+        // 0件 -> Collapsed
+        Assert.Equal(System.Windows.Visibility.Collapsed, converter.Convert(0, typeof(System.Windows.Visibility), null!, null!));
+
+        // 1件以上 -> Visible
+        Assert.Equal(System.Windows.Visibility.Visible, converter.Convert(1, typeof(System.Windows.Visibility), null!, null!));
+        Assert.Equal(System.Windows.Visibility.Visible, converter.Convert(5, typeof(System.Windows.Visibility), null!, null!));
+    }
+
+    [Fact]
     public void UpdatePageStrokeCache_GeneratesCacheBitmap_WhenStrokesExist()
     {
         // Arrange
@@ -470,6 +483,18 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
 
+        Assert.Equal(DetailPageViewMode.SinglePage, vm.PageViewMode);
+    }
+
+    [Fact]
+    public void InitialState_WithoutDocument_PagesEmptyAndCurrentPageItemNull()
+    {
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, (PdfDocumentModel?)null);
+
+        Assert.Empty(vm.Pages);
+        Assert.Null(vm.CurrentPageItem);
+        Assert.Null(vm.CurrentPage);
         Assert.Equal(DetailPageViewMode.SinglePage, vm.PageViewMode);
     }
 

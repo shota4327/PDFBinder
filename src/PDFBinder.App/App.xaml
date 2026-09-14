@@ -11,6 +11,7 @@
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
             <converters:InverseCountToVisibilityConverter x:Key="InverseCountToVisibilityConverter" />
+            <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />
             <converters:ToolToBooleanConverter x:Key="ToolToBooleanConverter" />
             <converters:EqualityToVisibilityConverter x:Key="EqualityToVisibilityConverter" />
             <converters:EqualityToBooleanConverter x:Key="EqualityToBooleanConverter" />

@@ -3,6 +3,7 @@
 ## 概要
 PDF詳細エディタビューにおいて、「単一ページ表示」と「連続表示」を切り替える機能を追加しました。
 初期表示モードを「単一ページ表示」とし、表示タブへの切り替えボタングループ追加、マウスホイールによるページ内スクロールおよび端でのスムーズなページめくり、連続表示中の拡大率固定維持制御、キーボードショートカット（PageUp/PageDown）の実装を行いました。
+また、起動直後（未読み込み時）に白紙ページが最前面に表示される不具合を修正し、ウェルカム画面が正常に表示されるようにしました。
 
 ---
 
@@ -23,7 +24,8 @@ PDF詳細エディタビューにおいて、「単一ページ表示」と「�
 ### 3. View / XAML & コードビハインド
 - **`DetailEditorView.xaml`**:
   - ページ描画用データテンプレート（`DetailPageItemTemplate`）をリソースとして共通化。
-  - `DetailScrollViewer` 内に、単一ページ表示用（`ContentControl`）と連続表示用（`ItemsControl`）を配置し、`PageViewMode` に応じてシームレスに切り替え。
+  - `DetailScrollViewer` に `CountToVisibilityConverter` を適用し、ページが0件（起動直後や未読み込み時）はキャンバス領域を非表示としてウェルカム表示を最前面に表示。
+  - `SinglePageContainer` にトリガーを追加し、`CurrentPageItem` が存在する時のみ `Visible` となるよう保護。
   - `PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"` イベントの登録。
 - **`DetailEditorView.xaml.cs`**:
   - `OnScrollViewerPreviewMouseWheel`:
@@ -35,19 +37,23 @@ PDF詳細エディタビューにおいて、「単一ページ表示」と「�
 - **`MainWindow.xaml`**:
   - 「表示」タブの表示オプション（100％・ウィンドウ・幅）の右横にセパレーターを追加し、「単一」「連続」ラジオボタングループ（`RibbonPageLayoutGroup`）を追加。
   - `InputBindings` に `PageUp`（前のページへ）と `PageDown`（次のページへ）のショートカットキーを追加。
+- **`CommonConverters.cs`** & **`App.xaml`**:
+  - `CountToVisibilityConverter`（件数 > 0 で Visible）を追加。
 
 ### 4. 単体テスト
 - **`DetailEditorViewModelTests.cs`**:
   - `PageViewMode_DefaultIsSinglePage`: 初期値が単一ページ表示であることの検証。
+  - `InitialState_WithoutDocument_PagesEmptyAndCurrentPageItemNull`: ドキュメント未読み込み時の初期状態の検証。
   - `PageViewMode_SwitchToContinuous_TriggersScrollRequest`: モード切り替え時にスクロール要求が発行されることの検証。
   - `FitMode_SinglePageMode_RecalculatesFitOnPageChange`: 単一ページ表示時にページをめくると新しいページの寸法に合わせて拡大率が再計算されることの検証。
   - `FitMode_ContinuousMode_DoesNotRecalculateFitOnCurrentPageChange`: 連続表示時にスクロールでカレントページが変わっても拡大率が固定維持されることの検証。
   - `FitMode_ContinuousMode_RecalculatesFitOnWindowResize`: 連続表示時でもリサイズ時にはカレントページ基準で拡大率が再計算されることの検証。
+  - `Converters_CountToVisibilityConverter_WorksCorrectly`: 件数コンバーターの検証。
 
 ### 5. ドキュメント更新
 - **`basic_design.md`**: 6.1節、6.2節（表示タブ）、6.5節（詳細エディタ）に単一ページ・連続表示切り替え仕様を反映。
 - **`README.md`**: 主な機能の詳細ビューおよび表示タブの記載を更新。
-- **`PROJECT.md`**: 機能インベントリに F39 を追加、テスト件数を151件に更新。
+- **`PROJECT.md`**: 機能インベントリに F39 を追加、テスト件数を153件に更新。
 
 ---
 
@@ -58,9 +64,9 @@ PDF詳細エディタビューにおいて、「単一ページ表示」と「�
 C:\Git\PDFBinder\tests\PDFBinder.Tests\bin\Debug\net10.0-windows\PDFBinder.Tests.dll (.NETCoreApp,Version=v10.0) のテスト実行
 合計 1 個のテスト ファイルが指定されたパターンと一致しました。
 
-成功!   -失敗:     0、合格:   151、スキップ:     0、合計:   151、期間: 842 ms - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗:     0、合格:   153、スキップ:     0、合計:   153、期間: 829 ms - PDFBinder.Tests.dll (net10.0)
 ```
-全151件の単体テストが 100% 合格しました。
+全153件の単体テストが 100% 合格しました。
 
 ### ビルド結果
 ```text
