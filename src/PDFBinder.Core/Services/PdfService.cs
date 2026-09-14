@@ -48,7 +48,7 @@ public class PdfService : IPdfService
             model.AddPage(pageModel);
         }
 
-        model.IsModified = false;
+        model.ResetModifiedState();
         return model;
     }
 
@@ -98,7 +98,7 @@ public class PdfService : IPdfService
             await Task.Run(() => BuildAndSavePdf(doc.Pages, tempPath));
             SafeReplaceFile(tempPath, outputPath);
             doc.FilePath = outputPath;
-            doc.IsModified = false;
+            doc.ResetModifiedState();
         }
         finally
         {

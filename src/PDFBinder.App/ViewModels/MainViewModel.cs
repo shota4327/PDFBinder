@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -300,6 +301,11 @@ public partial class MainViewModel : ObservableObject
             filePath = dialog.FileName;
         }
 
+        if (!await ConfirmSaveAndProceedAsync())
+        {
+            return;
+        }
+
         try
         {
             IsLoading = true;
@@ -395,25 +401,85 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 未保存の変更が存在する場合に保存を確認するダイアログ表示用デリゲート。
+    /// 引数はファイル名、戻り値はユーザー選択結果。
+    /// テスト時にモック可能。nullの場合は標準のMessageBoxを表示します。
+    /// </summary>
+    public Func<string, SaveConfirmationResult>? ConfirmSavePrompt { get; set; }
+
+    /// <summary>
+    /// 未保存変更の保存確認ダイアログを表示し、ユーザーの選択結果を取得します。
+    /// </summary>
+    public SaveConfirmationResult PromptSaveConfirmation(string fileName)
+    {
+        if (ConfirmSavePrompt != null)
+        {
+            return ConfirmSavePrompt(fileName);
+        }
+
+        var result = MessageBox.Show(
+            $"{fileName} への変更内容を保存しますか？",
+            "PDF Binder",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        return result switch
+        {
+            MessageBoxResult.Yes => SaveConfirmationResult.Save,
+            MessageBoxResult.No => SaveConfirmationResult.Discard,
+            _ => SaveConfirmationResult.Cancel
+        };
+    }
+
+    /// <summary>
+    /// 未保存の変更がある場合に保存確認を行い、後続処理（別ファイル読み込みや終了）を続行してよいかを判定します。
+    /// </summary>
+    /// <returns>続行可能な場合はtrue、キャンセルまたは保存失敗により中断すべき場合はfalse</returns>
+    public async Task<bool> ConfirmSaveAndProceedAsync()
+    {
+        if (!Document.IsModified || Document.Pages.Count == 0)
+        {
+            return true;
+        }
+
+        var choice = PromptSaveConfirmation(Document.FileName);
+        switch (choice)
+        {
+            case SaveConfirmationResult.Cancel:
+                return false;
+
+            case SaveConfirmationResult.Discard:
+                return true;
+
+            case SaveConfirmationResult.Save:
+                return await SaveDocumentAsync();
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
     /// 上書き保存を実行します。
     /// </summary>
+    /// <returns>保存に成功した場合はtrue、キャンセルまたは失敗した場合はfalse</returns>
     [RelayCommand]
-    public async Task SaveDocumentAsync()
+    public async Task<bool> SaveDocumentAsync()
     {
         if (string.IsNullOrEmpty(Document.FilePath))
         {
-            await SaveDocumentAsAsync();
-            return;
+            return await SaveDocumentAsAsync();
         }
 
-        await ExecuteSaveAsync(Document.FilePath);
+        return await ExecuteSaveAsync(Document.FilePath);
     }
 
     /// <summary>
     /// 名前を付けて保存を実行します。
     /// </summary>
+    /// <returns>保存に成功した場合はtrue、キャンセルまたは失敗した場合はfalse</returns>
     [RelayCommand]
-    public async Task SaveDocumentAsAsync()
+    public async Task<bool> SaveDocumentAsAsync()
     {
         var dialog = new SaveFileDialog
         {
@@ -422,11 +488,11 @@ public partial class MainViewModel : ObservableObject
             FileName = Document.FileName
         };
 
-        if (dialog.ShowDialog() != true) return;
-        await ExecuteSaveAsync(dialog.FileName);
+        if (dialog.ShowDialog() != true) return false;
+        return await ExecuteSaveAsync(dialog.FileName);
     }
 
-    private async Task ExecuteSaveAsync(string targetPath)
+    private async Task<bool> ExecuteSaveAsync(string targetPath)
     {
         try
         {
@@ -435,10 +501,12 @@ public partial class MainViewModel : ObservableObject
 
             await _pdfService.SaveDocumentAsync(Document, targetPath);
             StatusMessage = $"保存しました: {targetPath}";
+            return true;
         }
         catch (Exception ex)
         {
             StatusMessage = $"保存エラー: {ex.Message}";
+            return false;
         }
         finally
         {
@@ -651,7 +719,7 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public async Task EnsureThumbnailsGeneratedAsync()
     {
-        var targets = Document.Pages.Where(p => p.Thumbnail == null || p.IsModified).ToList();
+        var targets = Document.Pages.Where(p => p.Thumbnail == null || p.IsThumbnailDirty).ToList();
         if (targets.Count == 0) return;
 
         try
@@ -662,7 +730,7 @@ public partial class MainViewModel : ObservableObject
             foreach (var page in targets)
             {
                 await UpdatePageThumbnailAsync(page);
-                page.IsModified = false;
+                page.IsThumbnailDirty = false;
             }
 
             StatusMessage = $"グリッド表示（全 {Document.PageCount} ページ）";

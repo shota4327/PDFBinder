@@ -29,6 +29,7 @@
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
+| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認） | **完了** | Issue #49 / OnClosing & ConfirmSave |
 | **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
 | **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
 | **F30** | UI・グリッド俯瞰 | ページタイル状グリッド一覧表示（仮想化・カードUI） | **完了** | GridView.xaml |
@@ -49,7 +50,7 @@
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
 | **F37** | UI・ビュー構成 | 詳細ビュー基本表示（縦連続表示）・新設「表示」タブ・一本化ズーム・オンデマンドサムネイル | **完了** | Issue #23 |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 103件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 117件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 
