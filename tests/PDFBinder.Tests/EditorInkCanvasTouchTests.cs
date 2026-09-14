@@ -127,6 +127,7 @@ public class EditorInkCanvasTouchTests
         var thread = new Thread(() =>
         {
             var canvas = new EditorInkCanvas();
+            Assert.Equal(150, EditorInkCanvas.StylusSuppressionCooldownMs);
 
             // スタイラス接地中・ホバー中は抑止
             canvas.SetStylusStateForTesting(isTouching: true, isInRange: false);
@@ -135,12 +136,12 @@ public class EditorInkCanvasTouchTests
             canvas.SetStylusStateForTesting(isTouching: false, isInRange: true);
             Assert.True(canvas.IsStylusSuppressed());
 
-            // 離脱直後（クールダウン500ms以内）は抑止継続
-            canvas.SetStylusStateForTesting(isTouching: false, isInRange: false, DateTime.UtcNow.AddMilliseconds(-200));
+            // 離脱直後（クールダウン150ms以内）は抑止継続
+            canvas.SetStylusStateForTesting(isTouching: false, isInRange: false, DateTime.UtcNow.AddMilliseconds(-50));
             Assert.True(canvas.IsStylusSuppressed());
 
-            // クールダウン経過後（600ms経過）はタッチ受付再開
-            canvas.SetStylusStateForTesting(isTouching: false, isInRange: false, DateTime.UtcNow.AddMilliseconds(-600));
+            // クールダウン経過後（200ms経過）はタッチ受付再開
+            canvas.SetStylusStateForTesting(isTouching: false, isInRange: false, DateTime.UtcNow.AddMilliseconds(-200));
             Assert.False(canvas.IsStylusSuppressed());
         });
 
