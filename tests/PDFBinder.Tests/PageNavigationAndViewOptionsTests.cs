@@ -107,6 +107,46 @@ public class PageNavigationAndViewOptionsTests
     }
 
     [Fact]
+    public void FitModePropertySetter_ShouldImmediatelyRecalculateZoom()
+    {
+        // Arrange
+        var doc = CreateSampleDocument(3);
+        using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
+        vm.UpdateViewportSize(1260, 800); // availableWidth = 1200, page.Width = 600
+
+        // Act: ラジオボタンのTwoWayバインディングと同様にプロパティを直接設定
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+
+        // Assert: プロパティ設定と同時に即座に拡大率が 2.0 に再計算される
+        Assert.Equal(2.0, vm.Zoom, precision: 2);
+
+        // Act: 等倍に切り替え
+        vm.FitMode = DetailViewFitMode.ActualSize;
+
+        // Assert: 即座に 1.0 に再計算される
+        Assert.Equal(1.0, vm.Zoom);
+    }
+
+    [Fact]
+    public void InitializeDocument_ShouldApplyFitModeImmediately()
+    {
+        // Arrange: 初期ドキュメント（幅600）
+        var doc = CreateSampleDocument(1);
+        using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
+        vm.UpdateViewportSize(660, 860); // availableWidth = 600
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+        Assert.Equal(1.0, vm.Zoom, precision: 2);
+
+        // Act: 異なるページサイズ（幅1200）の別ドキュメントを読み込み
+        var doc2 = new PdfDocumentModel { FilePath = "sample2.pdf" };
+        doc2.Pages.Add(new PdfPageModel { PageNumber = 1, Width = 1200, Height = 1600 });
+        vm.InitializeDocument(doc2);
+
+        // Assert: 読み込み直後に即座に幅に合わせて縮小（600 / 1200 = 0.5）される
+        Assert.Equal(0.5, vm.Zoom, precision: 2);
+    }
+
+    [Fact]
     public void ManualZoom_ShouldSwitchFitModeToNone()
     {
         // Arrange

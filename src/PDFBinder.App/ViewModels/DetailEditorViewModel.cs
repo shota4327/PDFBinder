@@ -210,6 +210,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private DetailViewFitMode _fitMode = DetailViewFitMode.FitToWindow;
 
+    partial void OnFitModeChanged(DetailViewFitMode value)
+    {
+        ApplyFitMode();
+    }
+
     /// <summary>
     /// スクロールビューアの表示領域幅（px）
     /// </summary>
@@ -282,6 +287,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             Pages[0].IsCurrent = true;
         }
 
+        ApplyFitMode();
         _ = LoadPageBackgroundAsync();
     }
 
