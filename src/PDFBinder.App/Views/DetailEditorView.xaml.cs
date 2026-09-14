@@ -5,6 +5,7 @@ using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
 using PDFBinder.App.Controls;
+using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 
@@ -15,6 +16,9 @@ namespace PDFBinder.App.Views;
 /// </summary>
 public partial class DetailEditorView : UserControl
 {
+    private DateTime _lastPageTurnTime = DateTime.MinValue;
+    private static readonly TimeSpan PageTurnCooldown = TimeSpan.FromMilliseconds(250);
+
     public DetailEditorView()
     {
         InitializeComponent();
@@ -23,6 +27,7 @@ public partial class DetailEditorView : UserControl
         DetailScrollViewer.SizeChanged += OnDetailScrollViewerSizeChanged;
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+        SinglePageContainer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -71,6 +76,12 @@ public partial class DetailEditorView : UserControl
     {
         Dispatcher.InvokeAsync(() =>
         {
+            if (ViewModel?.PageViewMode == DetailPageViewMode.SinglePage)
+            {
+                DetailScrollViewer.ScrollToTop();
+                return;
+            }
+
             var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
             if (itemVm != null && PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
             {
@@ -96,7 +107,8 @@ public partial class DetailEditorView : UserControl
 
     private void OnScrollViewerScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (ViewModel == null || ViewModel.Pages.Count == 0) return;
+        // 連続表示時のみ、スクロール位置に応じた現在ページ判定を実施
+        if (ViewModel == null || ViewModel.Pages.Count == 0 || ViewModel.PageViewMode != DetailPageViewMode.Continuous) return;
 
         double targetCenterY = DetailScrollViewer.ViewportHeight / 2.0;
         DetailPageItemViewModel? bestMatch = null;
@@ -125,5 +137,53 @@ public partial class DetailEditorView : UserControl
                 p.IsCurrent = (p == bestMatch);
             }
         }
+    }
+
+    private void OnScrollViewerPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (ViewModel == null || ViewModel.PageViewMode != DetailPageViewMode.SinglePage) return;
+
+        double scrollableHeight = DetailScrollViewer.ScrollableHeight;
+        bool isFitInView = scrollableHeight <= 1.0;
+        bool isAtTop = DetailScrollViewer.VerticalOffset <= 1.0;
+        bool isAtBottom = DetailScrollViewer.VerticalOffset >= scrollableHeight - 1.0;
+
+        if (e.Delta > 0 && (isFitInView || isAtTop))
+        {
+            if (ViewModel.CanGoToPreviousPage)
+            {
+                // 拡大スクロールで前ページに戻る場合は移動先ページの下端へ、収まっている場合は上端へ
+                Action? postScroll = isAtTop && !isFitInView ? () => DetailScrollViewer.ScrollToBottom() : () => DetailScrollViewer.ScrollToTop();
+                if (TryTurnPage(() => ViewModel.GoToPreviousPageCommand.Execute(null), postScroll))
+                {
+                    e.Handled = true;
+                }
+            }
+        }
+        else if (e.Delta < 0 && (isFitInView || isAtBottom))
+        {
+            if (ViewModel.CanGoToNextPage)
+            {
+                // 次のページへ進む場合は常に新しいページの上端へスクロール
+                if (TryTurnPage(() => ViewModel.GoToNextPageCommand.Execute(null), () => DetailScrollViewer.ScrollToTop()))
+                {
+                    e.Handled = true;
+                }
+            }
+        }
+    }
+
+    private bool TryTurnPage(Action turnAction, Action? postScrollAction = null)
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastPageTurnTime < PageTurnCooldown) return false;
+
+        _lastPageTurnTime = now;
+        turnAction();
+        if (postScrollAction != null)
+        {
+            Dispatcher.InvokeAsync(postScrollAction, System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+        return true;
     }
 }
