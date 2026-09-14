@@ -90,8 +90,8 @@ dotnet run --project src/PDFBinder.App
 # フレームワーク依存版のみ発行（約8.4MB: OSの.NET 10デスクトップランタイムを利用・超軽量＆高速起動）
 .\build.ps1 -Target framework-dependent
 ```
-- 自己完結版（`dist/self-contained/PDFBinder.exe` および `dist/PDFBinder.exe`）: .NET未インストールのPCでも単体で起動可能。
-- フレームワーク依存版（`dist/framework-dependent/PDFBinder.exe` および `dist/PDFBinder-FrameworkDependent.exe`）: .NET 10 デスクトップランタイム導入済みPCで高速起動。
+- フレームワーク依存版（`dist/PDFBinder.exe`）: OSの.NET 10 デスクトップランタイムを利用。超軽量（約8.4MB）かつ高速起動。
+- 自己完結版（`dist/self-contained/PDFBinder.exe`）: .NETランタイム同梱（約66MB）。.NET未インストールのPCでも単体で完全オフライン動作可能。
 
 ---
 
