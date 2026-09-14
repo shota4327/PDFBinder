@@ -20,6 +20,7 @@ public partial class DetailEditorView : UserControl
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+        PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
     }
 
     /// <summary>

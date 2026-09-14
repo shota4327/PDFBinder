@@ -128,6 +128,7 @@ public class EditorInkCanvas : InkCanvas
     {
         DynamicRenderer = new PenOnlyDynamicRenderer();
         UpdateEditingMode();
+        AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) => e.Handled = true), true);
     }
 
     private static void OnToolModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
