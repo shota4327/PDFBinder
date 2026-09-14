@@ -16,6 +16,7 @@ namespace PDFBinder.App.ViewModels;
 public partial class DetailEditorViewModel : ObservableObject, IDisposable
 {
     private readonly IPdfRenderer _pdfRenderer;
+    private readonly IStrokeCacheService _strokeCacheService;
     private readonly Action _onBackToGrid;
     private readonly Func<int, PdfPageModel?> _pageLookup;
     private readonly Stack<StrokeCollection> _strokeUndoStack = new();
@@ -160,9 +161,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public DetailEditorViewModel(
         IPdfRenderer pdfRenderer,
-        PdfDocumentModel? document = null)
+        PdfDocumentModel? document = null,
+        IStrokeCacheService? strokeCacheService = null)
     {
         _pdfRenderer = pdfRenderer;
+        _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
         _onBackToGrid = () => { };
         _pageLookup = _ => null;
 
@@ -181,10 +184,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         PdfPageModel initialPage,
         IPdfRenderer pdfRenderer,
         Action onBackToGrid,
-        Func<int, PdfPageModel?> pageLookup)
+        Func<int, PdfPageModel?> pageLookup,
+        IStrokeCacheService? strokeCacheService = null)
     {
         _currentPage = initialPage;
         _pdfRenderer = pdfRenderer;
+        _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
         _onBackToGrid = onBackToGrid;
         _pageLookup = pageLookup;
 
@@ -295,10 +300,16 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                     token);
 
                 token.ThrowIfCancellationRequested();
-                if (generation == Volatile.Read(ref _renderGeneration) && rendered != null)
+                if (generation == Volatile.Read(ref _renderGeneration))
                 {
-                    // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
-                    item.PageBackground = rendered;
+                    if (rendered != null)
+                    {
+                        // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
+                        item.PageBackground = rendered;
+                    }
+
+                    // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
+                    UpdatePageStrokeCache(item);
                 }
             }
 
@@ -312,6 +323,20 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             // レンダリング例外時もクラッシュを防止
         }
+    }
+
+    /// <summary>
+    /// 指定されたページアイテムの確定済み手書きストロークキャッシュを現在のズーム倍率に合わせて更新します。
+    /// </summary>
+    public void UpdatePageStrokeCache(DetailPageItemViewModel item)
+    {
+        var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
+        item.StrokeCache = _strokeCacheService.RenderStrokeCache(
+            item.Page.InkStrokes,
+            item.Page.DisplayWidth,
+            item.Page.DisplayHeight,
+            targetWidth,
+            targetHeight);
     }
 
     /// <summary>

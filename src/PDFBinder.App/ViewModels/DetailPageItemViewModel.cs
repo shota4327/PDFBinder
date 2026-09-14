@@ -15,6 +15,12 @@ public partial class DetailPageItemViewModel : ObservableObject
     [ObservableProperty]
     private BitmapSource? _pageBackground;
 
+    /// <summary>
+    /// 確定済み手書きストロークの透過ビットマップキャッシュ画像
+    /// </summary>
+    [ObservableProperty]
+    private BitmapSource? _strokeCache;
+
     [ObservableProperty]
     private bool _isCurrent;
 

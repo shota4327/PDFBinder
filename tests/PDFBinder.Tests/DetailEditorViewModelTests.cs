@@ -1,3 +1,5 @@
+using System.Windows.Ink;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PDFBinder.App.Controls;
@@ -419,5 +421,44 @@ public class DetailEditorViewModelTests
         // 明るい色（黄、白） -> 黒ブラシ
         var yellowBrush = converter.Convert(DetailEditorViewModel.YellowPresetColor, typeof(Brush), null!, null!);
         Assert.Same(Brushes.Black, yellowBrush);
+    }
+
+    [Fact]
+    public void UpdatePageStrokeCache_GeneratesCacheBitmap_WhenStrokesExist()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var stroke = new Stroke(new StylusPointCollection { new StylusPoint(10.0, 10.0), new StylusPoint(50.0, 50.0) });
+        page.InkStrokes.Add(stroke);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        var item = vm.Pages[0];
+
+        // Act
+        vm.UpdatePageStrokeCache(item);
+
+        // Assert
+        Assert.NotNull(item.StrokeCache);
+        Assert.True(item.StrokeCache.PixelWidth > 0);
+        Assert.True(item.StrokeCache.PixelHeight > 0);
+    }
+
+    [Fact]
+    public void UpdatePageStrokeCache_SetsNull_WhenNoStrokes()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        var item = vm.Pages[0];
+
+        // Act
+        vm.UpdatePageStrokeCache(item);
+
+        // Assert
+        Assert.Null(item.StrokeCache);
     }
 }

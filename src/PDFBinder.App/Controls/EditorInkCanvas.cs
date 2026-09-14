@@ -35,6 +35,35 @@ public enum EditorToolMode
 /// </summary>
 public class EditorInkCanvas : InkCanvas
 {
+    public static readonly DependencyProperty PageItemProperty = DependencyProperty.Register(
+        nameof(PageItem),
+        typeof(DetailPageItemViewModel),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(null, OnPageItemChanged));
+
+    /// <summary>バインドされている個別ページのViewModel</summary>
+    public DetailPageItemViewModel? PageItem
+    {
+        get => (DetailPageItemViewModel?)GetValue(PageItemProperty);
+        set => SetValue(PageItemProperty, value);
+    }
+
+    private static void OnPageItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            if (e.OldValue is DetailPageItemViewModel oldItem)
+            {
+                oldItem.Page.InkStrokes.StrokesChanged -= canvas.OnMasterStrokesChanged;
+            }
+            if (e.NewValue is DetailPageItemViewModel newItem)
+            {
+                newItem.Page.InkStrokes.StrokesChanged += canvas.OnMasterStrokesChanged;
+            }
+            canvas.SyncStrokesWithCurrentMode();
+        }
+    }
+
     public static readonly DependencyProperty ToolModeProperty = DependencyProperty.Register(
         nameof(ToolMode),
         typeof(EditorToolMode),
@@ -129,6 +158,7 @@ public class EditorInkCanvas : InkCanvas
         DynamicRenderer = new PenOnlyDynamicRenderer();
         UpdateEditingMode();
         AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) => e.Handled = true), true);
+        Strokes.StrokesChanged += OnCanvasStrokesChanged;
     }
 
     private static void OnToolModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -136,6 +166,7 @@ public class EditorInkCanvas : InkCanvas
         if (d is EditorInkCanvas canvas)
         {
             canvas.UpdateEditingMode();
+            canvas.SyncStrokesWithCurrentMode();
         }
     }
 
@@ -677,8 +708,162 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
+    #region ストロークキャッシュおよびマスターコレクション連携
+
+    private bool _isInternalStrokeSync;
+
     /// <summary>
-    /// 直線をStrokeとしてStrokesコレクションにコミットします。
+    /// 現在のツールモードに合わせて、InkCanvas内部のStrokesコレクションとページマスター・キャッシュ状態を同期します。
+    /// </summary>
+    public void SyncStrokesWithCurrentMode()
+    {
+        if (PageItem == null || _isInternalStrokeSync) return;
+
+        _isInternalStrokeSync = true;
+        try
+        {
+            if (IsEraserOrSelectMode(ToolMode))
+            {
+                // 消しゴム・選択モード: InkCanvasにストロークを展開し直接編集可能にする
+                Strokes.Clear();
+                foreach (var s in PageItem.Page.InkStrokes)
+                {
+                    Strokes.Add(s);
+                }
+                PageItem.StrokeCache = null; // 重複描画を防止
+            }
+            else
+            {
+                // ペン・蛍光ペン・直線モード: InkCanvas内部は空にし、確定ストロークは背面キャッシュ画像に任せる
+                Strokes.Clear();
+                RequestCacheUpdate();
+            }
+        }
+        finally
+        {
+            _isInternalStrokeSync = false;
+        }
+    }
+
+    /// <summary>
+    /// 対象のツールが消しゴムまたは選択モードであるかを判定します。
+    /// </summary>
+    internal static bool IsEraserOrSelectMode(EditorToolMode tool) =>
+        tool is EditorToolMode.EraserStroke or EditorToolMode.EraserPoint or EditorToolMode.Select;
+
+    /// <summary>
+    /// ペン描画完了時のストローク確定処理。キャッシュ分離モード時はInkCanvasを空に保ちマスターとキャッシュを即時更新します。
+    /// </summary>
+    protected override void OnStrokeCollected(InkCanvasStrokeCollectedEventArgs e)
+    {
+        if (PageItem != null && !IsEraserOrSelectMode(ToolMode))
+        {
+            _isInternalStrokeSync = true;
+            try
+            {
+                Strokes.Remove(e.Stroke);
+            }
+            finally
+            {
+                _isInternalStrokeSync = false;
+            }
+
+            CommitNewStroke(e.Stroke);
+            base.OnStrokeCollected(e);
+            return;
+        }
+
+        base.OnStrokeCollected(e);
+    }
+
+    /// <summary>
+    /// 新規ストロークをページマスターにコミットし、キャッシュの更新を要求します。
+    /// </summary>
+    private void CommitNewStroke(Stroke stroke)
+    {
+        if (PageItem == null) return;
+
+        _isInternalStrokeSync = true;
+        try
+        {
+            PageItem.Page.InkStrokes.Add(stroke);
+        }
+        finally
+        {
+            _isInternalStrokeSync = false;
+        }
+
+        RequestCacheUpdate();
+    }
+
+    /// <summary>
+    /// 親ViewModelに対して現在のページのストロークキャッシュ更新を要求します。
+    /// </summary>
+    public void RequestCacheUpdate()
+    {
+        if (PageItem == null) return;
+        var vm = (DataContext as DetailEditorViewModel) ?? FindParentViewModel<DetailEditorViewModel>(this);
+        vm?.UpdatePageStrokeCache(PageItem);
+    }
+
+    /// <summary>
+    /// InkCanvas内部のStrokes変更時イベントハンドラー（消しゴム操作時等のマスター同期）。
+    /// </summary>
+    private void OnCanvasStrokesChanged(object? sender, StrokeCollectionChangedEventArgs e)
+    {
+        if (_isInternalStrokeSync || PageItem == null) return;
+
+        if (IsEraserOrSelectMode(ToolMode))
+        {
+            _isInternalStrokeSync = true;
+            try
+            {
+                if (e.Removed.Count > 0)
+                {
+                    foreach (var s in e.Removed)
+                    {
+                        PageItem.Page.InkStrokes.Remove(s);
+                    }
+                }
+                if (e.Added.Count > 0)
+                {
+                    foreach (var s in e.Added)
+                    {
+                        if (!PageItem.Page.InkStrokes.Contains(s))
+                        {
+                            PageItem.Page.InkStrokes.Add(s);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _isInternalStrokeSync = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 外部（Undo/Redoなど）によるページマスターストローク変更時のイベントハンドラー。
+    /// </summary>
+    private void OnMasterStrokesChanged(object? sender, StrokeCollectionChangedEventArgs e)
+    {
+        if (_isInternalStrokeSync || PageItem == null) return;
+
+        if (IsEraserOrSelectMode(ToolMode))
+        {
+            SyncStrokesWithCurrentMode();
+        }
+        else
+        {
+            RequestCacheUpdate();
+        }
+    }
+
+    #endregion
+
+    /// <summary>
+    /// 直線をStrokeとしてコミットします。
     /// </summary>
     private void CommitStraightLine(Point start, Point end)
     {
@@ -689,7 +874,14 @@ public class EditorInkCanvas : InkCanvas
         };
 
         var stroke = new Stroke(points, DefaultDrawingAttributes.Clone());
-        Strokes.Add(stroke);
+        if (PageItem != null && !IsEraserOrSelectMode(ToolMode))
+        {
+            CommitNewStroke(stroke);
+        }
+        else
+        {
+            Strokes.Add(stroke);
+        }
     }
 
     private static ScrollViewer? FindParentScrollViewer(DependencyObject? current)
