@@ -93,12 +93,12 @@ public class PageNavigationAndViewOptionsTests
         // Arrange
         var doc = CreateSampleDocument(3);
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
-        vm.UpdateViewportSize(660, 860);
+        vm.UpdateViewportSize(682, 882);
 
         // Act & Assert: 幅に合わせる
         vm.SetFitModeCommand.Execute(DetailViewFitMode.FitToWidth);
         Assert.Equal(DetailViewFitMode.FitToWidth, vm.FitMode);
-        Assert.Equal(1.0, vm.Zoom, precision: 2); // availableWidth = 660 - 60 = 600, 600/600 = 1.0
+        Assert.Equal(1.0, vm.Zoom, precision: 2); // availableWidth = 682 - 80 - 2 = 600, 600/600 = 1.0
 
         // Act & Assert: 100%（原寸）
         vm.SetFitModeCommand.Execute(DetailViewFitMode.ActualSize);
@@ -112,7 +112,7 @@ public class PageNavigationAndViewOptionsTests
         // Arrange
         var doc = CreateSampleDocument(3);
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
-        vm.UpdateViewportSize(1260, 800); // availableWidth = 1260 - 60 - 2 = 1198, 縦スクロール発生のため 1198 - 18 = 1180
+        vm.UpdateViewportSize(1280, 800); // availableWidth = 1280 - 80 - 2 = 1198, 縦スクロール発生のため 1198 - 18 = 1180
 
         // Act: ラジオボタンのTwoWayバインディングと同様にプロパティを直接設定
         vm.FitMode = DetailViewFitMode.FitToWidth;
@@ -133,7 +133,7 @@ public class PageNavigationAndViewOptionsTests
         // Arrange: 初期ドキュメント（幅600）
         var doc = CreateSampleDocument(1);
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
-        vm.UpdateViewportSize(660, 860); // availableWidth = 600
+        vm.UpdateViewportSize(682, 882); // availableWidth = 600
         vm.FitMode = DetailViewFitMode.FitToWidth;
         Assert.Equal(1.0, vm.Zoom, precision: 2);
 
@@ -193,14 +193,14 @@ public class PageNavigationAndViewOptionsTests
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
         vm.SetFitMode(DetailViewFitMode.FitToWidth);
 
-        // Act: 横幅が拡大された場合 (availableWidth: 1260 - 60 - 2 = 1198, 縦スクロール発生のため 1180)
-        vm.UpdateViewportSize(1260, 800);
+        // Act: 横幅が拡大された場合 (availableWidth: 1280 - 80 - 2 = 1198, 縦スクロール発生のため 1180)
+        vm.UpdateViewportSize(1280, 800);
 
         // Assert: 1180 / 600 = 1.967 ≒ 1.97
         Assert.Equal(1.97, vm.Zoom, precision: 2);
 
-        // Act: 横幅が縮小された場合 (availableWidth: 360 - 60 = 300)
-        vm.UpdateViewportSize(360, 800);
+        // Act: 横幅が縮小された場合 (availableWidth: 382 - 80 - 2 = 300)
+        vm.UpdateViewportSize(382, 800);
 
         // Assert: 300 / 600 = 0.5
         Assert.Equal(0.5, vm.Zoom, precision: 2);

@@ -530,7 +530,7 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.SinglePage;
-        vm.UpdateViewportSize(860, 1000); // availableWidth = 860 - 60 - 2 = 798
+        vm.UpdateViewportSize(880, 1000); // availableWidth = 880 - 80 - 2 = 798
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
         // page1 の幅500, 高さ800 -> 縦スクロール発生のため 780 / 500 = 1.56
@@ -558,7 +558,7 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.Continuous;
-        vm.UpdateViewportSize(860, 1000);
+        vm.UpdateViewportSize(880, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
         double initialZoom = vm.Zoom; // page1基準（スクロールバー考慮）: 1.56
@@ -585,15 +585,15 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.Continuous;
-        vm.UpdateViewportSize(860, 1000);
+        vm.UpdateViewportSize(880, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
         Assert.Equal(1.56, vm.Zoom, 2);
 
         // カレントページを page2 にしてウィンドウをリサイズ
         vm.CurrentPage = page2;
-        // リサイズ発生 (ViewportWidth = 1060 -> availableWidth = 1060 - 62 = 998, 縦スクロール考慮で 980)
-        vm.UpdateViewportSize(1060, 1000);
+        // リサイズ発生 (ViewportWidth = 1080 -> availableWidth = 1080 - 82 = 998, 縦スクロール考慮で 980)
+        vm.UpdateViewportSize(1080, 1000);
 
         // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 980 / 1000 = 0.98
         Assert.Equal(0.98, vm.Zoom, 2);
@@ -619,15 +619,19 @@ public class DetailEditorViewModelTests
         // FitToWindow 適用
         vm.FitMode = DetailViewFitMode.FitToWindow;
 
-        // 計算後のコンテンツサイズ（マージンなし、Padding=60、SafetyBuffer=2 を考慮）
+        // 計算後のコンテンツサイズ（Padding=40、影マージン=40、SafetyBuffer=2 を考慮）
         double renderedWidth = page.DisplayWidth * vm.Zoom;
         double renderedHeight = page.DisplayHeight * vm.Zoom;
 
-        // コンテンツ幅 + Padding(60) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
-        Assert.True(renderedWidth + 60.0 <= viewportW);
+        // コンテンツ幅 + 合計水平マージン(80.0) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
+        Assert.True(renderedWidth + DetailEditorViewModel.TotalHorizontalMargin <= viewportW);
 
-        // コンテンツ高さ + Padding(60) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
-        Assert.True(renderedHeight + 60.0 <= viewportH);
+        // コンテンツ高さ + 合計垂直マージン(80.0) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
+        Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
+
+        // 影用マージン(上下左右20px)が確保されているため、上下影(上12px, 下20px)・左右影(16px)が完全に収まる
+        Assert.True(DetailEditorViewModel.PageShadowMargin >= 20.0);
+        Assert.True(DetailEditorViewModel.ScrollViewerPadding == 20.0);
     }
 
     [Fact]
@@ -729,5 +733,34 @@ public class DetailEditorViewModelTests
         Assert.Equal(DetailEditorViewModel.MaxRenderDimension, width);
         Assert.Equal(DetailEditorViewModel.MaxRenderDimension, height);
         Assert.Equal(8192, DetailEditorViewModel.MaxRenderDimension);
+    }
+
+    [Fact]
+    public void FitMode_SinglePageMode_LandscapePage_FitToWindow_FitsCompletelyInsideViewport()
+    {
+        // 横長ページ（A4横: 842 x 595）
+        var page = CreateSamplePage(842, 595);
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+
+        // ビューポートサイズ: 800 x 600
+        double viewportW = 800.0;
+        double viewportH = 600.0;
+        vm.UpdateViewportSize(viewportW, viewportH);
+
+        // FitToWindow 適用（横幅が上限になる）
+        vm.FitMode = DetailViewFitMode.FitToWindow;
+
+        double renderedWidth = page.DisplayWidth * vm.Zoom;
+        double renderedHeight = page.DisplayHeight * vm.Zoom;
+
+        // コンテンツ幅 + 合計水平マージン(80.0) が ViewportWidth 以内に確実に収まる
+        Assert.True(renderedWidth + DetailEditorViewModel.TotalHorizontalMargin <= viewportW);
+        // コンテンツ高さ + 合計垂直マージン(80.0) が ViewportHeight 以内に確実に収まる
+        Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
     }
 }
