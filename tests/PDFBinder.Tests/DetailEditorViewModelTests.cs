@@ -654,4 +654,80 @@ public class DetailEditorViewModelTests
         Assert.False(vm.Pages[2].IsFirstPage);
         Assert.True(vm.Pages[2].IsLastPage);
     }
+
+    [Fact]
+    public void GetNextZoomIn_And_GetNextZoomOut_SnapToPresetStepsCorrectly()
+    {
+        // 等倍(1.0)からのズームイン・ズームアウト
+        Assert.Equal(1.25, DetailEditorViewModel.GetNextZoomIn(1.0));
+        Assert.Equal(0.75, DetailEditorViewModel.GetNextZoomOut(1.0));
+
+        // 端数(1.37)からのズームイン・ズームアウト（直近上位・下位へのスナップ）
+        Assert.Equal(1.5, DetailEditorViewModel.GetNextZoomIn(1.37));
+        Assert.Equal(1.25, DetailEditorViewModel.GetNextZoomOut(1.37));
+
+        // 高倍率域(16.0)からのズームイン・ズームアウト
+        Assert.Equal(20.0, DetailEditorViewModel.GetNextZoomIn(16.0));
+        Assert.Equal(14.0, DetailEditorViewModel.GetNextZoomOut(16.0));
+
+        // 境界値（上限 32.0）
+        Assert.Equal(DetailEditorViewModel.MaxZoom, DetailEditorViewModel.GetNextZoomIn(32.0));
+        Assert.Equal(DetailEditorViewModel.MaxZoom, DetailEditorViewModel.GetNextZoomIn(35.0));
+        Assert.Equal(28.0, DetailEditorViewModel.GetNextZoomOut(32.0));
+
+        // 境界値（下限 0.5）
+        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.5));
+        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.2));
+        Assert.Equal(0.75, DetailEditorViewModel.GetNextZoomIn(0.5));
+    }
+
+    [Fact]
+    public void ZoomIn_And_ZoomOut_Commands_TraverseStepsAndClamp()
+    {
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+
+        // 初期値 1.0
+        Assert.Equal(1.0, vm.Zoom);
+
+        // ズームインを繰り返して MaxZoom (32.0) まで到達
+        for (int i = 0; i < DetailEditorViewModel.ZoomSnapSteps.Length; i++)
+        {
+            vm.ZoomInCommand.Execute(null);
+        }
+        Assert.Equal(DetailEditorViewModel.MaxZoom, vm.Zoom);
+
+        // 最大値からの追加ズームインでも MaxZoom を維持
+        vm.ZoomInCommand.Execute(null);
+        Assert.Equal(DetailEditorViewModel.MaxZoom, vm.Zoom);
+
+        // ズームアウトを繰り返して MinZoom (0.5) まで到達
+        for (int i = 0; i < DetailEditorViewModel.ZoomSnapSteps.Length + 5; i++)
+        {
+            vm.ZoomOutCommand.Execute(null);
+        }
+        Assert.Equal(DetailEditorViewModel.MinZoom, vm.Zoom);
+
+        // 最小値からの追加ズームアウトでも MinZoom を維持
+        vm.ZoomOutCommand.Execute(null);
+        Assert.Equal(DetailEditorViewModel.MinZoom, vm.Zoom);
+    }
+
+    [Fact]
+    public void CalculateRenderDimensions_ClampsToMaxRenderDimension8192()
+    {
+        var page = CreateSamplePage(1000, 1000);
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(page);
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+
+        // 32倍ズーム時、1000pt * 1.333 * 32 ≒ 42666px だが 8192px にクランプされる
+        var (width, height) = vm.CalculateRenderDimensions(page, 32.0);
+        Assert.Equal(DetailEditorViewModel.MaxRenderDimension, width);
+        Assert.Equal(DetailEditorViewModel.MaxRenderDimension, height);
+        Assert.Equal(8192, DetailEditorViewModel.MaxRenderDimension);
+    }
 }

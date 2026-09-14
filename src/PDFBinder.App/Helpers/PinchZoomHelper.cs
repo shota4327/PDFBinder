@@ -21,8 +21,8 @@ public static class PinchZoomHelper
     /// <summary>最小ズーム倍率（50%）</summary>
     public const double DefaultMinZoom = 0.5;
 
-    /// <summary>最大ズーム倍率（300%）</summary>
-    public const double DefaultMaxZoom = 3.0;
+    /// <summary>最大ズーム倍率（3200%）</summary>
+    public const double DefaultMaxZoom = 32.0;
 
     /// <summary>
     /// ピンチ操作による新しいズーム倍率および中心点追従スクロールオフセットを算出します。
