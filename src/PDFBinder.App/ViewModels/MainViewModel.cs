@@ -417,11 +417,10 @@ public partial class MainViewModel : ObservableObject
             return ConfirmSavePrompt(fileName);
         }
 
-        var result = MessageBox.Show(
-            $"{fileName} への変更内容を保存しますか？",
-            "PDF Binder",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question);
+        var owner = Application.Current?.MainWindow;
+        var result = (owner != null && owner.IsVisible)
+            ? MessageBox.Show(owner, $"{fileName} への変更内容を保存しますか？", "PDF Binder", MessageBoxButton.YesNoCancel, MessageBoxImage.Question)
+            : MessageBox.Show($"{fileName} への変更内容を保存しますか？", "PDF Binder", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
 
         return result switch
         {

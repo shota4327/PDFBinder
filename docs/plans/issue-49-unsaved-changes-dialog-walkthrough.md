@@ -29,9 +29,16 @@ PDFの追加、並び替え、削除、回転、白紙追加、手書き描画�
   - `SaveDocumentAsync`, `SaveDocumentAsAsync`, `ExecuteSaveAsync` が `Task<bool>` を返し、保存成功/キャンセル/失敗の成否を伝播可能に改修。
   - `OpenDocumentAsync` にて、未保存変更がある場合は確認ダイアログを挟むフローを組み込み。
 - **[`MainWindow.xaml.cs`](file:///c:/Git/PDFBinder/src/PDFBinder.App/MainWindow.xaml.cs)**:
-  - `OnClosing` をオーバーライドし、未保存変更がある場合はクローズを保留（`e.Cancel = true`）して非同期保存確認 `ConfirmSaveAndProceedAsync()` を実行。続行可であればクローズを再開。
+  - `OnClosing` をオーバーライドし、未保存変更がある場合は確認ダイアログを表示。
+  - 「キャンセル」時は `e.Cancel = true` で終了中止。
+  - 「いいえ（破棄）」時は `e.Cancel = false` のままリターンし、自然かつ安全にウィンドウを終了（再入クローズによるフリーズを解消）。
+  - 「はい（保存）」時は `e.Cancel = true` として保存を実行し、保存成功後に `Dispatcher.BeginInvoke` で安全にクローズ。
 
-### 2.3 ドキュメント更新
+### 2.3 不具合修正（「いいえ」選択時のアプリフリーズ解消）
+- **発生原因**: `OnClosing` 内でダイアログ表示前に `e.Cancel = true` を設定していたため、「いいえ」選択時に同一コールスタックから同期的に `Close()` が再入呼び出しされ、WPF内部のクローズ状態と競合してウィンドウが固まる現象が発生していた。
+- **恒久対策**: 「いいえ」選択時は `e.Cancel = true` を行わず、そのまま `OnClosing` を完了させることでWPFの標準クローズ処理を自然に進行させる設計に修正。また `MessageBox.Show` にオーナーウィンドウ（`MainWindow`）を指定してモーダル制御を安定化。
+
+### 2.4 ドキュメント更新
 - **[`docs/basic_design.md`](file:///c:/Git/PDFBinder/docs/basic_design.md)**: モデル定義の更新および「6.4 未保存変更の保護フロー」を追加。
 - **[`docs/PROJECT.md`](file:///c:/Git/PDFBinder/docs/PROJECT.md)**: 機能インベントリに `F18` を追加、テスト件数（117件）を更新。
 - **[`README.md`](file:///c:/Git/PDFBinder/README.md)**: 機能一覧に未保存変更の保護を追加。

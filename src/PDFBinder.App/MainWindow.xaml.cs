@@ -36,15 +36,31 @@ public partial class MainWindow : Window
 
         if (_isClosingConfirmed) return;
 
-        if (DataContext is MainViewModel vm && vm.Document.IsModified && vm.Document.Pages.Count > 0)
+        if (DataContext is not MainViewModel vm || !vm.Document.IsModified || vm.Document.Pages.Count == 0)
+        {
+            return;
+        }
+
+        var choice = vm.PromptSaveConfirmation(vm.Document.FileName);
+        if (choice == SaveConfirmationResult.Cancel)
         {
             e.Cancel = true;
-            bool canClose = await vm.ConfirmSaveAndProceedAsync();
-            if (canClose)
-            {
-                _isClosingConfirmed = true;
-                Close();
-            }
+            return;
+        }
+
+        if (choice == SaveConfirmationResult.Discard)
+        {
+            // 保存せずにそのまま終了（e.Cancel = false のまま終了処理を続行）
+            return;
+        }
+
+        // 保存（Save）が選択された場合
+        e.Cancel = true;
+        bool saved = await vm.SaveDocumentAsync();
+        if (saved)
+        {
+            _isClosingConfirmed = true;
+            _ = Dispatcher.BeginInvoke(new Action(Close));
         }
     }
 
