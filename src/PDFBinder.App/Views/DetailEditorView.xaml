@@ -45,31 +45,39 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:DetailPageItemViewModel}">
-                        <Border Margin="0,15"
-                                HorizontalAlignment="Center"
-                                Background="White"
-                                CornerRadius="4"
-                                BorderThickness="1"
-                                BorderBrush="#CBD5E1"
-                                PreviewMouseDown="OnPagePreviewMouseDown">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
-                            </Border.Effect>
+                        <!-- 影とページコンテンツを分離したレイアウトコンテナ -->
+                        <Grid Margin="0,15"
+                              HorizontalAlignment="Center"
+                              PreviewMouseDown="OnPagePreviewMouseDown">
+                            <!-- 影専用の背景要素（子要素を持たないため、InkCanvas描画中にシェーダー再計算・再ラスタライズが発生しない） -->
+                            <Border Background="White"
+                                    CornerRadius="4"
+                                    BorderThickness="1"
+                                    BorderBrush="#CBD5E1">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.15" />
+                                </Border.Effect>
+                            </Border>
 
-                            <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}">
+                            <!-- ページ描画コンテナ（Effectがかかっていないため超高速描画） -->
+                            <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}" ClipToBounds="True">
                                 <!-- 背景PDFレンダリング画像 -->
                                 <Image Source="{Binding PageBackground}" Stretch="Fill"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
 
-                                <!-- 前面手書きInkCanvas -->
-                                <controls:EditorInkCanvas Strokes="{Binding Page.InkStrokes}"
+                                <!-- 確定済みストロークの透過ビットマップキャッシュ画像 -->
+                                <Image Source="{Binding StrokeCache}" Stretch="Fill"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+
+                                <!-- 前面手書きInkCanvas（ペン描画中は現在描画中の1画のみを保持して超高速動作） -->
+                                <controls:EditorInkCanvas PageItem="{Binding}"
                                                           ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                           Background="Transparent" />
                             </Grid>
-                        </Border>
+                        </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

@@ -48,19 +48,28 @@ public class PenOnlyDynamicRenderer : DynamicRenderer
         base.OnStylusUp(rawStylusInput);
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _deviceTouchCache = new();
+
     /// <summary>
-    /// 入力元デバイスが手指タッチ（Touch）か判定します。
+    /// 入力元デバイスが手指タッチ（Touch）か判定します（判定結果はキャッシュしてペンスレッドを高速化）。
     /// </summary>
     private static bool IsTouchInput(RawStylusInput rawStylusInput)
     {
         try
         {
             int tabletId = rawStylusInput.TabletDeviceId;
+            if (_deviceTouchCache.TryGetValue(tabletId, out bool isTouch))
+            {
+                return isTouch;
+            }
+
             foreach (TabletDevice device in Tablet.TabletDevices)
             {
                 if (device.Id == tabletId)
                 {
-                    return device.Type == TabletDeviceType.Touch;
+                    bool result = device.Type == TabletDeviceType.Touch;
+                    _deviceTouchCache[tabletId] = result;
+                    return result;
                 }
             }
         }
