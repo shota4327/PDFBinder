@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -38,8 +39,32 @@ public partial class PdfDocumentModel : ObservableObject
 
     private void OnPagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (e.OldItems != null)
+        {
+            foreach (PdfPageModel page in e.OldItems)
+            {
+                page.PropertyChanged -= OnPagePropertyChanged;
+            }
+        }
+
+        if (e.NewItems != null)
+        {
+            foreach (PdfPageModel page in e.NewItems)
+            {
+                page.PropertyChanged += OnPagePropertyChanged;
+            }
+        }
+
         UpdatePageNumbers();
         IsModified = true;
+    }
+
+    private void OnPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfPageModel.IsModified) && sender is PdfPageModel { IsModified: true })
+        {
+            IsModified = true;
+        }
     }
 
     /// <summary>
@@ -104,12 +129,29 @@ public partial class PdfDocumentModel : ObservableObject
     }
 
     /// <summary>
+    /// ドキュメントおよび全ページの変更状態（未保存フラグおよびサムネイル更新フラグ）を初期化します。
+    /// </summary>
+    public void ResetModifiedState()
+    {
+        IsModified = false;
+        foreach (var page in Pages)
+        {
+            page.IsModified = false;
+            page.IsThumbnailDirty = false;
+        }
+    }
+
+    /// <summary>
     /// ドキュメントをクリアします。
     /// </summary>
     public void Clear()
     {
+        foreach (var page in Pages)
+        {
+            page.PropertyChanged -= OnPagePropertyChanged;
+        }
         Pages.Clear();
         FilePath = null;
-        IsModified = false;
+        ResetModifiedState();
     }
 }

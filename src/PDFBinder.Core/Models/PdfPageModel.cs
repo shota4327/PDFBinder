@@ -48,6 +48,15 @@ public partial class PdfPageModel : ObservableObject
     [ObservableProperty]
     private bool _isModified;
 
+    [ObservableProperty]
+    private bool _isThumbnailDirty;
+
+    partial void OnRotationChanged(PageRotation value)
+    {
+        IsModified = true;
+        IsThumbnailDirty = true;
+    }
+
     /// <summary>ユーザーによる手書きストロークコレクション</summary>
     public StrokeCollection InkStrokes { get; set; } = new();
 
@@ -56,7 +65,11 @@ public partial class PdfPageModel : ObservableObject
     /// </summary>
     public PdfPageModel()
     {
-        InkStrokes.StrokesChanged += (s, e) => IsModified = true;
+        InkStrokes.StrokesChanged += (s, e) =>
+        {
+            IsModified = true;
+            IsThumbnailDirty = true;
+        };
     }
 
     /// <summary>
@@ -66,6 +79,7 @@ public partial class PdfPageModel : ObservableObject
     {
         Rotation = Rotation.RotateClockwise();
         IsModified = true;
+        IsThumbnailDirty = true;
     }
 
     /// <summary>
@@ -75,6 +89,7 @@ public partial class PdfPageModel : ObservableObject
     {
         Rotation = Rotation.RotateCounterClockwise();
         IsModified = true;
+        IsThumbnailDirty = true;
     }
 
     /// <summary>

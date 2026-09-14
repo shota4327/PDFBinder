@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -22,6 +23,45 @@ public partial class MainWindow : Window
         CommandBindings.Add(new CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
 
         StateChanged += OnWindowStateChanged;
+    }
+
+    private bool _isClosingConfirmed;
+
+    /// <summary>
+    /// ウィンドウ終了時に未保存の変更がある場合、確認ダイアログを表示して終了処理を制御します。
+    /// </summary>
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+
+        if (_isClosingConfirmed) return;
+
+        if (DataContext is not MainViewModel vm || !vm.Document.IsModified || vm.Document.Pages.Count == 0)
+        {
+            return;
+        }
+
+        var choice = vm.PromptSaveConfirmation(vm.Document.FileName);
+        if (choice == SaveConfirmationResult.Cancel)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (choice == SaveConfirmationResult.Discard)
+        {
+            // 保存せずにそのまま終了（e.Cancel = false のまま終了処理を続行）
+            return;
+        }
+
+        // 保存（Save）が選択された場合
+        e.Cancel = true;
+        bool saved = await vm.SaveDocumentAsync();
+        if (saved)
+        {
+            _isClosingConfirmed = true;
+            _ = Dispatcher.BeginInvoke(new Action(Close));
+        }
     }
 
     /// <summary>
