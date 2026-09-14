@@ -18,7 +18,6 @@ Write-Host "==========================================================" -Foregro
 
 $distDir = Join-Path $PSScriptRoot "dist"
 $selfContainedDir = Join-Path $distDir "self-contained"
-$frameworkDependentDir = Join-Path $distDir "framework-dependent"
 $projectPath = Join-Path $PSScriptRoot "src/PDFBinder.App/PDFBinder.App.csproj"
 
 # Clean output directories
@@ -29,11 +28,17 @@ if ($Target -eq "all") {
     }
 } elseif ($Target -eq "self-contained") {
     if (Test-Path $selfContainedDir) {
+        Write-Host "Cleaning dist/self-contained folder..." -ForegroundColor Yellow
         Remove-Item $selfContainedDir -Recurse -Force
     }
 } elseif ($Target -eq "framework-dependent") {
-    if (Test-Path $frameworkDependentDir) {
-        Remove-Item $frameworkDependentDir -Recurse -Force
+    if (Test-Path $distDir) {
+        Write-Host "Cleaning framework-dependent files in dist folder..." -ForegroundColor Yellow
+        Get-ChildItem -Path $distDir -File | Remove-Item -Force
+        $oldFdDir = Join-Path $distDir "framework-dependent"
+        if (Test-Path $oldFdDir) {
+            Remove-Item $oldFdDir -Recurse -Force
+        }
     }
 }
 
@@ -51,10 +56,7 @@ if ($Target -eq "all" -or $Target -eq "self-contained") {
         -o $selfContainedDir
 
     $scExe = Join-Path $selfContainedDir "PDFBinder.exe"
-    if (Test-Path $scExe) {
-        # Keep backward compatibility and root placement
-        Copy-Item -Path $scExe -Destination (Join-Path $distDir "PDFBinder.exe") -Force
-    } else {
+    if (-not (Test-Path $scExe)) {
         Write-Error "Failed to build Self-Contained PDFBinder.exe"
     }
 }
@@ -69,13 +71,10 @@ if ($Target -eq "all" -or $Target -eq "framework-dependent") {
         --no-self-contained `
         -p:PublishSingleFile=true `
         -p:IncludeNativeLibrariesForSelfExtract=true `
-        -o $frameworkDependentDir
+        -o $distDir
 
-    $fdExe = Join-Path $frameworkDependentDir "PDFBinder.exe"
-    if (Test-Path $fdExe) {
-        # Place alias in root dist directory
-        Copy-Item -Path $fdExe -Destination (Join-Path $distDir "PDFBinder-FrameworkDependent.exe") -Force
-    } else {
+    $fdExe = Join-Path $distDir "PDFBinder.exe"
+    if (-not (Test-Path $fdExe)) {
         Write-Error "Failed to build Framework-Dependent PDFBinder.exe"
     }
 }
@@ -86,25 +85,25 @@ Write-Host "==========================================================" -Foregro
 Write-Host " Publish Summary" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 
+$fdSummaryExe = Join-Path $distDir "PDFBinder.exe"
+if (Test-Path $fdSummaryExe) {
+    $fdItem = Get-Item $fdSummaryExe
+    $fdSizeMb = [Math]::Round($fdItem.Length / 1MB, 2)
+    Write-Host " [Framework-Dependent / フレームワーク依存版]" -ForegroundColor Cyan
+    Write-Host "  - Path: $fdSummaryExe" -ForegroundColor White
+    Write-Host "  - Size: $fdSizeMb MB" -ForegroundColor Yellow
+    Write-Host "  - Info: Requires .NET 10 Desktop Runtime installed on OS. Lightweight, faster cold start." -ForegroundColor Gray
+    Write-Host ""
+}
+
 $scSummaryExe = Join-Path $selfContainedDir "PDFBinder.exe"
 if (Test-Path $scSummaryExe) {
     $scItem = Get-Item $scSummaryExe
     $scSizeMb = [Math]::Round($scItem.Length / 1MB, 2)
     Write-Host " [Self-Contained / 自己完結版]" -ForegroundColor Cyan
-    Write-Host "  - Path: $scSummaryExe (and dist/PDFBinder.exe)" -ForegroundColor White
+    Write-Host "  - Path: $scSummaryExe" -ForegroundColor White
     Write-Host "  - Size: $scSizeMb MB" -ForegroundColor Yellow
     Write-Host "  - Info: Bundles .NET 10 runtime. Fully offline, no pre-installed runtime required." -ForegroundColor Gray
-    Write-Host ""
-}
-
-$fdSummaryExe = Join-Path $frameworkDependentDir "PDFBinder.exe"
-if (Test-Path $fdSummaryExe) {
-    $fdItem = Get-Item $fdSummaryExe
-    $fdSizeMb = [Math]::Round($fdItem.Length / 1MB, 2)
-    Write-Host " [Framework-Dependent / フレームワーク依存版]" -ForegroundColor Cyan
-    Write-Host "  - Path: $fdSummaryExe (and dist/PDFBinder-FrameworkDependent.exe)" -ForegroundColor White
-    Write-Host "  - Size: $fdSizeMb MB" -ForegroundColor Yellow
-    Write-Host "  - Info: Requires .NET 10 Desktop Runtime installed on OS. Lightweight, faster cold start." -ForegroundColor Gray
     Write-Host ""
 }
 
