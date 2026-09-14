@@ -103,7 +103,7 @@ public class EditorInkCanvas : InkCanvas
     private ScrollViewer? _parentScrollViewer;
 
     /// <summary>スタイラス離脱後のパーム抑制クールダウン時間（ミリ秒）</summary>
-    internal const int StylusSuppressionCooldownMs = 500;
+    internal const int StylusSuppressionCooldownMs = 150;
 
     /// <summary>1本指スクロール（パン）開始と判定する移動距離閾値（タッチスロップ）</summary>
     internal const double TouchSlopThreshold = 8.0;
@@ -336,9 +336,9 @@ public class EditorInkCanvas : InkCanvas
             _isStylusTouching = true;
             _lastStylusActivityTime = DateTime.UtcNow;
             PurgeActiveTouches();
+            base.OnPreviewStylusDown(e);
         }
-
-        base.OnPreviewStylusDown(e);
+        // タッチデバイス（TabletDeviceType.Touch）時はbaseを呼ばず、InkCanvasによる誤描画を根本防止する
     }
 
     protected override void OnPreviewStylusMove(StylusEventArgs e)
@@ -346,9 +346,8 @@ public class EditorInkCanvas : InkCanvas
         if (IsStylusDevice(e))
         {
             _lastStylusActivityTime = DateTime.UtcNow;
+            base.OnPreviewStylusMove(e);
         }
-
-        base.OnPreviewStylusMove(e);
     }
 
     protected override void OnPreviewStylusUp(StylusEventArgs e)
@@ -357,9 +356,8 @@ public class EditorInkCanvas : InkCanvas
         {
             _isStylusTouching = false;
             _lastStylusActivityTime = DateTime.UtcNow;
+            base.OnPreviewStylusUp(e);
         }
-
-        base.OnPreviewStylusUp(e);
     }
 
     protected override void OnStylusInAirMove(StylusEventArgs e)
@@ -424,7 +422,7 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
-    private static bool IsStylusDevice(StylusEventArgs e) =>
+    internal static bool IsStylusDevice(StylusEventArgs e) =>
         e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus;
 
     #endregion
