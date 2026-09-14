@@ -102,6 +102,12 @@ public class EditorInkCanvas : InkCanvas
     private Point? _panStartPoint;
     private ScrollViewer? _parentScrollViewer;
 
+    /// <summary>スタイラス離脱後のパーム抑制クールダウン時間（ミリ秒）</summary>
+    internal const int StylusSuppressionCooldownMs = 500;
+
+    /// <summary>1本指スクロール（パン）開始と判定する移動距離閾値（タッチスロップ）</summary>
+    internal const double TouchSlopThreshold = 8.0;
+
     // スタイラスペン状態およびパームリジェクション管理
     private bool _isStylusTouching;
     private bool _isStylusInRange;
@@ -109,6 +115,9 @@ public class EditorInkCanvas : InkCanvas
 
     // マルチタッチ（パン・ピンチズーム）管理
     private readonly Dictionary<int, Point> _activeTouchPoints = new();
+    private readonly Dictionary<int, Point> _touchStartPoints = new();
+    private readonly HashSet<TouchDevice> _capturedTouchDevices = new();
+    private bool _isPanningStarted;
     private double? _initialPinchDistance;
     private Point? _lastPinchCenter;
 
@@ -325,6 +334,7 @@ public class EditorInkCanvas : InkCanvas
         {
             _isStylusTouching = true;
             _lastStylusActivityTime = DateTime.UtcNow;
+            PurgeActiveTouches();
         }
 
         base.OnPreviewStylusDown(e);
@@ -357,6 +367,7 @@ public class EditorInkCanvas : InkCanvas
         {
             _isStylusInRange = true;
             _lastStylusActivityTime = DateTime.UtcNow;
+            PurgeActiveTouches();
         }
         base.OnStylusInAirMove(e);
     }
@@ -367,6 +378,7 @@ public class EditorInkCanvas : InkCanvas
         {
             _isStylusInRange = true;
             _lastStylusActivityTime = DateTime.UtcNow;
+            PurgeActiveTouches();
         }
         base.OnStylusInRange(e);
     }
@@ -384,10 +396,31 @@ public class EditorInkCanvas : InkCanvas
     /// <summary>
     /// スタイラスペンが接地・近接（ホバー）中か判定し、タッチ操作を抑止すべきか返します。
     /// </summary>
-    private bool IsStylusSuppressed()
+    internal bool IsStylusSuppressed()
     {
         if (_isStylusTouching || _isStylusInRange) return true;
-        return (DateTime.UtcNow - _lastStylusActivityTime).TotalMilliseconds < 350;
+        return (DateTime.UtcNow - _lastStylusActivityTime).TotalMilliseconds < StylusSuppressionCooldownMs;
+    }
+
+    /// <summary>
+    /// スタイラス検知時などに、残存する手指タッチおよびキャプチャを即時破棄し、描画モードを復元します。
+    /// </summary>
+    internal void PurgeActiveTouches()
+    {
+        if (_activeTouchPoints.Count > 0 || _capturedTouchDevices.Count > 0)
+        {
+            foreach (var device in _capturedTouchDevices.ToList())
+            {
+                ReleaseTouchCapture(device);
+            }
+            _capturedTouchDevices.Clear();
+            _activeTouchPoints.Clear();
+            _touchStartPoints.Clear();
+            _isPanningStarted = false;
+            _initialPinchDistance = null;
+            _lastPinchCenter = null;
+            UpdateEditingMode();
+        }
     }
 
     private static bool IsStylusDevice(StylusEventArgs e) =>
@@ -409,15 +442,20 @@ public class EditorInkCanvas : InkCanvas
         // タッチ操作中はインク収集モードを一時停止してパン・ズームに専念
         EditingMode = InkCanvasEditingMode.None;
 
-        CaptureTouch(e.TouchDevice);
+        if (CaptureTouch(e.TouchDevice))
+        {
+            _capturedTouchDevices.Add(e.TouchDevice);
+        }
         _parentScrollViewer ??= FindParentScrollViewer(this);
 
         if (_parentScrollViewer != null)
         {
             Point pos = e.GetTouchPoint(_parentScrollViewer).Position;
             _activeTouchPoints[e.TouchDevice.Id] = pos;
+            _touchStartPoints[e.TouchDevice.Id] = pos;
 
-            // タッチ点数が変化した時はピンチズームの基準点をリセット
+            // タッチ点数が変化した時はピンチズームの基準点およびパン開始状態をリセット
+            _isPanningStarted = false;
             _initialPinchDistance = null;
             _lastPinchCenter = null;
         }
@@ -427,6 +465,12 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewTouchMove(TouchEventArgs e)
     {
+        if (IsStylusSuppressed())
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (!_activeTouchPoints.ContainsKey(e.TouchDevice.Id)) return;
 
         _parentScrollViewer ??= FindParentScrollViewer(this);
@@ -468,6 +512,23 @@ public class EditorInkCanvas : InkCanvas
     private void HandleOneFingerPan(int touchId, Point newPos)
     {
         if (_parentScrollViewer == null) return;
+
+        // タッチスロップ判定（一定以上の移動があるまでスクロールを開始しない）
+        if (!_isPanningStarted)
+        {
+            if (_touchStartPoints.TryGetValue(touchId, out Point startPos))
+            {
+                Vector diff = newPos - startPos;
+                if (diff.Length < TouchSlopThreshold)
+                {
+                    return;
+                }
+
+                _isPanningStarted = true;
+                _activeTouchPoints[touchId] = newPos;
+            }
+            return;
+        }
 
         if (_activeTouchPoints.TryGetValue(touchId, out Point oldPos))
         {
@@ -524,12 +585,15 @@ public class EditorInkCanvas : InkCanvas
     private void HandleTouchRelease(TouchDevice device)
     {
         ReleaseTouchCapture(device);
+        _capturedTouchDevices.Remove(device);
         _activeTouchPoints.Remove(device.Id);
+        _touchStartPoints.Remove(device.Id);
         _initialPinchDistance = null;
         _lastPinchCenter = null;
 
         if (_activeTouchPoints.Count == 0)
         {
+            _isPanningStarted = false;
             UpdateEditingMode();
             if (IsMouseCaptured)
             {
@@ -541,6 +605,50 @@ public class EditorInkCanvas : InkCanvas
             }
         }
     }
+
+    #region テスト用ヘルパー
+
+    internal int ActiveTouchPointCount => _activeTouchPoints.Count;
+    internal bool IsPanningStarted => _isPanningStarted;
+
+    internal void SetStylusStateForTesting(bool isTouching, bool isInRange, DateTime? lastActivity = null)
+    {
+        _isStylusTouching = isTouching;
+        _isStylusInRange = isInRange;
+        _lastStylusActivityTime = lastActivity ?? DateTime.UtcNow;
+    }
+
+    internal void AddTouchPointForTesting(int touchId, Point pos)
+    {
+        _activeTouchPoints[touchId] = pos;
+        _touchStartPoints[touchId] = pos;
+        EditingMode = InkCanvasEditingMode.None;
+    }
+
+    internal bool ProcessOneFingerPanForTesting(int touchId, Point newPos)
+    {
+        if (!_isPanningStarted)
+        {
+            if (_touchStartPoints.TryGetValue(touchId, out Point startPos))
+            {
+                Vector diff = newPos - startPos;
+                if (diff.Length < TouchSlopThreshold)
+                {
+                    return false;
+                }
+
+                _isPanningStarted = true;
+                _activeTouchPoints[touchId] = newPos;
+                return true;
+            }
+            return false;
+        }
+
+        _activeTouchPoints[touchId] = newPos;
+        return true;
+    }
+
+    #endregion
 
     #endregion
 

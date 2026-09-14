@@ -19,6 +19,15 @@ public partial class DetailEditorView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+    }
+
+    /// <summary>
+    /// 子要素（InkCanvasやBorder等）のフォーカス取得やクリック時に発生する自動スクロールを完全に抑止します。
+    /// </summary>
+    private static void OnRequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    {
+        e.Handled = true;
     }
 
     private DetailEditorViewModel? ViewModel => DataContext as DetailEditorViewModel;
@@ -41,10 +50,12 @@ public partial class DetailEditorView : UserControl
         Dispatcher.InvokeAsync(() =>
         {
             var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
-            if (itemVm != null)
+            if (itemVm != null && PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
             {
-                var container = PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) as FrameworkElement;
-                container?.BringIntoView();
+                var transform = container.TransformToVisual(DetailScrollViewer);
+                Point pt = transform.Transform(new Point(0, 0));
+                double targetOffset = DetailScrollViewer.VerticalOffset + pt.Y - DetailScrollViewer.Padding.Top;
+                DetailScrollViewer.ScrollToVerticalOffset(Math.Max(0.0, targetOffset));
             }
         }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
