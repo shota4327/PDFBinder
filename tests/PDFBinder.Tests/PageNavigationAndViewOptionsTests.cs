@@ -112,13 +112,13 @@ public class PageNavigationAndViewOptionsTests
         // Arrange
         var doc = CreateSampleDocument(3);
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
-        vm.UpdateViewportSize(1260, 800); // availableWidth = 1200, page.Width = 600
+        vm.UpdateViewportSize(1260, 800); // availableWidth = 1260 - 60 - 2 = 1198, 縦スクロール発生のため 1198 - 18 = 1180
 
         // Act: ラジオボタンのTwoWayバインディングと同様にプロパティを直接設定
         vm.FitMode = DetailViewFitMode.FitToWidth;
 
-        // Assert: プロパティ設定と同時に即座に拡大率が 2.0 に再計算される
-        Assert.Equal(2.0, vm.Zoom, precision: 2);
+        // Assert: 縦スクロールバー幅とセーフティバッファを控除した幅（1180 / 600 = 1.967 ≒ 1.97）に再計算される
+        Assert.Equal(1.97, vm.Zoom, precision: 2);
 
         // Act: 等倍に切り替え
         vm.FitMode = DetailViewFitMode.ActualSize;
@@ -193,11 +193,11 @@ public class PageNavigationAndViewOptionsTests
         using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
         vm.SetFitMode(DetailViewFitMode.FitToWidth);
 
-        // Act: 横幅が拡大された場合 (availableWidth: 1260 - 60 = 1200)
+        // Act: 横幅が拡大された場合 (availableWidth: 1260 - 60 - 2 = 1198, 縦スクロール発生のため 1180)
         vm.UpdateViewportSize(1260, 800);
 
-        // Assert: 1200 / 600 = 2.0
-        Assert.Equal(2.0, vm.Zoom, precision: 2);
+        // Assert: 1180 / 600 = 1.967 ≒ 1.97
+        Assert.Equal(1.97, vm.Zoom, precision: 2);
 
         // Act: 横幅が縮小された場合 (availableWidth: 360 - 60 = 300)
         vm.UpdateViewportSize(360, 800);

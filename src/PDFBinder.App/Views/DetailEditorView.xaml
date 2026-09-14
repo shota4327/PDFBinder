@@ -12,8 +12,7 @@
         <!-- ページ描画用共通データテンプレート -->
         <DataTemplate x:Key="DetailPageItemTemplate" DataType="{x:Type vm:DetailPageItemViewModel}">
             <!-- 影とページコンテンツを分離したレイアウトコンテナ -->
-            <Grid Margin="0,15"
-                  HorizontalAlignment="Center"
+            <Grid HorizontalAlignment="Center"
                   PreviewMouseDown="OnPagePreviewMouseDown">
                 <!-- 影専用の背景要素（子要素を持たないため、InkCanvas描画中にシェーダー再計算・再ラスタライズが発生しない） -->
                 <Border Background="White"
@@ -107,6 +106,17 @@
                               ItemTemplate="{StaticResource DetailPageItemTemplate}"
                               HorizontalAlignment="Center"
                               Visibility="{Binding PageViewMode, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=Continuous}">
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <!-- 先頭ページ上部および最終ページ下部の余白を除去し、中間ページ間余白のみを30pxに統一 -->
+                            <Setter Property="Margin" Value="0,0,0,30" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLastPage}" Value="True">
+                                    <Setter Property="Margin" Value="0" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center" />

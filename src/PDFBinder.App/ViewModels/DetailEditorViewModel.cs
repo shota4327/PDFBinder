@@ -48,6 +48,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>レンダリング最大ピクセル寸法（過大メモリ確保防止の上限保護）</summary>
     public const int MaxRenderDimension = 4096;
 
+    /// <summary>スクロールバー幅の見込み値（DIP）</summary>
+    public const double ScrollBarWidth = 18.0;
+
+    /// <summary>WPFレイアウト計算の丸め誤差によるスクロールバー誤出現を防ぐセーフティバッファ（DIP）</summary>
+    public const double SafetyBuffer = 2.0;
+
     private Color _penColor = Colors.Black;
     private double _penThickness = 1.0;
     private Color _highlighterColor = YellowPresetColor;
@@ -296,6 +302,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _pageLookup = pageLookup;
 
         Pages.Add(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
+        UpdatePageEdgeFlags();
 
         UpdateThicknessPresets(_selectedTool);
         _ = LoadPageBackgroundAsync();
@@ -318,6 +325,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             Pages[0].IsCurrent = true;
         }
 
+        UpdatePageEdgeFlags();
         ApplyFitMode();
         _ = LoadPageBackgroundAsync();
     }
@@ -639,20 +647,64 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         const double horizontalPadding = 60.0;
         const double verticalPadding = 60.0;
 
-        double availableWidth = Math.Max(100.0, ViewportWidth - horizontalPadding);
-        double availableHeight = Math.Max(100.0, ViewportHeight - verticalPadding);
+        double availableWidth = Math.Max(50.0, ViewportWidth - horizontalPadding - SafetyBuffer);
+        double availableHeight = Math.Max(50.0, ViewportHeight - verticalPadding - SafetyBuffer);
 
-        if (FitMode == DetailViewFitMode.FitToWidth)
+        if (FitMode == DetailViewFitMode.FitToWindow)
         {
-            double scale = availableWidth / page.DisplayWidth;
-            SetZoom(scale);
+            ApplyFitToWindow(page, availableWidth, availableHeight);
         }
-        else if (FitMode == DetailViewFitMode.FitToWindow)
+        else if (FitMode == DetailViewFitMode.FitToWidth)
         {
-            double scaleX = availableWidth / page.DisplayWidth;
-            double scaleY = availableHeight / page.DisplayHeight;
-            double scale = Math.Min(scaleX, scaleY);
-            SetZoom(scale);
+            ApplyFitToWidth(page, availableWidth, availableHeight);
+        }
+    }
+
+    private void ApplyFitToWindow(PdfPageModel page, double availableWidth, double availableHeight)
+    {
+        double scaleX = availableWidth / page.DisplayWidth;
+        double scaleY = availableHeight / page.DisplayHeight;
+        SetZoom(Math.Min(scaleX, scaleY));
+    }
+
+    private void ApplyFitToWidth(PdfPageModel page, double availableWidth, double availableHeight)
+    {
+        double testScale = availableWidth / page.DisplayWidth;
+        bool hasVerticalScroll = CheckVerticalScrollOverflow(page, testScale, availableHeight);
+
+        if (hasVerticalScroll)
+        {
+            double widthWithScrollbar = Math.Max(50.0, availableWidth - ScrollBarWidth);
+            SetZoom(widthWithScrollbar / page.DisplayWidth);
+        }
+        else
+        {
+            SetZoom(testScale);
+        }
+    }
+
+    private bool CheckVerticalScrollOverflow(PdfPageModel page, double scale, double availableHeight)
+    {
+        if (PageViewMode == DetailPageViewMode.Continuous && Pages.Count > 1)
+        {
+            // 連続表示時は先頭上部・最終下部の余白を除外し、ページ間マージン (N - 1) * 30.0 のみを加算して正確に判定
+            double totalPageHeight = Pages.Sum(p => p.Page.DisplayHeight);
+            double totalSpacing = (Pages.Count - 1) * 30.0;
+            double totalHeight = (totalPageHeight + totalSpacing) * scale;
+            return totalHeight > availableHeight;
+        }
+        return (page.DisplayHeight * scale) > availableHeight;
+    }
+
+    /// <summary>
+    /// 連続表示時の余白制御（先頭上部・最終下部の余白除去）用に各ページの端点フラグを更新します。
+    /// </summary>
+    private void UpdatePageEdgeFlags()
+    {
+        for (int i = 0; i < Pages.Count; i++)
+        {
+            Pages[i].IsFirstPage = (i == 0);
+            Pages[i].IsLastPage = (i == Pages.Count - 1);
         }
     }
 
