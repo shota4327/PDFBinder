@@ -111,6 +111,10 @@ public class EqualityToBooleanConverter : IValueConverter
     {
         if (value is true && parameter != null)
         {
+            if (targetType.IsEnum && Enum.TryParse(targetType, parameter.ToString(), true, out var enumVal))
+            {
+                return enumVal;
+            }
             if (int.TryParse(parameter.ToString(), out int intVal))
             {
                 return intVal;

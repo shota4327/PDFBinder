@@ -202,4 +202,18 @@ public partial class MainWindow : Window
             vmReset.IsDragOver = false;
         }
     }
+
+    /// <summary>
+    /// ステータスバーのページ番号入力欄でのEnterキー押下時にバインディングを更新してフォーカスを外します。
+    /// </summary>
+    private void OnPageNumberTextBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is System.Windows.Controls.TextBox tb)
+        {
+            var binding = tb.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty);
+            binding?.UpdateSource();
+            tb.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+            e.Handled = true;
+        }
+    }
 }

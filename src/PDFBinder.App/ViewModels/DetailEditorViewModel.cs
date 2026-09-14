@@ -64,6 +64,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PageBackground))]
     [NotifyPropertyChangedFor(nameof(CurrentPageItem))]
+    [NotifyPropertyChangedFor(nameof(CurrentPageIndex))]
+    [NotifyPropertyChangedFor(nameof(CanGoToPreviousPage))]
+    [NotifyPropertyChangedFor(nameof(CanGoToNextPage))]
+    [NotifyPropertyChangedFor(nameof(CurrentPageNumber))]
     private PdfPageModel? _currentPage;
 
     /// <summary>
@@ -157,6 +161,68 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     public bool HasNextPage => CurrentPage != null && _pageLookup(CurrentPage.PageNumber) != null;
 
     /// <summary>
+    /// 現在アクティブなページのインデックス（0-based）を取得します。
+    /// </summary>
+    public int CurrentPageIndex
+    {
+        get
+        {
+            if (CurrentPage == null || Pages.Count == 0) return -1;
+            for (int i = 0; i < Pages.Count; i++)
+            {
+                if (Pages[i].Page == CurrentPage) return i;
+            }
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// 前のページへ移動可能かどうかを取得します。
+    /// </summary>
+    public bool CanGoToPreviousPage => CurrentPageIndex > 0 || (Pages.Count <= 1 && HasPreviousPage);
+
+    /// <summary>
+    /// 次のページへ移動可能かどうかを取得します。
+    /// </summary>
+    public bool CanGoToNextPage => (CurrentPageIndex >= 0 && CurrentPageIndex < Pages.Count - 1) || (Pages.Count <= 1 && HasNextPage);
+
+    /// <summary>
+    /// 現在のページ番号（1-based）を取得または設定します。
+    /// </summary>
+    public int CurrentPageNumber
+    {
+        get => CurrentPage?.PageNumber ?? (Pages.Count > 0 ? 1 : 0);
+        set
+        {
+            if (value < 1 || Pages.Count == 0) return;
+            var target = Pages.FirstOrDefault(p => p.Page.PageNumber == value);
+            if (target != null && target.Page != CurrentPage)
+            {
+                ScrollToPage(target.Page);
+            }
+            OnPropertyChanged(nameof(CurrentPageNumber));
+        }
+    }
+
+    /// <summary>
+    /// 現在の表示フィットモード
+    /// </summary>
+    [ObservableProperty]
+    private DetailViewFitMode _fitMode = DetailViewFitMode.FitToWindow;
+
+    /// <summary>
+    /// スクロールビューアの表示領域幅（px）
+    /// </summary>
+    [ObservableProperty]
+    private double _viewportWidth;
+
+    /// <summary>
+    /// スクロールビューアの表示領域高さ（px）
+    /// </summary>
+    [ObservableProperty]
+    private double _viewportHeight;
+
+    /// <summary>
     /// ドキュメントを指定して初期化するメインコンストラクタ
     /// </summary>
     public DetailEditorViewModel(
@@ -230,6 +296,19 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             item.IsCurrent = (item.Page == page);
         }
         ScrollToPageRequested?.Invoke(page);
+    }
+
+    partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
+    {
+        OnPropertyChanged(nameof(HasPreviousPage));
+        OnPropertyChanged(nameof(HasNextPage));
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
+
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
+        }
     }
 
     partial void OnZoomChanged(double value)
@@ -477,45 +556,128 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         Zoom = Math.Clamp(Math.Round(zoom, 3), MinZoom, MaxZoom);
     }
 
+    /// <summary>
+    /// 表示領域サイズを更新し、アクティブなフィットモードに従って拡大率を再計算します。
+    /// </summary>
+    public void UpdateViewportSize(double width, double height)
+    {
+        bool changed = Math.Abs(ViewportWidth - width) > 1.0 || Math.Abs(ViewportHeight - height) > 1.0;
+        ViewportWidth = width;
+        ViewportHeight = height;
+        if (changed && FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
+        }
+    }
+
+    /// <summary>
+    /// 表示フィットモードを設定し、倍率を再計算します。
+    /// </summary>
+    [RelayCommand]
+    public void SetFitMode(DetailViewFitMode mode)
+    {
+        FitMode = mode;
+        ApplyFitMode();
+    }
+
+    /// <summary>
+    /// 現在のフィットモードに従ってズーム倍率を再計算・適用します。
+    /// </summary>
+    public void ApplyFitMode()
+    {
+        if (FitMode == DetailViewFitMode.None) return;
+
+        if (FitMode == DetailViewFitMode.ActualSize)
+        {
+            SetZoom(1.0);
+            return;
+        }
+
+        var page = CurrentPage ?? Pages.FirstOrDefault()?.Page;
+        if (page == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
+
+        // DetailScrollViewer の Padding="30"（左右合計60、上下合計60）
+        const double horizontalPadding = 60.0;
+        const double verticalPadding = 60.0;
+
+        double availableWidth = Math.Max(100.0, ViewportWidth - horizontalPadding);
+        double availableHeight = Math.Max(100.0, ViewportHeight - verticalPadding);
+
+        if (FitMode == DetailViewFitMode.FitToWidth)
+        {
+            double scale = availableWidth / page.DisplayWidth;
+            SetZoom(scale);
+        }
+        else if (FitMode == DetailViewFitMode.FitToWindow)
+        {
+            double scaleX = availableWidth / page.DisplayWidth;
+            double scaleY = availableHeight / page.DisplayHeight;
+            double scale = Math.Min(scaleX, scaleY);
+            SetZoom(scale);
+        }
+    }
+
     [RelayCommand]
     private void ZoomIn()
     {
+        FitMode = DetailViewFitMode.None;
         if (Zoom < MaxZoom) Zoom = Math.Round(Math.Min(Zoom + 0.25, MaxZoom), 2);
     }
 
     [RelayCommand]
     private void ZoomOut()
     {
+        FitMode = DetailViewFitMode.None;
         if (Zoom > MinZoom) Zoom = Math.Round(Math.Max(Zoom - 0.25, MinZoom), 2);
     }
 
     [RelayCommand]
     private void ZoomReset()
     {
-        Zoom = 1.0;
+        SetFitMode(DetailViewFitMode.ActualSize);
     }
 
-    [RelayCommand]
-    private async Task GoToPreviousPageAsync()
+    /// <summary>
+    /// 1つ前のページへスクロール移動します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGoToPreviousPage))]
+    public void GoToPreviousPage()
     {
-        if (CurrentPage == null) return;
-        var prev = _pageLookup(CurrentPage.PageNumber - 2);
-        if (prev != null)
+        int idx = CurrentPageIndex;
+        if (idx > 0)
         {
-            CurrentPage = prev;
-            await LoadPageBackgroundAsync();
+            ScrollToPage(Pages[idx - 1].Page);
+        }
+        else if (HasPreviousPage && CurrentPage != null)
+        {
+            var prev = _pageLookup(CurrentPage.PageNumber - 2);
+            if (prev != null)
+            {
+                CurrentPage = prev;
+                _ = LoadPageBackgroundAsync();
+            }
         }
     }
 
-    [RelayCommand]
-    private async Task GoToNextPageAsync()
+    /// <summary>
+    /// 1つ次のページへスクロール移動します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGoToNextPage))]
+    public void GoToNextPage()
     {
-        if (CurrentPage == null) return;
-        var next = _pageLookup(CurrentPage.PageNumber);
-        if (next != null)
+        int idx = CurrentPageIndex;
+        if (idx >= 0 && idx < Pages.Count - 1)
         {
-            CurrentPage = next;
-            await LoadPageBackgroundAsync();
+            ScrollToPage(Pages[idx + 1].Page);
+        }
+        else if (HasNextPage && CurrentPage != null)
+        {
+            var next = _pageLookup(CurrentPage.PageNumber);
+            if (next != null)
+            {
+                CurrentPage = next;
+                _ = LoadPageBackgroundAsync();
+            }
         }
     }
 

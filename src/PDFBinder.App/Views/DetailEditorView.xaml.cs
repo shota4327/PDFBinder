@@ -19,8 +19,28 @@ public partial class DetailEditorView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnLoaded;
+        DetailScrollViewer.SizeChanged += OnDetailScrollViewerSizeChanged;
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        UpdateViewportToViewModel();
+    }
+
+    private void OnDetailScrollViewerSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateViewportToViewModel();
+    }
+
+    private void UpdateViewportToViewModel()
+    {
+        if (ViewModel != null && DetailScrollViewer.ActualWidth > 0 && DetailScrollViewer.ActualHeight > 0)
+        {
+            ViewModel.UpdateViewportSize(DetailScrollViewer.ActualWidth, DetailScrollViewer.ActualHeight);
+        }
     }
 
     /// <summary>
@@ -43,6 +63,7 @@ public partial class DetailEditorView : UserControl
         if (e.NewValue is DetailEditorViewModel newVm)
         {
             newVm.ScrollToPageRequested += OnScrollToPageRequested;
+            UpdateViewportToViewModel();
         }
     }
 
