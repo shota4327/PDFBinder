@@ -289,6 +289,71 @@ public class UnsavedChangesTests
         // Assert: 保存失敗時は処理中断（false）
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task PromptSaveConfirmationAsync_DisplaysOverlayAndResolvesOnConfirmSave()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        Assert.False(vm.IsSaveConfirmationVisible);
+
+        // Act: 非同期で確認プロンプトを開始
+        var promptTask = vm.PromptSaveConfirmationAsync("Sample.pdf");
+
+        // Assert: オーバーレイが表示され、ファイル名が設定されている
+        Assert.True(vm.IsSaveConfirmationVisible);
+        Assert.Equal("Sample.pdf", vm.SaveConfirmationFileName);
+
+        // Act: ユーザーが「保存しない」を選択
+        vm.ConfirmSaveCommand.Execute(SaveConfirmationResult.Discard);
+        var result = await promptTask;
+
+        // Assert: 選択結果が正しく返却され、オーバーレイが閉じる
+        Assert.Equal(SaveConfirmationResult.Discard, result);
+        Assert.False(vm.IsSaveConfirmationVisible);
+    }
+
+    [Fact]
+    public async Task CancelSaveConfirmation_WhenOverlayVisible_ResolvesAsCancel()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+
+        // Act: 確認プロンプトを開始し、キャンセル操作を実行
+        var promptTask = vm.PromptSaveConfirmationAsync("Doc.pdf");
+        Assert.True(vm.IsSaveConfirmationVisible);
+
+        vm.CancelSaveConfirmation();
+        var result = await promptTask;
+
+        // Assert: キャンセルとして完了し、オーバーレイが非表示になる
+        Assert.Equal(SaveConfirmationResult.Cancel, result);
+        Assert.False(vm.IsSaveConfirmationVisible);
+    }
+
+    [Fact]
+    public async Task ConfirmSaveAndProceedAsync_WithOverlayFlow_ResolvesCorrectly()
+    {
+        // Arrange
+        var testService = new TestPdfService();
+        var vm = new MainViewModel(pdfService: testService);
+        vm.Document.AddPage(new PdfPageModel());
+        vm.Document.FilePath = @"C:\Fake\Doc.pdf";
+        vm.Document.IsModified = true;
+
+        // Act: 確認処理を開始
+        var proceedTask = vm.ConfirmSaveAndProceedAsync();
+        Assert.True(vm.IsSaveConfirmationVisible);
+
+        // ユーザーが「保存」ボタンをクリック
+        vm.ConfirmSaveCommand.Execute(SaveConfirmationResult.Save);
+        bool proceedResult = await proceedTask;
+
+        // Assert: 保存が実行され、処理続行（true）が返る
+        Assert.True(proceedResult);
+        Assert.True(testService.SaveCalled);
+        Assert.False(vm.IsSaveConfirmationVisible);
+    }
 }
 
 /// <summary>

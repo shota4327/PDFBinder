@@ -29,7 +29,7 @@
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
-| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認） | **完了** | Issue #49 / OnClosing & ConfirmSave |
+| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54 / インアプリオーバーレイ & OnClosing |
 | **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
 | **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
 | **F30** | UI・グリッド俯瞰 | ページタイル状グリッド一覧表示（仮想化・カードUI） | **完了** | GridView.xaml |

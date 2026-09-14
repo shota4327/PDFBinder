@@ -400,15 +400,63 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    [ObservableProperty]
+    private bool _isSaveConfirmationVisible;
+
+    [ObservableProperty]
+    private string _saveConfirmationFileName = string.Empty;
+
+    private TaskCompletionSource<SaveConfirmationResult>? _saveConfirmationTcs;
+
     /// <summary>
     /// 未保存の変更が存在する場合に保存を確認するダイアログ表示用デリゲート。
     /// 引数はファイル名、戻り値はユーザー選択結果。
-    /// テスト時にモック可能。nullの場合は標準のMessageBoxを表示します。
+    /// テスト時にモック可能。nullの場合はインアプリオーバーレイを表示します。
     /// </summary>
     public Func<string, SaveConfirmationResult>? ConfirmSavePrompt { get; set; }
 
     /// <summary>
-    /// 未保存変更の保存確認ダイアログを表示し、ユーザーの選択結果を取得します。
+    /// 未保存変更の保存確認ダイアログ（インアプリオーバーレイ）を表示し、ユーザーの選択結果を非同期に取得します。
+    /// </summary>
+    public async Task<SaveConfirmationResult> PromptSaveConfirmationAsync(string fileName)
+    {
+        if (ConfirmSavePrompt != null)
+        {
+            return ConfirmSavePrompt(fileName);
+        }
+
+        SaveConfirmationFileName = fileName;
+        IsSaveConfirmationVisible = true;
+
+        _saveConfirmationTcs = new TaskCompletionSource<SaveConfirmationResult>();
+        return await _saveConfirmationTcs.Task;
+    }
+
+    /// <summary>
+    /// 保存確認ダイアログのユーザー選択を確定し、オーバーレイを閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void ConfirmSave(SaveConfirmationResult result)
+    {
+        IsSaveConfirmationVisible = false;
+        _saveConfirmationTcs?.TrySetResult(result);
+        _saveConfirmationTcs = null;
+    }
+
+    /// <summary>
+    /// 保存確認ダイアログをキャンセルして閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void CancelSaveConfirmation()
+    {
+        if (IsSaveConfirmationVisible)
+        {
+            ConfirmSave(SaveConfirmationResult.Cancel);
+        }
+    }
+
+    /// <summary>
+    /// 未保存変更の保存確認ダイアログを表示し、ユーザーの選択結果を取得します（同期フォールバック用）。
     /// </summary>
     public SaveConfirmationResult PromptSaveConfirmation(string fileName)
     {
@@ -441,7 +489,7 @@ public partial class MainViewModel : ObservableObject
             return true;
         }
 
-        var choice = PromptSaveConfirmation(Document.FileName);
+        var choice = await PromptSaveConfirmationAsync(Document.FileName);
         switch (choice)
         {
             case SaveConfirmationResult.Cancel:
