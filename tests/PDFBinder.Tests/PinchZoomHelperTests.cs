@@ -107,11 +107,11 @@ public class PinchZoomHelperTests
         // Arrange
         Point center = new(200, 200);
 
-        // 極端な拡大（10倍） -> MaxZoom (3.0) にクランプ
+        // 極端な拡大（50倍） -> DefaultMaxZoom (32.0) にクランプ
         var zoomInResult = PinchZoomHelper.Calculate(
             currentZoom: 1.0,
             previousDistance: 100.0,
-            currentDistance: 1000.0,
+            currentDistance: 5000.0,
             previousCenter: center,
             currentCenter: center,
             horizontalOffset: 0,
