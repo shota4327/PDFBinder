@@ -66,6 +66,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>フィット計算で使用する垂直方向の合計余白（Padding上下計10px + 影マージン上下計40px = 50px）</summary>
     public const double TotalVerticalMargin = (ScrollViewerPadding + PageShadowMargin) * 2;
 
+    /// <summary>下部ステータスバーの高さ（オーバーレイ領域）</summary>
+    public const double StatusBarHeight = 42.0;
+
+    /// <summary>単一ページ表示時のフィット計算で使用する垂直方向の合計余白（TotalVerticalMargin 50px + ステータスバー42px = 92px）</summary>
+    public const double SinglePageTotalVerticalMargin = TotalVerticalMargin + StatusBarHeight;
+
     private Color _penColor = Colors.Black;
     private double _penThickness = 1.0;
     private Color _highlighterColor = YellowPresetColor;
@@ -682,14 +688,18 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (page == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
 
         double availableWidth = Math.Max(50.0, ViewportWidth - TotalHorizontalMargin - SafetyBuffer);
-        double availableHeight = Math.Max(50.0, ViewportHeight - TotalVerticalMargin - SafetyBuffer);
 
         if (FitMode == DetailViewFitMode.FitToWindow)
         {
+            double verticalMargin = PageViewMode == DetailPageViewMode.SinglePage
+                ? SinglePageTotalVerticalMargin
+                : TotalVerticalMargin;
+            double availableHeight = Math.Max(50.0, ViewportHeight - verticalMargin - SafetyBuffer);
             ApplyFitToWindow(page, availableWidth, availableHeight);
         }
         else if (FitMode == DetailViewFitMode.FitToWidth)
         {
+            double availableHeight = Math.Max(50.0, ViewportHeight - TotalVerticalMargin - SafetyBuffer);
             ApplyFitToWidth(page, availableWidth, availableHeight);
         }
     }

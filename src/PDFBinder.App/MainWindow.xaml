@@ -63,7 +63,6 @@
             <RowDefinition Height="38" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- 最上段：統合タイトルバー＆タブバー -->
@@ -494,23 +493,24 @@
             </Grid>
         </Grid>
 
-        <!-- 下部ステータスバー（高さ約1.5倍・ページ移動＆ズームコントロール搭載） -->
-        <Border Grid.Row="3" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" MinHeight="36" Padding="12,3">
+        <!-- 下部ステータスバー（半透明オーバーレイ配置・不透明度85%・約5px拡大） -->
+        <Border Grid.Row="2" VerticalAlignment="Bottom" Panel.ZIndex="10"
+                Background="#D9FFFFFF" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
             <DockPanel LastChildFill="True">
                 <!-- 左端：ページ表示・移動ボタン（< ページ 1 / 2 >） -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding GoToPreviousPageCommand}"
                             ToolTip="前のページへ (PgUp / ↑ / ←)"
-                            Width="26" Height="26">
-                        <TextBlock Text="&#xE76B;" FontFamily="{StaticResource IconFontFamily}" FontSize="11" />
+                            Width="28" Height="28">
+                        <TextBlock Text="&#xE76B;" FontFamily="{StaticResource IconFontFamily}" FontSize="12" />
                     </Button>
                     <TextBlock Text="ページ" FontSize="12" Foreground="#475569" VerticalAlignment="Center" Margin="6,0,4,0" />
                     <TextBox x:Name="CurrentPageNumberTextBox"
                              Text="{Binding CurrentPageNumber, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding CanNavigatePages}"
                              KeyDown="OnPageNumberTextBoxKeyDown"
-                             Width="38" Height="24"
+                             Width="40" Height="26"
                              Padding="2,1"
                              FontSize="12"
                              TextAlignment="Center"
@@ -523,8 +523,8 @@
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding GoToNextPageCommand}"
                             ToolTip="次のページへ (PgDn / ↓ / →)"
-                            Width="26" Height="26">
-                        <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFontFamily}" FontSize="11" />
+                            Width="28" Height="28">
+                        <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFontFamily}" FontSize="12" />
                     </Button>
                 </StackPanel>
 
@@ -536,21 +536,21 @@
                             Command="{Binding ZoomOutCommand}"
                             IsEnabled="{Binding CanZoomOut}"
                             ToolTip="縮小 (Ctrl+-)"
-                            Width="26" Height="26">
-                        <TextBlock Text="&#xE738;" FontFamily="{StaticResource IconFontFamily}" FontSize="12" />
+                            Width="28" Height="28">
+                        <TextBlock Text="&#xE738;" FontFamily="{StaticResource IconFontFamily}" FontSize="13" />
                     </Button>
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding ZoomResetCommand}"
                             ToolTip="等倍表示 / 標準リセット (Ctrl+0)"
-                            MinWidth="48" Width="Auto" Height="26" Padding="4,0" Margin="2,0">
+                            MinWidth="50" Width="Auto" Height="28" Padding="4,0" Margin="2,0">
                         <TextBlock Text="{Binding CurrentZoomText}" FontSize="11" FontWeight="SemiBold" Foreground="#334155" />
                     </Button>
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding ZoomInCommand}"
                             IsEnabled="{Binding CanZoomIn}"
                             ToolTip="拡大 (Ctrl++)"
-                            Width="26" Height="26">
-                        <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="12" />
+                            Width="28" Height="28">
+                        <TextBlock Text="&#xE710;" FontFamily="{StaticResource IconFontFamily}" FontSize="13" />
                     </Button>
                 </StackPanel>
 
@@ -561,7 +561,7 @@
         </Border>
 
         <!-- 未保存変更確認ダイアログ（インアプリ・オーバーレイ） -->
-        <Grid Grid.Row="0" Grid.RowSpan="4"
+        <Grid Grid.Row="0" Grid.RowSpan="3"
               Visibility="{Binding IsSaveConfirmationVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
               Background="#500F172A"
               Focusable="False"

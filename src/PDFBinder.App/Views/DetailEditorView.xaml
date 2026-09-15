@@ -74,9 +74,10 @@
                       PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"
                       Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
                       Padding="5">
+            <!-- キャンバス親コンテナ（単一・連続表示ともに最下部スクロール時に最後のページがステータスバーに隠れないよう下部オフセット62pxを確保） -->
             <Grid HorizontalAlignment="Center"
                   VerticalAlignment="Center"
-                  Margin="20">
+                  Margin="20,20,20,62">
                 <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
                 </Grid.LayoutTransform>
