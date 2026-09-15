@@ -38,6 +38,7 @@
                     <controls:EditorInkCanvas PageItem="{Binding}"
                                               ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              IsPenPressureEnabled="{Binding DataContext.IsPenPressureEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Background="Transparent" />
