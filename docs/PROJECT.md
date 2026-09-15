@@ -54,7 +54,8 @@
 | **F38** | UI・ステータスバー | 高機能ステータスバー刷新（高さ1.5倍拡大、ページ移動 `< ページ 1 / 2 >`・直接ジャンプ入力、ズームコントロール `[-] 100% [+]`） | **完了** | Issue #52 / MainWindow & DetailEditor |
 | **F39** | UI・表示設定 | 連続表示・単ページ表示切り替え機能（初期値: 単一ページ、ホイールページめくり、拡大率固定制御、PageUp/PageDown、高速ホイール追従・Delta累積） | **完了** | Issue #61, #73 / DetailPageViewMode |
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 195件全PASS） | **完了** | PDFBinder.Tests |
+| **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 210件全PASS） | **完了** | PDFBinder.Tests |
 
 ---
 

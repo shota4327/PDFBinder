@@ -22,6 +22,9 @@
    - コマンドライン引数に対象PDFファイルパスが渡された場合、自動的にそのPDFを読み込んで詳細ビューを表示する。
    - 複数ファイルが渡された場合は、最初のファイルを現在のプロセスで開き、2つ目以降のファイルはそれぞれ独立した別プロセス（`Process.Start`）として起動して個別ウィンドウで開く。
    - 存在しないファイルや無効な引数が渡された場合は、エラー通知を表示し、アプリ自体は空ドキュメントの初期状態で安全に起動を継続する。
+3. **ウィンドウ状態・サイズの復元**:
+   - 前回終了時のウィンドウサイズ（幅・高さ）および最大化状態を `settings.json`（EXE同階層、完全ポータブル仕様）に自動保存し、次回起動時に復元する。
+   - 画面解像度・作業領域（`SystemParameters.WorkArea`）を超える場合は画面内に収まるよう自動調整する。
 
 ---
 
@@ -95,6 +98,12 @@ PDFBinder/
 - `IsModified`: `bool` (未保存変更の有無)
 - `CanUndo` / `CanRedo`: `bool` (アンドゥ・リドゥ可能状態)
 
+### 4.3 `AppSettings` / `WindowSettings`
+アプリ全体の設定およびウィンドウ状態の永続化モデル。
+- `Window.Width`: `double` (ウィンドウ幅、既定値: 1100)
+- `Window.Height`: `double` (ウィンドウ高さ、既定値: 760)
+- `Window.IsMaximized`: `bool` (最大化状態フラグ、既定値: false)
+
 ---
 
 ## 5. 主要サービスインターフェース設計
@@ -118,6 +127,11 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `Execute(IUndoableCommand command)`
 - `Undo()`, `Redo()`
 - `Clear()`
+
+### 5.4 `ISettingsService`
+アプリケーション設定（`settings.json`）の読み込み・保存管理。
+- `AppSettings Load()`: 設定読み込み（未存在または破損時は既定値返却）
+- `void Save(AppSettings settings)`: 設定保存（例外安全）
 
 ---
 
