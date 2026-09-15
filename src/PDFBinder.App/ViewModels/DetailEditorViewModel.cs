@@ -132,12 +132,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private double _strokeThickness = 1.0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanTogglePenPressure))]
     private bool _isStraightLine;
+
+    [ObservableProperty]
+    private bool _isPenPressureEnabled;
 
     /// <summary>
     /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
     /// </summary>
     public bool CanToggleStraightLine => SelectedTool == EditorToolMode.Pen || SelectedTool == EditorToolMode.Highlighter;
+
+    /// <summary>
+    /// 筆圧トグルボタンを有効化できるか（ペン選択時かつ直線モードが無効のときのみtrue）
+    /// </summary>
+    public bool CanTogglePenPressure => SelectedTool == EditorToolMode.Pen && !IsStraightLine;
 
     /// <summary>
     /// 太さプリセットを変更できるか（ペン、蛍光ペン、部分消しゴム選択時のみtrue）
@@ -554,6 +563,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         // ツール切り替え時は直線トグルを自動的にオフへリセット
         IsStraightLine = false;
         OnPropertyChanged(nameof(CanToggleStraightLine));
+        OnPropertyChanged(nameof(CanTogglePenPressure));
         OnPropertyChanged(nameof(CanChangeThickness));
         OnPropertyChanged(nameof(CanChangeColor));
 

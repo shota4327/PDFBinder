@@ -90,6 +90,19 @@ public class EditorInkCanvas : InkCanvas
         set => SetValue(IsStraightLineProperty, value);
     }
 
+    public static readonly DependencyProperty IsPenPressureEnabledProperty = DependencyProperty.Register(
+        nameof(IsPenPressureEnabled),
+        typeof(bool),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(false, OnIsPenPressureEnabledChanged));
+
+    /// <summary>筆圧感知モードが有効かどうか</summary>
+    public bool IsPenPressureEnabled
+    {
+        get => (bool)GetValue(IsPenPressureEnabledProperty);
+        set => SetValue(IsPenPressureEnabledProperty, value);
+    }
+
     public static readonly DependencyProperty DrawingColorProperty = DependencyProperty.Register(
         nameof(DrawingColor),
         typeof(Color),
@@ -122,6 +135,12 @@ public class EditorInkCanvas : InkCanvas
     public bool IsStraightLineActive =>
         ToolMode == EditorToolMode.StraightLine ||
         (IsStraightLine && (ToolMode == EditorToolMode.Pen || ToolMode == EditorToolMode.Highlighter));
+
+    /// <summary>
+    /// 現在筆圧感知がアクティブであるか（ペンツール選択中かつ直線モードが無効、筆圧が有効な場合）
+    /// </summary>
+    public bool IsPenPressureActive =>
+        IsPenPressureEnabled && ToolMode == EditorToolMode.Pen && !IsStraightLine;
 
     private Point? _lineStartPoint;
     private Point? _currentLinePoint;
@@ -194,6 +213,14 @@ public class EditorInkCanvas : InkCanvas
         }
     }
 
+    private static void OnIsPenPressureEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.ApplyDrawingAttributes();
+        }
+    }
+
     /// <summary>
     /// 現在のToolModeに合わせてInkCanvasのEditingModeやカーソルを更新します。
     /// </summary>
@@ -251,7 +278,8 @@ public class EditorInkCanvas : InkCanvas
             Width = StrokeThickness,
             Height = StrokeThickness,
             FitToCurve = true,
-            IsHighlighter = ToolMode == EditorToolMode.Highlighter
+            IsHighlighter = ToolMode == EditorToolMode.Highlighter,
+            IgnorePressure = !IsPenPressureActive
         };
 
         DefaultDrawingAttributes = attr;

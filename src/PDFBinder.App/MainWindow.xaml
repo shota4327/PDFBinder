@@ -273,13 +273,22 @@
 
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
-                            <!-- グループ3: 【描画オプション（直線・太さ・色）】 -->
+                            <!-- グループ3: 【描画オプション（直線・筆圧・太さ・色）】 -->
                             <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="直線描画（ペン・蛍光ペン使用時のみ）"
                                           IsChecked="{Binding DetailEditor.IsStraightLine, Mode=TwoWay}"
                                           IsEnabled="{Binding DetailEditor.CanToggleStraightLine}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE41C;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="直線" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+
+                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="筆圧感知（ペン使用時のみ）"
+                                          IsChecked="{Binding DetailEditor.IsPenPressureEnabled, Mode=TwoWay}"
+                                          IsEnabled="{Binding DetailEditor.CanTogglePenPressure}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE91A;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="筆圧" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
 
