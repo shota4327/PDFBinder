@@ -91,20 +91,20 @@ dotnet test
 dotnet run --project src/PDFBinder.App
 ```
 
-### 単一実行ファイル（Single-File EXE）の発行
-用途に合わせて、完全ポータブルな「自己完結版」と、軽量・高速起動な「フレームワーク依存版」を発行できます。
+### 配布バイナリの発行
+用途に合わせて、完全ポータブルな「自己完結版（単一EXE）」と、軽量・最速起動な「フレームワーク依存版（DLL分離形式）」を発行できます。
 ```powershell
 # 両方のバージョンを一括発行（デフォルト）
 .\build.ps1
 
-# 自己完結版のみ発行（約66MB: .NETランタイム内包・完全オフラインポータブル）
+# 自己完結版のみ発行（.NETランタイム内包・部分トリミング・単一EXE・完全オフラインポータブル）
 .\build.ps1 -Target self-contained
 
-# フレームワーク依存版のみ発行（約8.4MB: OSの.NET 10デスクトップランタイムを利用・超軽量＆高速起動）
+# フレームワーク依存版のみ発行（OSの.NET 10デスクトップランタイムを利用・DLL分離・ReadyToRun・最速起動）
 .\build.ps1 -Target framework-dependent
 ```
-- フレームワーク依存版（`dist/PDFBinder.exe`）: OSの.NET 10 デスクトップランタイムを利用。超軽量（約8.4MB）かつ高速起動。
-- 自己完結版（`dist/self-contained/PDFBinder.exe`）: .NETランタイム同梱（約66MB）。.NET未インストールのPCでも単体で完全オフライン動作可能。
+- **フレームワーク依存版（`dist/`）**: OSの .NET 10 デスクトップランタイムを利用する DLL 分離形式。ReadyToRun 最適化と Windows PE ローダーによる直接メモリマッピングにより、最速のコールドスタートと最小のメモリ消費を実現。
+- **自己完結版（`dist/self-contained/PDFBinder.exe`）**: .NET 10 ランタイムを同梱した単一 EXE 形式。部分トリミング（`TrimMode=partial`）と ReadyToRun による最適化が施されており、.NET 未インストールの PC でも単体で完全オフライン動作可能。
 
 ---
 
