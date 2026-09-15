@@ -1,21 +1,20 @@
-# Issue #62: 使用アイコンをGoogle Fonts (Material Symbols Rounded) に変更する 検証報告 (Walkthrough)
+# Issue #62: 使用アイコンをGoogle Fonts (Material Symbols Outlined) に変更する 検証報告 (Walkthrough)
 
 ## 1. 実施概要
 - **対象Issue**: #62
 - **ブランチ**: `issue-62-material-symbols-icons`
-- **目的**: Windows標準フォント（`Segoe Fluent Icons` / `Segoe MDL2 Assets`）およびUnicode絵文字・記号に依存していた全アイコンを、Google Fontsのオープンソースフォント **Material Symbols Rounded** に完全移行・統一。
-- **オフライン動作保証**: フォントファイル（`MaterialSymbolsRounded.ttf`）を `PDFBinder.App/Assets/Fonts/` にリソースとして内包し、外部通信ゼロの完全オフライン動作を実現。
+- **目的**: Windows標準フォント（`Segoe Fluent Icons` / `Segoe MDL2 Assets`）およびUnicode絵文字・記号に依存していた全アイコンを、Google Fontsのオープンソースフォント **Material Symbols Outlined** に完全移行・統一。
+- **オフライン動作保証**: フォントファイル（`MaterialSymbolsOutlined.ttf`）を `PDFBinder.App/Assets/Fonts/` にリソースとして内包し、外部通信ゼロの完全オフライン動作を実現。
 
 ---
 
 ## 2. 変更内容一覧
 
 ### 2.1 フォントファイルおよびリソース設定
-- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsRounded.ttf`: Google Fonts 公式リポジトリより入手した Rounded TTF フォントファイルを配置。
-- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsOutlined.ttf`: 比較・確認用として Outlined TTF フォントファイルも追加配置。
+- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsOutlined.ttf`: Google Fonts 公式リポジトリより入手した Outlined TTF フォントファイルを配置。
 - `src/PDFBinder.App/PDFBinder.App.csproj`: `<Resource Include="Assets\Fonts\*.ttf" />` を定義。
 - `src/PDFBinder.App/App.xaml`:
-  - `IconFontFamily` を `pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Outlined` に設定（Rounded と Outlined でコードポイントは完全互換のため、即時相互切り替え可能）。
+  - `IconFontFamily` を `pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Outlined` に設定。
 
 ### 2.2 UI グリフの刷新
 

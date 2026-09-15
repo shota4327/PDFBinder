@@ -35,7 +35,7 @@
 | **プラットフォーム** | .NET 10.0 (`net10.0-windows`) | MIT | 最新の高DPI対応、高速なJIT/GC、WPFの性能改善を活用 |
 | **UIフレームワーク** | WPF (Windows Presentation Foundation) | MIT | 成熟した `InkCanvas` による手書き・筆圧・消しゴム機能、強力なドラッグ＆ドロップ |
 | **デザイン/スタイル** | WPF-UI または モダンFluentスタイル | MIT | Windows 11準拠の洗練された角丸・アクリル外観の実現 |
-| **アイコン** | Material Symbols Rounded (Google Fonts) | Apache-2.0 | アプリ全体で統一された角丸デザインのオープンソースアイコン（リソース完全内包・完全オフライン動作） |
+| **アイコン** | Material Symbols Outlined (Google Fonts) | Apache-2.0 | アプリ全体で統一されたアウトラインデザインのオープンソースアイコン（リソース完全内包・完全オフライン動作） |
 | **MVVM基盤** | CommunityToolkit.Mvvm | MIT | 軽量・高パフォーマンスな `ObservableObject`, `RelayCommand` |
 | **PDF構造操作** | PdfSharp (v6.x+) | MIT | ページの回転、並び替え、削除、結合、分割、空白ページ追加、PDF保存 |
 | **PDFレンダリング** | PDFium / PDFiumSharp | Apache-2.0 / BSD | Chromiumで実証済みの高速・高精細なサムネイルおよび画面描画 |
@@ -67,7 +67,7 @@ PDFBinder/
 │       ├── Controls/             # CustomInkCanvas, ThumbnailCard
 │       ├── Converters/           # 各種ValueConverter
 │       └── Assets/               # アイコンリソース
-│           └── Fonts/            # Material Symbols Rounded フォントファイル (.ttf)
+│           └── Fonts/            # Material Symbols Outlined フォントファイル (.ttf)
 └── tests/
     └── PDFBinder.Tests/          # 単体テストプロジェクト（xUnit）
 ```
