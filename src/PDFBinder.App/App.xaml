@@ -18,8 +18,8 @@
             <converters:ColorEqualsToVisibilityConverter x:Key="ColorEqualsToVisibilityConverter" />
             <converters:ColorToContrastingBrushConverter x:Key="ColorToContrastingBrushConverter" />
 
-            <!-- アイコンフォント（Material Symbols Rounded - 埋め込みリソース） -->
-            <FontFamily x:Key="IconFontFamily">pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Rounded</FontFamily>
+            <!-- アイコンフォント（Material Symbols Outlined - 埋め込みリソース） -->
+            <FontFamily x:Key="IconFontFamily">pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Outlined</FontFamily>
 
             <!-- 基本フォント -->
             <Style TargetType="Control" x:Key="BaseFont">

@@ -11,10 +11,11 @@
 ## 2. 変更内容一覧
 
 ### 2.1 フォントファイルおよびリソース設定
-- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsRounded.ttf`: Google Fonts 公式リポジトリより入手した TTF フォントファイルを配置。
+- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsRounded.ttf`: Google Fonts 公式リポジトリより入手した Rounded TTF フォントファイルを配置。
+- `src/PDFBinder.App/Assets/Fonts/MaterialSymbolsOutlined.ttf`: 比較・確認用として Outlined TTF フォントファイルも追加配置。
 - `src/PDFBinder.App/PDFBinder.App.csproj`: `<Resource Include="Assets\Fonts\*.ttf" />` を定義。
 - `src/PDFBinder.App/App.xaml`:
-  - `IconFontFamily` を `pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Rounded` に更新。
+  - `IconFontFamily` を `pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Outlined` に設定（Rounded と Outlined でコードポイントは完全互換のため、即時相互切り替え可能）。
 
 ### 2.2 UI グリフの刷新
 
