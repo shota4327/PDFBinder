@@ -5,7 +5,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using PDFBinder.App.Helpers;
 using PDFBinder.App.ViewModels;
+using PDFBinder.Core.Models;
+using PDFBinder.Core.Services;
 
 namespace PDFBinder.App;
 
@@ -14,8 +17,18 @@ namespace PDFBinder.App;
 /// </summary>
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    private readonly ISettingsService _settingsService;
+    private bool _isClosingConfirmed;
+    private bool _isSettingsSaved;
+
+    /// <summary>
+    /// <see cref="MainWindow"/> の新しいインスタンスを初期化します。
+    /// </summary>
+    /// <param name="settingsService">設定サービス（テスト用DI、未指定時は既定の SettingsService）</param>
+    public MainWindow(ISettingsService? settingsService = null)
     {
+        _settingsService = settingsService ?? new SettingsService();
+
         InitializeComponent();
         DataContext = new MainViewModel();
 
@@ -25,9 +38,9 @@ public partial class MainWindow : Window
         CommandBindings.Add(new CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
 
         StateChanged += OnWindowStateChanged;
-    }
 
-    private bool _isClosingConfirmed;
+        RestoreWindowSettings();
+    }
 
     /// <summary>
     /// キー入力を先行検知し、フォーカス位置に関わらずショートカットキーの確実な実行を制御します。
@@ -154,16 +167,88 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 設定情報から前回のウィンドウサイズおよび最大化状態を復元します。
+    /// </summary>
+    private void RestoreWindowSettings()
+    {
+        var settings = _settingsService.Load();
+        if (settings?.Window == null) return;
+
+        var workArea = SystemParameters.WorkArea;
+        var (adjustedWidth, adjustedHeight) = WindowBoundsHelper.AdjustBounds(
+            settings.Window.Width,
+            settings.Window.Height,
+            workArea.Width,
+            workArea.Height,
+            MinWidth,
+            MinHeight);
+
+        Width = adjustedWidth;
+        Height = adjustedHeight;
+
+        if (settings.Window.IsMaximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+    }
+
+    /// <summary>
+    /// 現在のウィンドウサイズおよび最大化状態を設定情報へ保存します。
+    /// </summary>
+    private void SaveWindowSettings()
+    {
+        if (_isSettingsSaved) return;
+        _isSettingsSaved = true;
+
+        var settings = _settingsService.Load() ?? new AppSettings();
+        settings.Window ??= new WindowSettings();
+
+        if (WindowState == WindowState.Maximized)
+        {
+            settings.Window.IsMaximized = true;
+            var bounds = RestoreBounds;
+            if (bounds.Width > 0 && bounds.Height > 0)
+            {
+                settings.Window.Width = bounds.Width;
+                settings.Window.Height = bounds.Height;
+            }
+        }
+        else if (WindowState == WindowState.Normal)
+        {
+            settings.Window.IsMaximized = false;
+            settings.Window.Width = ActualWidth > 0 ? ActualWidth : Width;
+            settings.Window.Height = ActualHeight > 0 ? ActualHeight : Height;
+        }
+        else // 最小化時
+        {
+            settings.Window.IsMaximized = false;
+            var bounds = RestoreBounds;
+            if (bounds.Width > 0 && bounds.Height > 0)
+            {
+                settings.Window.Width = bounds.Width;
+                settings.Window.Height = bounds.Height;
+            }
+        }
+
+        _settingsService.Save(settings);
+    }
+
+    /// <summary>
     /// ウィンドウ終了時に未保存の変更がある場合、確認ダイアログを表示して終了処理を制御します。
     /// </summary>
     protected override async void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
 
-        if (_isClosingConfirmed) return;
+        if (_isClosingConfirmed)
+        {
+            SaveWindowSettings();
+            return;
+        }
 
         if (DataContext is not MainViewModel vm || !vm.Document.IsModified || vm.Document.Pages.Count == 0)
         {
+            SaveWindowSettings();
             return;
         }
 
@@ -186,6 +271,7 @@ public partial class MainWindow : Window
         if (choice == SaveConfirmationResult.Discard)
         {
             _isClosingConfirmed = true;
+            SaveWindowSettings();
             Close();
             return;
         }
@@ -196,9 +282,19 @@ public partial class MainWindow : Window
             if (saved)
             {
                 _isClosingConfirmed = true;
+                SaveWindowSettings();
                 Close();
             }
         }
+    }
+
+    /// <summary>
+    /// ウィンドウが閉じられた際の最終処理を行います。
+    /// </summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        SaveWindowSettings();
     }
 
     /// <summary>
