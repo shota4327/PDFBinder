@@ -24,8 +24,8 @@
             </StackPanel>
         </Border>
 
-        <!-- サムネイル一覧グリッド -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20">
+        <!-- サムネイル一覧グリッド（下部ステータスバーのオーバーレイに隠れないようBottom Paddingを確保） -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,20,20,56">
             <ItemsControl ItemsSource="{Binding Document.Pages}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

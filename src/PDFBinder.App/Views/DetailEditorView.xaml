@@ -66,14 +66,14 @@
             </StackPanel>
         </Border>
 
-        <!-- メインキャンバス領域（単一ページ / 縦連続スクロール表示） -->
+        <!-- メインキャンバス領域（単一ページ / 縦連続スクロール表示、下部ステータスバーのオーバーレイに隠れないようBottom Paddingを確保） -->
         <controls:NoAutoScrollScrollViewer x:Name="DetailScrollViewer"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
                       ScrollChanged="OnScrollViewerScrollChanged"
                       PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"
                       Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
-                      Padding="5">
+                      Padding="5,5,5,48">
             <Grid HorizontalAlignment="Center"
                   VerticalAlignment="Center"
                   Margin="20">
