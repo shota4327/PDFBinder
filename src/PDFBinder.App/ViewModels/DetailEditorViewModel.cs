@@ -54,16 +54,16 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>WPFレイアウト計算の丸め誤差によるスクロールバー誤出現を防ぐセーフティバッファ（DIP）</summary>
     public const double SafetyBuffer = 2.0;
 
-    /// <summary>ScrollViewer の内側余白（上下左右各20px）</summary>
-    public const double ScrollViewerPadding = 20.0;
+    /// <summary>ScrollViewer の内側余白（上下左右各5px）</summary>
+    public const double ScrollViewerPadding = 5.0;
 
     /// <summary>ページの影描画用マージン（上下左右各20px）</summary>
     public const double PageShadowMargin = 20.0;
 
-    /// <summary>フィット計算で使用する水平方向の合計余白（Padding左右計40px + 影マージン左右計40px）</summary>
+    /// <summary>フィット計算で使用する水平方向の合計余白（Padding左右計10px + 影マージン左右計40px = 50px）</summary>
     public const double TotalHorizontalMargin = (ScrollViewerPadding + PageShadowMargin) * 2;
 
-    /// <summary>フィット計算で使用する垂直方向の合計余白（Padding上下計40px + 影マージン上下計40px）</summary>
+    /// <summary>フィット計算で使用する垂直方向の合計余白（Padding上下計10px + 影マージン上下計40px = 50px）</summary>
     public const double TotalVerticalMargin = (ScrollViewerPadding + PageShadowMargin) * 2;
 
     private Color _penColor = Colors.Black;

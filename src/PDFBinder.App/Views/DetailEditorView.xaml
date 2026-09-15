@@ -73,7 +73,7 @@
                       ScrollChanged="OnScrollViewerScrollChanged"
                       PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"
                       Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
-                      Padding="20">
+                      Padding="5">
             <Grid HorizontalAlignment="Center"
                   VerticalAlignment="Center"
                   Margin="20">
