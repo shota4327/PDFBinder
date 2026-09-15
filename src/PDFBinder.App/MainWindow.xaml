@@ -52,6 +52,10 @@
         <KeyBinding Key="NumPad0" Modifiers="Control" Command="{Binding ZoomResetCommand}" />
         <KeyBinding Key="PageUp" Command="{Binding GoToPreviousPageCommand}" />
         <KeyBinding Key="PageDown" Command="{Binding GoToNextPageCommand}" />
+        <KeyBinding Key="Up" Command="{Binding GoToPreviousPageCommand}" />
+        <KeyBinding Key="Left" Command="{Binding GoToPreviousPageCommand}" />
+        <KeyBinding Key="Down" Command="{Binding GoToNextPageCommand}" />
+        <KeyBinding Key="Right" Command="{Binding GoToNextPageCommand}" />
     </Window.InputBindings>
 
     <Grid Background="#F1F5F9">
@@ -497,7 +501,7 @@
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding GoToPreviousPageCommand}"
-                            ToolTip="前のページへ"
+                            ToolTip="前のページへ (PgUp / ↑ / ←)"
                             Width="26" Height="26">
                         <TextBlock Text="&#xE76B;" FontFamily="{StaticResource IconFontFamily}" FontSize="11" />
                     </Button>
@@ -518,7 +522,7 @@
                                FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,6,0" />
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding GoToNextPageCommand}"
-                            ToolTip="次のページへ"
+                            ToolTip="次のページへ (PgDn / ↓ / →)"
                             Width="26" Height="26">
                         <TextBlock Text="&#xE76C;" FontFamily="{StaticResource IconFontFamily}" FontSize="11" />
                     </Button>

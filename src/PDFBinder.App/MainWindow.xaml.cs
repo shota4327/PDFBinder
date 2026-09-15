@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using PDFBinder.App.ViewModels;
 
@@ -28,27 +30,127 @@ public partial class MainWindow : Window
     private bool _isClosingConfirmed;
 
     /// <summary>
-    /// キー入力を先行検知し、保存確認ダイアログ表示中のキーボード操作（Escによるキャンセル等）を処理します。
+    /// キー入力を先行検知し、フォーカス位置に関わらずショートカットキーの確実な実行を制御します。
     /// </summary>
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
 
-        if (DataContext is MainViewModel vm && vm.IsSaveConfirmationVisible)
-        {
-            if (e.Key == Key.Escape)
-            {
-                vm.ConfirmSave(SaveConfirmationResult.Cancel);
-                e.Handled = true;
-                return;
-            }
+        if (DataContext is not MainViewModel vm) return;
 
-            // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
-            if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        // 1. 保存確認ダイアログのキー制御
+        if (HandleSaveConfirmationKeyDown(vm, e)) return;
+
+        // 2. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
+        if (Keyboard.FocusedElement is TextBoxBase || e.OriginalSource is TextBoxBase)
+        {
+            return;
+        }
+
+        // 3. 詳細ビューでのページ移動（PgUp/PgDn/矢印キー）
+        if (HandlePageNavigationKeyDown(vm, e)) return;
+
+        // 4. その他のグローバルショートカット（Window.InputBindings）
+        HandleGlobalInputBindingsKeyDown(vm, e);
+    }
+
+    /// <summary>
+    /// 保存確認ダイアログ表示中のキーボード操作（Escによるキャンセル等）を先行処理します。
+    /// </summary>
+    private static bool HandleSaveConfirmationKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsSaveConfirmationVisible) return false;
+
+        if (e.Key == Key.Escape)
+        {
+            vm.ConfirmSave(SaveConfirmationResult.Cancel);
+            e.Handled = true;
+            return true;
+        }
+
+        // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 詳細ビューにおけるPgUp/PgDnおよび矢印キー（↑↓←→）によるページ移動を先行処理します。
+    /// </summary>
+    private static bool HandlePageNavigationKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (HandlePageNavigation(vm, key, Keyboard.Modifiers))
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 指定されたキーおよび修飾キーをもとにページ移動コマンドを実行可能か判定し、実行します（テスト可能な静的ヘルパー）。
+    /// </summary>
+    internal static bool HandlePageNavigation(MainViewModel vm, Key key, ModifierKeys modifiers)
+    {
+        if (modifiers != ModifierKeys.None) return false;
+
+        if (key is Key.PageUp or Key.Up or Key.Left)
+        {
+            if (vm.CanGoToPreviousPage)
             {
-                e.Handled = true;
+                vm.GoToPreviousPageCommand.Execute(null);
+                return true;
             }
         }
+        else if (key is Key.PageDown or Key.Down or Key.Right)
+        {
+            if (vm.CanGoToNextPage)
+            {
+                vm.GoToNextPageCommand.Execute(null);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// ウィンドウのInputBindingsに定義されたショートカットを先行実行し、子コントロールによる消費を防ぎます。
+    /// </summary>
+    private bool HandleGlobalInputBindingsKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var modifiers = Keyboard.Modifiers;
+
+        // 選択ツールでインクストロークが選択されている場合は、ストローク消去を優先するためDeleteキーをパススルー
+        if (key == Key.Delete && modifiers == ModifierKeys.None && vm.IsDetailViewActive)
+        {
+            if (Keyboard.FocusedElement is InkCanvas inkCanvas && inkCanvas.GetSelectedStrokes().Count > 0)
+            {
+                return false;
+            }
+        }
+
+        foreach (InputBinding ib in InputBindings)
+        {
+            if (ib is KeyBinding kb && kb.Key == key && kb.Modifiers == modifiers)
+            {
+                if (kb.Command != null && kb.Command.CanExecute(kb.CommandParameter))
+                {
+                    kb.Command.Execute(kb.CommandParameter);
+                    e.Handled = true;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
