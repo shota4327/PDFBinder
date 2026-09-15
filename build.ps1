@@ -1,8 +1,8 @@
-# PDF Binder - Single-File EXE Build Script (.NET 10 / win-x64)
+# PDF Binder - Build Script (.NET 10 / win-x64)
 # Usage:
 #   .\build.ps1                              # Build both (all)
-#   .\build.ps1 -Target self-contained       # Build Self-Contained only
-#   .\build.ps1 -Target framework-dependent  # Build Framework-Dependent only
+#   .\build.ps1 -Target self-contained       # Build Self-Contained only (Single-File EXE)
+#   .\build.ps1 -Target framework-dependent  # Build Framework-Dependent only (DLL-separated)
 
 param(
     [ValidateSet("all", "self-contained", "framework-dependent")]
@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " PDF Binder - Build Process (.NET 10 / win-x64)" -ForegroundColor Cyan
@@ -34,15 +35,11 @@ if ($Target -eq "all") {
 } elseif ($Target -eq "framework-dependent") {
     if (Test-Path $distDir) {
         Write-Host "Cleaning framework-dependent files in dist folder..." -ForegroundColor Yellow
-        Get-ChildItem -Path $distDir -File | Remove-Item -Force
-        $oldFdDir = Join-Path $distDir "framework-dependent"
-        if (Test-Path $oldFdDir) {
-            Remove-Item $oldFdDir -Recurse -Force
-        }
+        Get-ChildItem -Path $distDir -Exclude "self-contained" | Remove-Item -Recurse -Force
     }
 }
 
-# 1. Publish Self-Contained
+# 1. Publish Self-Contained (Single-File EXE with ReadyToRun and embedded PDB)
 if ($Target -eq "all" -or $Target -eq "self-contained") {
     Write-Host ""
     Write-Host "[Self-Contained] Publishing..." -ForegroundColor Green
@@ -53,6 +50,8 @@ if ($Target -eq "all" -or $Target -eq "self-contained") {
         -p:PublishSingleFile=true `
         -p:IncludeNativeLibrariesForSelfExtract=true `
         -p:EnableCompressionInSingleFile=true `
+        -p:PublishReadyToRun=true `
+        -p:DebugType=embedded `
         -o $selfContainedDir
 
     $scExe = Join-Path $selfContainedDir "PDFBinder.exe"
@@ -61,7 +60,7 @@ if ($Target -eq "all" -or $Target -eq "self-contained") {
     }
 }
 
-# 2. Publish Framework-Dependent
+# 2. Publish Framework-Dependent (DLL-separated with ReadyToRun and embedded PDB)
 if ($Target -eq "all" -or $Target -eq "framework-dependent") {
     Write-Host ""
     Write-Host "[Framework-Dependent] Publishing..." -ForegroundColor Green
@@ -69,8 +68,9 @@ if ($Target -eq "all" -or $Target -eq "framework-dependent") {
         -c Release `
         -r win-x64 `
         --no-self-contained `
-        -p:PublishSingleFile=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:PublishSingleFile=false `
+        -p:PublishReadyToRun=true `
+        -p:DebugType=embedded `
         -o $distDir
 
     $fdExe = Join-Path $distDir "PDFBinder.exe"
@@ -88,11 +88,14 @@ Write-Host "==========================================================" -Foregro
 $fdSummaryExe = Join-Path $distDir "PDFBinder.exe"
 if (Test-Path $fdSummaryExe) {
     $fdItem = Get-Item $fdSummaryExe
-    $fdSizeMb = [Math]::Round($fdItem.Length / 1MB, 2)
-    Write-Host " [Framework-Dependent / フレームワーク依存版]" -ForegroundColor Cyan
-    Write-Host "  - Path: $fdSummaryExe" -ForegroundColor White
-    Write-Host "  - Size: $fdSizeMb MB" -ForegroundColor Yellow
-    Write-Host "  - Info: Requires .NET 10 Desktop Runtime installed on OS. Lightweight, faster cold start." -ForegroundColor Gray
+    $fdExeSizeMb = [Math]::Round($fdItem.Length / 1MB, 2)
+    $fdAllFiles = Get-ChildItem -Path $distDir -File
+    $fdTotalBytes = ($fdAllFiles | Measure-Object -Property Length -Sum).Sum
+    $fdTotalSizeMb = [Math]::Round($fdTotalBytes / 1MB, 2)
+    Write-Host " [Framework-Dependent / フレームワーク依存版 (DLL分離形式)]" -ForegroundColor Cyan
+    Write-Host "  - Entry EXE : $fdSummaryExe ($fdExeSizeMb MB)" -ForegroundColor White
+    Write-Host "  - Total Dir : $distDir ($($fdAllFiles.Count) files, total $fdTotalSizeMb MB)" -ForegroundColor White
+    Write-Host "  - Info      : Requires .NET 10 Desktop Runtime. DLL-separated, ReadyToRun, fastest cold start." -ForegroundColor Gray
     Write-Host ""
 }
 
@@ -100,10 +103,10 @@ $scSummaryExe = Join-Path $selfContainedDir "PDFBinder.exe"
 if (Test-Path $scSummaryExe) {
     $scItem = Get-Item $scSummaryExe
     $scSizeMb = [Math]::Round($scItem.Length / 1MB, 2)
-    Write-Host " [Self-Contained / 自己完結版]" -ForegroundColor Cyan
-    Write-Host "  - Path: $scSummaryExe" -ForegroundColor White
-    Write-Host "  - Size: $scSizeMb MB" -ForegroundColor Yellow
-    Write-Host "  - Info: Bundles .NET 10 runtime. Fully offline, no pre-installed runtime required." -ForegroundColor Gray
+    Write-Host " [Self-Contained / 自己完結版 (単一EXE形式)]" -ForegroundColor Cyan
+    Write-Host "  - Path : $scSummaryExe" -ForegroundColor White
+    Write-Host "  - Size : $scSizeMb MB" -ForegroundColor Yellow
+    Write-Host "  - Info : Bundles .NET 10 runtime. ReadyToRun, fully offline, no pre-installed runtime required." -ForegroundColor Gray
     Write-Host ""
 }
 

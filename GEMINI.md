@@ -54,9 +54,9 @@
     - プルリクエストをマージする際は、**スカッシュマージ（`--squash`）を行ってはならない（禁止）**。
     - 各機能ブランチで作成した個別コミット履歴を完全に保持するため、必ず**通常マージ（`gh pr merge <PR番号> --merge --delete-branch`）を使用すること**。
   - PR マージ後は、`git checkout master`、`git pull origin master`、`git fetch --prune` などを**連結せず1コマンドずつ順番に実行**して削除済みリモート追跡ブランチ（`remotes/origin/*`）のローカルキャッシュを整理し、不要となったローカルブランチも安全に削除すること。
-  - **マージ完了時の単一EXE自動発行（必須）**:
-    - PR マージおよび `master` ブランチの最新化・ローカルブランチ整理が完了した後は、必ず `powershell -ExecutionPolicy Bypass -File .\build.ps1`（単一EXE発行スクリプト）を実行し、`dist/PDFBinder.exe`（フレームワーク依存版）および `dist/self-contained/PDFBinder.exe`（自己完結版）に最新の単一実行可能ファイルを書き出し・更新すること。
-    - 生成された各 EXE ファイルの出力パスおよびサイズをユーザーへの作業完了報告に明記すること。
+  - **マージ完了時の配布バイナリ自動発行（必須）**:
+    - PR マージおよび `master` ブランチの最新化・ローカルブランチ整理が完了した後は、必ず `powershell -ExecutionPolicy Bypass -File .\build.ps1`（配布バイナリ発行スクリプト）を実行し、`dist/`（フレームワーク依存版: DLL分離形式）および `dist/self-contained/PDFBinder.exe`（自己完結版: 単一EXE形式）に最新の配布ファイルを書き出し・更新すること。
+    - 生成された各バイナリ・フォルダの出力パスおよびサイズをユーザーへの作業完了報告に明記すること。
 
 ### 3.2 実装計画（Plan）＆検証報告（Walkthrough）のライフサイクル
 - **Plan & Walkthrough の永続記録と同時コミット（必須）**:
