@@ -530,16 +530,16 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(renderer, doc);
         vm.PageViewMode = DetailPageViewMode.SinglePage;
-        vm.UpdateViewportSize(880, 1000); // availableWidth = 880 - 80 - 2 = 798
+        vm.UpdateViewportSize(880, 1000); // availableWidth = 880 - 50 - 2 = 828
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        // page1 の幅500, 高さ800 -> 縦スクロール発生のため 780 / 500 = 1.56
-        Assert.Equal(1.56, vm.Zoom, 2);
+        // page1 の幅500, 高さ800 -> 縦スクロール発生のため 810 / 500 = 1.62
+        Assert.Equal(1.62, vm.Zoom, 2);
 
         // page2 へ移動
         vm.GoToNextPage();
-        // page2 の幅1000, 高さ800 -> 縦スクロールなしのため 798 / 1000 = 0.798 ≒ 0.80
-        Assert.Equal(0.8, vm.Zoom, 2);
+        // page2 の幅1000, 高さ800 -> 縦スクロールなしのため 828 / 1000 = 0.828 ≒ 0.83
+        Assert.Equal(0.83, vm.Zoom, 2);
     }
 
     [Fact]
@@ -561,7 +561,7 @@ public class DetailEditorViewModelTests
         vm.UpdateViewportSize(880, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        double initialZoom = vm.Zoom; // page1基準（スクロールバー考慮）: 1.56
+        double initialZoom = vm.Zoom; // page1基準（スクロールバー考慮）: 1.62
 
         // スクロール等で CurrentPage が page2 に変わった場合
         vm.CurrentPage = page2;
@@ -588,15 +588,15 @@ public class DetailEditorViewModelTests
         vm.UpdateViewportSize(880, 1000);
 
         vm.FitMode = DetailViewFitMode.FitToWidth;
-        Assert.Equal(1.56, vm.Zoom, 2);
+        Assert.Equal(1.62, vm.Zoom, 2);
 
         // カレントページを page2 にしてウィンドウをリサイズ
         vm.CurrentPage = page2;
-        // リサイズ発生 (ViewportWidth = 1080 -> availableWidth = 1080 - 82 = 998, 縦スクロール考慮で 980)
+        // リサイズ発生 (ViewportWidth = 1080 -> availableWidth = 1080 - 52 = 1028, 縦スクロール考慮で 1010)
         vm.UpdateViewportSize(1080, 1000);
 
-        // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 980 / 1000 = 0.98
-        Assert.Equal(0.98, vm.Zoom, 2);
+        // リサイズ時はカレントページ（page2: 幅1000）を基準に再計算 -> 1010 / 1000 = 1.01
+        Assert.Equal(1.01, vm.Zoom, 2);
     }
 
     [Fact]
@@ -619,19 +619,19 @@ public class DetailEditorViewModelTests
         // FitToWindow 適用
         vm.FitMode = DetailViewFitMode.FitToWindow;
 
-        // 計算後のコンテンツサイズ（Padding=40、影マージン=40、SafetyBuffer=2 を考慮）
+        // 計算後のコンテンツサイズ（Padding=10、影マージン=40、SafetyBuffer=2 を考慮）
         double renderedWidth = page.DisplayWidth * vm.Zoom;
         double renderedHeight = page.DisplayHeight * vm.Zoom;
 
-        // コンテンツ幅 + 合計水平マージン(80.0) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
+        // コンテンツ幅 + 合計水平マージン(50.0) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
         Assert.True(renderedWidth + DetailEditorViewModel.TotalHorizontalMargin <= viewportW);
 
-        // コンテンツ高さ + 合計垂直マージン(80.0) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
+        // コンテンツ高さ + 合計垂直マージン(50.0) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
         Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
 
         // 影用マージン(上下左右20px)が確保されているため、上下影(上12px, 下20px)・左右影(16px)が完全に収まる
         Assert.True(DetailEditorViewModel.PageShadowMargin >= 20.0);
-        Assert.True(DetailEditorViewModel.ScrollViewerPadding == 20.0);
+        Assert.True(DetailEditorViewModel.ScrollViewerPadding == 5.0);
     }
 
     [Fact]
@@ -758,9 +758,9 @@ public class DetailEditorViewModelTests
         double renderedWidth = page.DisplayWidth * vm.Zoom;
         double renderedHeight = page.DisplayHeight * vm.Zoom;
 
-        // コンテンツ幅 + 合計水平マージン(80.0) が ViewportWidth 以内に確実に収まる
+        // コンテンツ幅 + 合計水平マージン(50.0) が ViewportWidth 以内に確実に収まる
         Assert.True(renderedWidth + DetailEditorViewModel.TotalHorizontalMargin <= viewportW);
-        // コンテンツ高さ + 合計垂直マージン(80.0) が ViewportHeight 以内に確実に収まる
+        // コンテンツ高さ + 合計垂直マージン(50.0) が ViewportHeight 以内に確実に収まる
         Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
     }
 
