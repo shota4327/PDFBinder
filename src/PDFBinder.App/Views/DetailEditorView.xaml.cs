@@ -5,6 +5,7 @@ using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
 using PDFBinder.App.Controls;
+using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
@@ -16,8 +17,7 @@ namespace PDFBinder.App.Views;
 /// </summary>
 public partial class DetailEditorView : UserControl
 {
-    private DateTime _lastPageTurnTime = DateTime.MinValue;
-    private static readonly TimeSpan PageTurnCooldown = TimeSpan.FromMilliseconds(250);
+    private readonly WheelPageTurnTracker _wheelTracker = new();
 
     public DetailEditorView()
     {
@@ -148,42 +148,55 @@ public partial class DetailEditorView : UserControl
         bool isAtTop = DetailScrollViewer.VerticalOffset <= 1.0;
         bool isAtBottom = DetailScrollViewer.VerticalOffset >= scrollableHeight - 1.0;
 
-        if (e.Delta > 0 && (isFitInView || isAtTop))
+        bool isAtEdge = (e.Delta > 0 && (isFitInView || isAtTop)) ||
+                        (e.Delta < 0 && (isFitInView || isAtBottom));
+
+        int pageTurns = _wheelTracker.ProcessScroll(e.Delta, DateTime.UtcNow, isAtEdge);
+        if (pageTurns == 0)
         {
-            if (ViewModel.CanGoToPreviousPage)
+            if (isAtEdge)
             {
-                // 拡大スクロールで前ページに戻る場合は移動先ページの下端へ、収まっている場合は上端へ
-                Action? postScroll = isAtTop && !isFitInView ? () => DetailScrollViewer.ScrollToBottom() : () => DetailScrollViewer.ScrollToTop();
-                if (TryTurnPage(() => ViewModel.GoToPreviousPageCommand.Execute(null), postScroll))
-                {
-                    e.Handled = true;
-                }
+                // 境界上で端数Deltaを蓄積中の場合は、親要素やビューポートの不要な揺れを防ぐためイベントを消費
+                e.Handled = true;
             }
+            return;
         }
-        else if (e.Delta < 0 && (isFitInView || isAtBottom))
-        {
-            if (ViewModel.CanGoToNextPage)
-            {
-                // 次のページへ進む場合は常に新しいページの上端へスクロール
-                if (TryTurnPage(() => ViewModel.GoToNextPageCommand.Execute(null), () => DetailScrollViewer.ScrollToTop()))
-                {
-                    e.Handled = true;
-                }
-            }
-        }
+
+        e.Handled = true;
+        ExecutePageTurns(pageTurns, isFitInView, isAtTop);
     }
 
-    private bool TryTurnPage(Action turnAction, Action? postScrollAction = null)
+    private void ExecutePageTurns(int pageTurns, bool isFitInView, bool isAtTop)
     {
-        var now = DateTime.UtcNow;
-        if (now - _lastPageTurnTime < PageTurnCooldown) return false;
-
-        _lastPageTurnTime = now;
-        turnAction();
-        if (postScrollAction != null)
+        if (pageTurns > 0)
         {
-            Dispatcher.InvokeAsync(postScrollAction, System.Windows.Threading.DispatcherPriority.Loaded);
+            for (int i = 0; i < pageTurns; i++)
+            {
+                if (!ViewModel!.CanGoToPreviousPage)
+                {
+                    _wheelTracker.Reset();
+                    break;
+                }
+                ViewModel.GoToPreviousPageCommand.Execute(null);
+            }
+
+            Action? postScroll = isAtTop && !isFitInView ? () => DetailScrollViewer.ScrollToBottom() : () => DetailScrollViewer.ScrollToTop();
+            Dispatcher.InvokeAsync(postScroll, System.Windows.Threading.DispatcherPriority.Loaded);
         }
-        return true;
+        else if (pageTurns < 0)
+        {
+            int count = -pageTurns;
+            for (int i = 0; i < count; i++)
+            {
+                if (!ViewModel!.CanGoToNextPage)
+                {
+                    _wheelTracker.Reset();
+                    break;
+                }
+                ViewModel.GoToNextPageCommand.Execute(null);
+            }
+
+            Dispatcher.InvokeAsync(() => DetailScrollViewer.ScrollToTop(), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
 }
