@@ -463,7 +463,7 @@
 
             <!-- ドロップ案内オーバーレイ（読み込み済みのファイルドラッグ中に表示） -->
             <Grid Visibility="{Binding IsDragOver, Converter={StaticResource BooleanToVisibilityConverter}}"
-                  Background="#E60F172A"
+                  Background="#E61E1E1E"
                   IsHitTestVisible="False">
                 <Border Margin="24"
                         Background="{StaticResource SurfaceBackgroundBrush}"
@@ -491,7 +491,7 @@
 
         <!-- 下部ステータスバー（半透明オーバーレイ配置・不透明度85%・約5px拡大） -->
         <Border Grid.Row="2" VerticalAlignment="Bottom" Panel.ZIndex="10"
-                Background="#E61E293B" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
+                Background="#E6252526" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
             <DockPanel LastChildFill="True">
                 <!-- 左端：ページ表示・移動ボタン（< ページ 1 / 2 >） -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">

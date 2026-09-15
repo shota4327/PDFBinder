@@ -59,7 +59,7 @@
                                             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                                             <Setter Property="Effect">
                                                 <Setter.Value>
-                                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#3B82F6" Opacity="0.45" />
+                                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#007ACC" Opacity="0.45" />
                                                 </Setter.Value>
                                             </Setter>
                                         </DataTrigger>
