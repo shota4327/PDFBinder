@@ -55,7 +55,7 @@
                 <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.1" />
             </Border.Effect>
             <StackPanel HorizontalAlignment="Center">
-                <TextBlock Text="📄" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock Text="&#xE415;" FontFamily="{StaticResource IconFontFamily}" FontSize="48" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
                             FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
                 <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 

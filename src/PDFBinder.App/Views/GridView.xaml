@@ -14,7 +14,7 @@
                 HorizontalAlignment="Center" VerticalAlignment="Center"
                 Background="White" CornerRadius="12" Padding="40,30" BorderBrush="#E2E8F0" BorderThickness="1">
             <StackPanel HorizontalAlignment="Center">
-                <TextBlock Text="📄" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock Text="&#xE415;" FontFamily="{StaticResource IconFontFamily}" FontSize="48" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
                            FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
                 <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 
@@ -89,9 +89,15 @@
 
                                 <!-- カード下部: クイックアクションボタン -->
                                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="4,6">
-                                    <Button Content="⟲" ToolTip="左に90°回転" Click="OnRotateCounterClockwiseClick" Style="{StaticResource MiniIconButtonStyle}" />
-                                    <Button Content="⟳" ToolTip="右に90°回転" Click="OnRotateClockwiseClick" Style="{StaticResource MiniIconButtonStyle}" />
-                                    <Button Content="🗑" ToolTip="ページ削除" Click="OnDeletePageClick" Style="{StaticResource MiniIconButtonStyle}" Foreground="#EF4444" />
+                                    <Button ToolTip="左に90°回転" Click="OnRotateCounterClockwiseClick" Style="{StaticResource MiniIconButtonStyle}">
+                                        <TextBlock Text="&#xE419;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
+                                    </Button>
+                                    <Button ToolTip="右に90°回転" Click="OnRotateClockwiseClick" Style="{StaticResource MiniIconButtonStyle}">
+                                        <TextBlock Text="&#xE41A;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
+                                    </Button>
+                                    <Button ToolTip="ページ削除" Click="OnDeletePageClick" Style="{StaticResource MiniIconButtonStyle}" Foreground="#EF4444">
+                                        <TextBlock Text="&#xE92E;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
+                                    </Button>
                                 </StackPanel>
                             </Grid>
                         </Border>

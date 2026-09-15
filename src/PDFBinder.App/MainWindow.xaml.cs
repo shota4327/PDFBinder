@@ -304,12 +304,12 @@ public partial class MainWindow : Window
     {
         if (WindowState == WindowState.Maximized)
         {
-            MaximizeRestoreGlyph.Text = "\uE923";
+            MaximizeRestoreGlyph.Text = "\uE3E0";
             MaximizeRestoreButton.ToolTip = "元に戻す";
         }
         else
         {
-            MaximizeRestoreGlyph.Text = "\uE922";
+            MaximizeRestoreGlyph.Text = "\uE3C6";
             MaximizeRestoreButton.ToolTip = "最大化";
         }
     }

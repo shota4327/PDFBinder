@@ -74,6 +74,7 @@
   - `PdfSharp` (MIT): PDF構造操作・保存
   - `PDFium` / `PDFiumSharp` (Apache-2.0 / BSD): 高速PDFレンダリング
   - `CommunityToolkit.Mvvm` (MIT): MVVMアーキテクチャ基盤
+  - `Material Symbols Rounded` (Apache-2.0): オープンソースアイコンフォント（完全オフライン内包）
 
 ---
 

@@ -18,8 +18,8 @@
             <converters:ColorEqualsToVisibilityConverter x:Key="ColorEqualsToVisibilityConverter" />
             <converters:ColorToContrastingBrushConverter x:Key="ColorToContrastingBrushConverter" />
 
-            <!-- アイコンフォント -->
-            <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+            <!-- アイコンフォント（Material Symbols Rounded - 埋め込みリソース） -->
+            <FontFamily x:Key="IconFontFamily">pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Rounded</FontFamily>
 
             <!-- 基本フォント -->
             <Style TargetType="Control" x:Key="BaseFont">
