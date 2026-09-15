@@ -495,7 +495,7 @@
 
         <!-- 下部ステータスバー（半透明オーバーレイ配置・約5px拡大） -->
         <Border Grid.Row="2" VerticalAlignment="Bottom" Panel.ZIndex="10"
-                Background="#E6FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
+                Background="#99FFFFFF" BorderBrush="#B0CBD5E1" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
             <DockPanel LastChildFill="True">
                 <!-- 左端：ページ表示・移動ボタン（< ページ 1 / 2 >） -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">
