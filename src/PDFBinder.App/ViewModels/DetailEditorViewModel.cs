@@ -337,17 +337,31 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public void InitializeDocument(PdfDocumentModel document)
     {
+        var previousPage = CurrentPage;
         Pages.Clear();
         foreach (var page in document.Pages)
         {
             Pages.Add(new DetailPageItemViewModel(page));
         }
 
-        CurrentPage = document.Pages.FirstOrDefault();
-        if (Pages.Count > 0)
+        // 以前のカレントページが存在する場合は維持し、存在しない場合は先頭ページを選択
+        var targetPage = (previousPage != null
+            ? document.Pages.FirstOrDefault(p => p.Id == previousPage.Id || p == previousPage)
+            : null) ?? document.Pages.FirstOrDefault();
+
+        // プロパティ変更通知を確実に発火させ、UIバインディング（CurrentPageItem等）の更新を保証
+        CurrentPage = null;
+        CurrentPage = targetPage;
+
+        foreach (var item in Pages)
         {
-            Pages[0].IsCurrent = true;
+            item.IsCurrent = (item.Page == targetPage);
         }
+
+        OnPropertyChanged(nameof(CurrentPageItem));
+        OnPropertyChanged(nameof(PageBackground));
+        OnPropertyChanged(nameof(CurrentPageIndex));
+        OnPropertyChanged(nameof(CurrentPageNumber));
 
         UpdatePageEdgeFlags();
         ApplyFitMode();

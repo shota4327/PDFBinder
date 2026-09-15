@@ -395,11 +395,10 @@ public partial class MainViewModel : ObservableObject
             StatusMessage = "PDFを読み込んでいます...";
 
             var doc = await _pdfService.LoadDocumentAsync(filePath);
+            IsDetailViewActive = true;
             Document = doc;
             _undoRedoService.Clear();
 
-            IsDetailViewActive = true;
-            DetailEditor?.InitializeDocument(doc);
             StatusMessage = $"{Document.FileName} を読み込みました（全 {Document.PageCount} ページ）";
         }
         catch (Exception ex)

@@ -763,4 +763,89 @@ public class DetailEditorViewModelTests
         // コンテンツ高さ + 合計垂直マージン(80.0) が ViewportHeight 以内に確実に収まる
         Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
     }
+
+    [Fact]
+    public void InitializeDocument_ConsecutiveCalls_UpdatesCurrentPageItem_AndRaisesPropertyChanged()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        doc.Pages.Add(CreateSamplePage(500, 700));
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+
+        var firstItem = vm.CurrentPageItem;
+        Assert.NotNull(firstItem);
+        Assert.Same(doc.Pages[0], firstItem.Page);
+
+        int currentPageItemChangedCount = 0;
+        vm.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPageItem))
+            {
+                currentPageItemChangedCount++;
+            }
+        };
+
+        // Act: 同一ドキュメントで再度 InitializeDocument を実行
+        vm.InitializeDocument(doc);
+
+        // Assert: CurrentPageItem の変更通知が発火し、Pages 内の最新インスタンスを参照していること
+        Assert.True(currentPageItemChangedCount > 0);
+        var newItem = vm.CurrentPageItem;
+        Assert.NotNull(newItem);
+        Assert.NotSame(firstItem, newItem);
+        Assert.Same(doc.Pages[0], newItem.Page);
+        Assert.Contains(newItem, vm.Pages);
+        Assert.True(newItem.IsCurrent);
+    }
+
+    [Fact]
+    public void InitializeDocument_RetainsCurrentPage_WhenPageStillExists()
+    {
+        // Arrange: 3ページのドキュメントで2ページ目を選択
+        var doc = new PdfDocumentModel();
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        doc.Pages.Add(CreateSamplePage(500, 700));
+        doc.Pages.Add(CreateSamplePage(500, 700));
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.CurrentPage = doc.Pages[1];
+
+        // Act: ドキュメントを再初期化（白紙追加・結合時等の挙動を模倣）
+        vm.InitializeDocument(doc);
+
+        // Assert: 2ページ目が維持されていること
+        Assert.Same(doc.Pages[1], vm.CurrentPage);
+        Assert.NotNull(vm.CurrentPageItem);
+        Assert.Same(doc.Pages[1], vm.CurrentPageItem.Page);
+        Assert.True(vm.Pages[1].IsCurrent);
+    }
+
+    [Fact]
+    public void InitializeDocument_SelectsFirstPage_WhenPreviousPageNoLongerExists()
+    {
+        // Arrange: 以前のドキュメントで2ページ目を選択
+        var doc1 = new PdfDocumentModel();
+        doc1.Pages.Add(CreateSamplePage(500, 700));
+        doc1.Pages.Add(CreateSamplePage(500, 700));
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer, doc1);
+        vm.CurrentPage = doc1.Pages[1];
+
+        // Act: 異なるドキュメントで初期化
+        var doc2 = new PdfDocumentModel();
+        doc2.Pages.Add(CreateSamplePage(600, 800));
+        doc2.Pages.Add(CreateSamplePage(600, 800));
+        vm.InitializeDocument(doc2);
+
+        // Assert: 存在しないため新規ドキュメントの先頭ページが選択されること
+        Assert.Same(doc2.Pages[0], vm.CurrentPage);
+        Assert.NotNull(vm.CurrentPageItem);
+        Assert.Same(doc2.Pages[0], vm.CurrentPageItem.Page);
+        Assert.True(vm.Pages[0].IsCurrent);
+    }
 }
