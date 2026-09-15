@@ -8,17 +8,17 @@
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="800">
     
-    <Grid Background="#F8FAFC">
+    <Grid Background="{StaticResource AppBackgroundBrush}">
         <!-- 空白時のウェルカム表示 -->
         <Border Visibility="{Binding Document.Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                Background="White" CornerRadius="12" Padding="40,30" BorderBrush="#E2E8F0" BorderThickness="1">
+                Background="{StaticResource SurfaceBackgroundBrush}" CornerRadius="12" Padding="40,30" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1">
             <StackPanel HorizontalAlignment="Center">
-                <TextBlock Text="&#xE415;" FontFamily="{StaticResource IconFontFamily}" FontSize="48" Foreground="#2563EB" HorizontalAlignment="Center" Margin="0,0,0,10" />
+                <TextBlock Text="&#xE415;" FontFamily="{StaticResource IconFontFamily}" FontSize="48" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
-                           FontSize="16" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" />
+                           FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="複数PDFの結合、ページの並び替え・回転・削除、手書き記入が可能です" 
-                           FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,6,0,16" />
+                           FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,6,0,16" />
                 <Button Content="ファイルを開く..." Command="{Binding OpenDocumentCommand}" 
                         Padding="20,8" HorizontalAlignment="Center" Style="{StaticResource PrimaryButtonStyle}" />
             </StackPanel>
@@ -36,7 +36,7 @@
                     <DataTemplate DataType="{x:Type models:PdfPageModel}">
                         <Border Width="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 Margin="12"
-                                Background="White"
+                                Background="{StaticResource SurfaceBackgroundBrush}"
                                 CornerRadius="8"
                                 BorderThickness="2"
                                 MouseLeftButtonDown="OnCardMouseLeftButtonDown"
@@ -48,18 +48,18 @@
                                 Cursor="Hand">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="#E2E8F0" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
                                     <Setter Property="Effect">
                                         <Setter.Value>
-                                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="270" Opacity="0.1" />
+                                            <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.3" Color="#000000" />
                                         </Setter.Value>
                                     </Setter>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="BorderBrush" Value="#2563EB" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                                             <Setter Property="Effect">
                                                 <Setter.Value>
-                                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#2563EB" Opacity="0.35" />
+                                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#3B82F6" Opacity="0.45" />
                                                 </Setter.Value>
                                             </Setter>
                                         </DataTrigger>
@@ -78,12 +78,12 @@
                                 <Grid Grid.Row="0" Margin="8,6,8,4">
                                     <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" HorizontalAlignment="Left" />
                                     <TextBlock Text="{Binding PageNumber, StringFormat='P.{0}'}" 
-                                               FontSize="12" FontWeight="SemiBold" Foreground="#475569" 
+                                               FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" 
                                                HorizontalAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
 
                                 <!-- カード中央: サムネイル画像 -->
-                                <Border Grid.Row="1" Margin="8,0,8,0" Background="#F1F5F9" MinHeight="140" CornerRadius="4" ClipToBounds="True">
+                                <Border Grid.Row="1" Margin="8,0,8,0" Background="{StaticResource AppBackgroundBrush}" MinHeight="140" CornerRadius="4" ClipToBounds="True">
                                     <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
                                 </Border>
 
@@ -95,7 +95,7 @@
                                     <Button ToolTip="右に90°回転" Click="OnRotateClockwiseClick" Style="{StaticResource MiniIconButtonStyle}">
                                         <TextBlock Text="&#xE41A;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
                                     </Button>
-                                    <Button ToolTip="ページ削除" Click="OnDeletePageClick" Style="{StaticResource MiniIconButtonStyle}" Foreground="#EF4444">
+                                    <Button ToolTip="ページ削除" Click="OnDeletePageClick" Style="{StaticResource MiniIconButtonStyle}" Foreground="{StaticResource DangerBrush}">
                                         <TextBlock Text="&#xE92E;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
                                     </Button>
                                 </StackPanel>

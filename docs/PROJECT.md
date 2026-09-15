@@ -51,12 +51,13 @@
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
 | **F37** | UI・表示設定 | 表示オプション（100%、ウィンドウにあわせる、幅にあわせる、動的リサイズ追従、スクロールバー幅および余白補正） | **完了** | Issue #52, #65 / DetailViewFitMode |
-| **F38** | UI・ステータスバー | 高機能ステータスバー刷新・半透明オーバーレイ化（半透明白 `#D9FFFFFF`（不透明度85%）、高さ約5px拡大 MinHeight 42px、ボタン・入力欄拡大、単一・連続表示時のステータスバー重複回避・スクロールバー誤出現防止、ページ移動 `< ページ 1 / 2 >`、ズームコントロール `[-] 100% [+]`） | **完了** | Issue #52, #77 / MainWindow & DetailEditor |
+| **F38** | UI・ステータスバー | 高機能ステータスバー刷新・半透明オーバーレイ化（半透明ダーク `#E61E293B`（不透明度90%）、高さ約5px拡大 MinHeight 42px、ボタン・入力欄拡大、単一・連続表示時のステータスバー重複回避・スクロールバー誤出現防止、ページ移動 `< ページ 1 / 2 >`、ズームコントロール `[-] 100% [+]`） | **完了** | Issue #52, #77, #91 / MainWindow & DetailEditor |
 | **F39** | UI・表示設定 | 連続表示・単ページ表示切り替え機能（初期値: 単一ページ、ホイールページめくり、拡大率固定制御、PageUp/PageDown、高速ホイール追従・Delta累積） | **完了** | Issue #61, #73 / DetailPageViewMode |
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
 | **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 210件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
+| **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
 
 ---
 

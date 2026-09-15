@@ -58,7 +58,7 @@
         <KeyBinding Key="Right" Command="{Binding GoToNextPageCommand}" />
     </Window.InputBindings>
 
-    <Grid Background="#F1F5F9">
+    <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="38" />
             <RowDefinition Height="Auto" />
@@ -66,7 +66,7 @@
         </Grid.RowDefinitions>
 
         <!-- 最上段：統合タイトルバー＆タブバー -->
-        <Border Grid.Row="0" Height="38" Background="#F1F5F9" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Height="38" Background="{StaticResource HeaderBackgroundBrush}" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <!-- 左側：アプリアイコン ＋ タブ -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Stretch">
@@ -92,7 +92,7 @@
 
                 <!-- 中央：開いているファイル名（ドラッグ可能・クリック透過） -->
                 <TextBlock Text="{Binding DisplayFileName}"
-                           Foreground="#64748B" FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            IsHitTestVisible="False" TextTrimming="CharacterEllipsis"
                            MaxWidth="500" />
@@ -121,7 +121,7 @@
         </Border>
 
         <!-- ツールバーコンテンツ領域 -->
-        <Border Grid.Row="1" Background="White" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,6">
+        <Border Grid.Row="1" Background="{StaticResource RibbonBackgroundBrush}" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,0,0,1" Padding="12,6">
                     <Grid>
                         <!-- PDF編集タブコンテンツ -->
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
@@ -300,7 +300,7 @@
                                                 CommandParameter="{Binding Thickness}"
                                                 Style="{StaticResource ThicknessButtonStyle}"
                                                 ToolTip="{Binding ToolTip}">
-                                            <Ellipse Width="{Binding DotSize}" Height="{Binding DotSize}" Fill="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Ellipse Width="{Binding DotSize}" Height="{Binding DotSize}" Fill="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -324,7 +324,7 @@
                                                 CommandParameter="{Binding}">
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
-                                                    <Border x:Name="border" CornerRadius="11" BorderThickness="2" BorderBrush="#94A3B8">
+                                                    <Border x:Name="border" CornerRadius="11" BorderThickness="2" BorderBrush="{StaticResource SurfaceBorderLightBrush}">
                                                         <Border.Background>
                                                             <SolidColorBrush Color="{Binding}" />
                                                         </Border.Background>
@@ -340,7 +340,7 @@
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="border" Property="BorderBrush" Value="#475569" />
+                                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource TextPrimaryBrush}" />
                                                         </Trigger>
                                                         <Trigger Property="IsEnabled" Value="False">
                                                             <Setter TargetName="border" Property="Opacity" Value="0.4" />
@@ -463,26 +463,26 @@
 
             <!-- ドロップ案内オーバーレイ（読み込み済みのファイルドラッグ中に表示） -->
             <Grid Visibility="{Binding IsDragOver, Converter={StaticResource BooleanToVisibilityConverter}}"
-                  Background="#E6FFFFFF"
+                  Background="#E60F172A"
                   IsHitTestVisible="False">
                 <Border Margin="24"
-                        Background="#F0F7FF"
+                        Background="{StaticResource SurfaceBackgroundBrush}"
                         CornerRadius="16"
-                        BorderBrush="#2563EB"
+                        BorderBrush="{StaticResource AccentBrush}"
                         BorderThickness="2"
                         SnapsToDevicePixels="True">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Border Width="64" Height="64" Background="#DBEAFE" CornerRadius="32"
+                        <Border Width="64" Height="64" Background="{StaticResource SelectedItemBrush}" CornerRadius="32"
                                 HorizontalAlignment="Center" Margin="0,0,0,16">
                             <TextBlock Text="&#xE9FC;" FontFamily="{StaticResource IconFontFamily}"
-                                       FontSize="32" Foreground="#2563EB"
+                                       FontSize="32" Foreground="{StaticResource AccentBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <TextBlock Text="ここにPDFをドロップして末尾に追加・結合"
-                                   FontSize="18" FontWeight="Bold" Foreground="#1E3A8A"
+                                   FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"
                                    HorizontalAlignment="Center" Margin="0,0,0,8" />
                         <TextBlock Text="ドロップすると現在のドキュメントの末尾にページが追加されます"
-                                   FontSize="13" Foreground="#3B82F6"
+                                   FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
                 </Border>
@@ -491,7 +491,7 @@
 
         <!-- 下部ステータスバー（半透明オーバーレイ配置・不透明度85%・約5px拡大） -->
         <Border Grid.Row="2" VerticalAlignment="Bottom" Panel.ZIndex="10"
-                Background="#D9FFFFFF" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
+                Background="#E61E293B" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,1,0,0" MinHeight="42" Padding="12,5">
             <DockPanel LastChildFill="True">
                 <!-- 左端：ページ表示・移動ボタン（< ページ 1 / 2 >） -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0">
@@ -501,7 +501,7 @@
                             Width="28" Height="28">
                         <TextBlock Text="&#xE5CB;" FontFamily="{StaticResource IconFontFamily}" FontSize="14" />
                     </Button>
-                    <TextBlock Text="ページ" FontSize="12" Foreground="#475569" VerticalAlignment="Center" Margin="6,0,4,0" />
+                    <TextBlock Text="ページ" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="6,0,4,0" />
                     <TextBox x:Name="CurrentPageNumberTextBox"
                              Text="{Binding CurrentPageNumber, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding CanNavigatePages}"
@@ -511,11 +511,12 @@
                              FontSize="12"
                              TextAlignment="Center"
                              VerticalContentAlignment="Center"
-                             Background="#F8FAFC"
-                             BorderBrush="#CBD5E1"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             Background="{StaticResource SurfaceSecondaryBrush}"
+                             BorderBrush="{StaticResource SurfaceBorderLightBrush}"
                              BorderThickness="1" />
                     <TextBlock Text="{Binding Document.PageCount, StringFormat=' / {0}'}"
-                               FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="4,0,6,0" />
+                               FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="4,0,6,0" />
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding GoToNextPageCommand}"
                             ToolTip="次のページへ (PgDn / ↓ / →)"
@@ -539,7 +540,7 @@
                             Command="{Binding ZoomResetCommand}"
                             ToolTip="等倍表示 / 標準リセット (Ctrl+0)"
                             MinWidth="50" Width="Auto" Height="28" Padding="4,0" Margin="2,0">
-                        <TextBlock Text="{Binding CurrentZoomText}" FontSize="11" FontWeight="SemiBold" Foreground="#334155" />
+                        <TextBlock Text="{Binding CurrentZoomText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                     </Button>
                     <Button Style="{StaticResource MiniIconButtonStyle}"
                             Command="{Binding ZoomInCommand}"
@@ -551,7 +552,7 @@
                 </StackPanel>
 
                 <!-- 中央：ステータスメッセージ -->
-                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#475569"
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="8,0" />
             </DockPanel>
         </Border>
@@ -559,35 +560,35 @@
         <!-- 未保存変更確認ダイアログ（インアプリ・オーバーレイ） -->
         <Grid Grid.Row="0" Grid.RowSpan="3"
               Visibility="{Binding IsSaveConfirmationVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-              Background="#500F172A"
+              Background="#80000000"
               Focusable="False"
               Panel.ZIndex="1000">
             <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
             <Border Width="460"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="White"
-                    BorderBrush="#E2E8F0"
+                    Background="{StaticResource SurfaceBackgroundBrush}"
+                    BorderBrush="{StaticResource SurfaceBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="12"
                     Padding="24">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" Color="#0F172A" Direction="270" Opacity="0.18" ShadowDepth="8" />
+                    <DropShadowEffect BlurRadius="28" Color="#000000" Direction="270" Opacity="0.5" ShadowDepth="8" />
                 </Border.Effect>
                 <StackPanel>
                     <!-- ヘッダー（アイコンとタイトル） -->
                     <DockPanel LastChildFill="True" Margin="0,0,0,14">
-                        <Border Width="36" Height="36" Background="#FEF3C7" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <TextBlock Text="&#xF083;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#D97706"
+                        <Border Width="36" Height="36" Background="#78350F" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xF083;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#FBBF24"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="変更内容を保存しますか？" FontSize="16" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center" />
+                        <TextBlock Text="変更内容を保存しますか？" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </DockPanel>
 
                     <!-- 本文メッセージ -->
-                    <TextBlock FontSize="13" Foreground="#475569" TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,24">
-                        <Run Text="「" /><Run Text="{Binding SaveConfirmationFileName, Mode=OneWay}" FontWeight="SemiBold" Foreground="#1E293B" /><Run Text="」への変更内容を保存しますか？" /><LineBreak />
-                        <Run Text="保存しない場合、編集内容は失われます。" Foreground="#64748B" FontSize="12" />
+                    <TextBlock FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,24">
+                        <Run Text="「" /><Run Text="{Binding SaveConfirmationFileName, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" /><Run Text="」への変更内容を保存しますか？" /><LineBreak />
+                        <Run Text="保存しない場合、編集内容は失われます。" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
                     </TextBlock>
 
                     <!-- アクションボタンエリア -->
