@@ -75,8 +75,17 @@
                       Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
                       Padding="5">
             <Grid HorizontalAlignment="Center"
-                  VerticalAlignment="Center"
-                  Margin="20">
+                  VerticalAlignment="Center">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Margin" Value="20" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=SinglePage}" Value="True">
+                                <Setter Property="Margin" Value="20,20,20,62" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
                 </Grid.LayoutTransform>

@@ -626,8 +626,11 @@ public class DetailEditorViewModelTests
         // コンテンツ幅 + 合計水平マージン(50.0) が ViewportWidth 以内に確実に収まる（スクロールバーが出ない）
         Assert.True(renderedWidth + DetailEditorViewModel.TotalHorizontalMargin <= viewportW);
 
-        // コンテンツ高さ + 合計垂直マージン(50.0) が ViewportHeight 以内に確実に収まる（スクロールバーが出ない）
+        // コンテンツ高さ + 合計垂直マージン(50.0) およびステータスバー高さ(42.0)を含むSinglePageTotalVerticalMargin(92.0) が ViewportHeight 以内に確実に収まる（スクロールバーが出ず、ステータスバーと重ならない）
         Assert.True(renderedHeight + DetailEditorViewModel.TotalVerticalMargin <= viewportH);
+        Assert.True(renderedHeight + DetailEditorViewModel.SinglePageTotalVerticalMargin <= viewportH);
+        Assert.Equal(42.0, DetailEditorViewModel.StatusBarHeight);
+        Assert.Equal(DetailEditorViewModel.TotalVerticalMargin + DetailEditorViewModel.StatusBarHeight, DetailEditorViewModel.SinglePageTotalVerticalMargin);
 
         // 影用マージン(上下左右20px)が確保されているため、上下影(上12px, 下20px)・左右影(16px)が完全に収まる
         Assert.True(DetailEditorViewModel.PageShadowMargin >= 20.0);
