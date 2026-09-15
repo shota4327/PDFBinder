@@ -74,18 +74,10 @@
                       PreviewMouseWheel="OnScrollViewerPreviewMouseWheel"
                       Visibility="{Binding Pages.Count, Converter={StaticResource CountToVisibilityConverter}}"
                       Padding="5">
+            <!-- キャンバス親コンテナ（単一・連続表示ともに最下部スクロール時に最後のページがステータスバーに隠れないよう下部オフセット62pxを確保） -->
             <Grid HorizontalAlignment="Center"
-                  VerticalAlignment="Center">
-                <Grid.Style>
-                    <Style TargetType="Grid">
-                        <Setter Property="Margin" Value="20" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=SinglePage}" Value="True">
-                                <Setter Property="Margin" Value="20,20,20,62" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
+                  VerticalAlignment="Center"
+                  Margin="20,20,20,62">
                 <Grid.LayoutTransform>
                     <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}" />
                 </Grid.LayoutTransform>
