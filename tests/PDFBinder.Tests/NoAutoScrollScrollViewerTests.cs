@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PDFBinder.App.Controls;
 using Xunit;
 
@@ -48,5 +49,38 @@ public class NoAutoScrollScrollViewerTests
         thread.Start();
         bool finished = thread.Join(5000);
         Assert.True(finished, "Thread timed out");
+    }
+
+    [Theory]
+    [InlineData(Key.PageUp)]
+    [InlineData(Key.PageDown)]
+    [InlineData(Key.Up)]
+    [InlineData(Key.Down)]
+    [InlineData(Key.Left)]
+    [InlineData(Key.Right)]
+    public void NoAutoScrollScrollViewer_OnKeyDown_SuppressesInternalHandlingForPageNavigationKeys(Key key)
+    {
+        var thread = new Thread(() =>
+        {
+            var scrollViewer = new TestableNoAutoScrollScrollViewer();
+            var e = new KeyEventArgs(Keyboard.PrimaryDevice, new System.Windows.Interop.HwndSource(0, 0, 0, 0, 0, "", nint.Zero), 0, key)
+            {
+                RoutedEvent = Keyboard.KeyDownEvent
+            };
+
+            scrollViewer.TestOnKeyDown(e);
+
+            Assert.False(e.Handled, $"Key {key} should not be handled by NoAutoScrollScrollViewer");
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "Thread timed out");
+    }
+
+    private class TestableNoAutoScrollScrollViewer : NoAutoScrollScrollViewer
+    {
+        public void TestOnKeyDown(KeyEventArgs e) => OnKeyDown(e);
     }
 }
