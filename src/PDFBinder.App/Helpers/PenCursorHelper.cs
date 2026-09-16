@@ -105,7 +105,7 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 単一ピクセルの色をアンチエイリアス処理（8x8スーパーサンプリング＋乗算済みアルファ）で設定します。
+    /// 単一ピクセルの色をアンチエイリアス処理（8x8スーパーサンプリング）で設定します。
     /// </summary>
     private static void DrawCirclePixel(
         byte[] pixels, int pixelOffset, int x, int y, double cx, double cy,
@@ -125,15 +125,10 @@ public static class PenCursorHelper
 
         if (alpha > 0)
         {
-            byte r = isHollow ? (byte)0 : color.R;
-            byte g = isHollow ? (byte)0 : color.G;
-            byte b = isHollow ? (byte)0 : color.B;
-
-            // Windows 32-bit DIB カーソル描画用の乗算済みアルファ（Premultiplied Alpha）
-            pixels[pixelOffset] = (byte)Math.Round(b * (alpha / 255.0));     // B
-            pixels[pixelOffset + 1] = (byte)Math.Round(g * (alpha / 255.0)); // G
-            pixels[pixelOffset + 2] = (byte)Math.Round(r * (alpha / 255.0)); // R
-            pixels[pixelOffset + 3] = alpha;                                 // A
+            pixels[pixelOffset] = isHollow ? (byte)0 : color.B;     // B
+            pixels[pixelOffset + 1] = isHollow ? (byte)0 : color.G; // G
+            pixels[pixelOffset + 2] = isHollow ? (byte)0 : color.R; // R
+            pixels[pixelOffset + 3] = alpha;                         // A
         }
     }
 

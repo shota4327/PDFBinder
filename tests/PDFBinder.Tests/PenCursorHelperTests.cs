@@ -225,26 +225,26 @@ public class PenCursorHelperTests
     }
 
     [Fact]
-    public void RenderCirclePixels_PremultipliedAlpha_ColorChannelsDoNotExceedAlpha()
+    public void RenderCirclePixels_StraightAlpha_PreservesSourceRgb()
     {
-        // Windows 32-bit DIB カーソルの乗算済みアルファ特性（R, G, B <= A）を検証
+        // ストレートアルファ（RGB値を直接維持し、アルファのみを調整）を検証
         int size = 32;
         int hotspot = 16;
         double diameter = 18.0;
+        var sourceColor = Color.FromArgb(200, 255, 128, 64);
 
         byte[] pixels = PenCursorHelper.RenderCirclePixels(
-            size, hotspot, diameter, Color.FromArgb(200, 255, 128, 64), isHollow: false, isHighlighter: false);
+            size, hotspot, diameter, sourceColor, isHollow: false, isHighlighter: false);
 
         for (int i = 0; i < pixels.Length; i += 4)
         {
-            byte b = pixels[i];
-            byte g = pixels[i + 1];
-            byte r = pixels[i + 2];
             byte a = pixels[i + 3];
-
-            Assert.True(b <= a, $"B ({b}) should not exceed A ({a})");
-            Assert.True(g <= a, $"G ({g}) should not exceed A ({a})");
-            Assert.True(r <= a, $"R ({r}) should not exceed A ({a})");
+            if (a > 0)
+            {
+                Assert.Equal(sourceColor.B, pixels[i]);
+                Assert.Equal(sourceColor.G, pixels[i + 1]);
+                Assert.Equal(sourceColor.R, pixels[i + 2]);
+            }
         }
     }
 
