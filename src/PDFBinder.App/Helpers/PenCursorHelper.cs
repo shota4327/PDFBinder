@@ -65,10 +65,10 @@ public static class PenCursorHelper
     /// </summary>
     public static Cursor CreateCircleCursor(double diameter, Color color, bool isHollow, bool isHighlighter)
     {
-        int size = Math.Max((int)Math.Ceiling(diameter) + 2, 4);
+        int size = Math.Max((int)Math.Ceiling(diameter) + 4, 6);
         int hotspot = size / 2;
 
-        byte[] bgraPixels = RenderCirclePixels(size, diameter, color, isHollow, isHighlighter);
+        byte[] bgraPixels = RenderCirclePixels(size, hotspot, diameter, color, isHollow, isHighlighter);
         byte[] curBytes = BuildCurBytes(size, size, hotspot, hotspot, bgraPixels);
 
         using var stream = new MemoryStream(curBytes);
@@ -76,27 +76,28 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 円形カーソルのピクセル配列（32-bit BGRA、ボトムアップ順）を描画・生成します。
+    /// 円形カーソルのピクセル配列（32-bit BGRA、ボトムアップ行順）を描画・生成します。
     /// </summary>
-    private static byte[] RenderCirclePixels(int size, double diameter, Color color, bool isHollow, bool isHighlighter)
+    internal static byte[] RenderCirclePixels(
+        int size, int hotspot, double diameter, Color color, bool isHollow, bool isHighlighter)
     {
         byte[] pixels = new byte[size * size * 4];
-        double cx = size / 2.0;
-        double cy = size / 2.0;
+        double cx = hotspot + 0.5;
+        double cy = hotspot + 0.5;
         double radius = diameter / 2.0;
+        double strokeWidth = 1.5;
+        double halfStroke = Math.Min(strokeWidth / 2.0, radius * 0.4);
 
         for (int y = 0; y < size; y++)
         {
-            // DIBはボトムアップ行順
+            // DIBはボトムアップ行順（先頭が最下行）
             int dibRow = size - 1 - y;
             int rowOffset = dibRow * size * 4;
 
             for (int x = 0; x < size; x++)
             {
-                double dist = Math.Sqrt(Math.Pow(x + 0.5 - cx, 2) + Math.Pow(y + 0.5 - cy, 2));
                 int pixelOffset = rowOffset + x * 4;
-
-                DrawCirclePixel(pixels, pixelOffset, dist, radius, color, isHollow, isHighlighter);
+                DrawCirclePixel(pixels, pixelOffset, x, y, cx, cy, radius, halfStroke, color, isHollow, isHighlighter);
             }
         }
 
@@ -104,44 +105,108 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 単一ピクセルの色を円の距離・内外判定に基づいて設定します。
+    /// 単一ピクセルの色をアンチエイリアス処理（8x8スーパーサンプリング＋乗算済みアルファ）で設定します。
     /// </summary>
     private static void DrawCirclePixel(
-        byte[] pixels, int offset, double dist, double radius,
-        Color color, bool isHollow, bool isHighlighter)
+        byte[] pixels, int pixelOffset, int x, int y, double cx, double cy,
+        double radius, double halfStroke, Color color, bool isHollow, bool isHighlighter)
+    {
+        double distCenter = Math.Sqrt(Math.Pow(x + 0.5 - cx, 2) + Math.Pow(y + 0.5 - cy, 2));
+        int hitCount = CalculateSubpixelHits(x, y, cx, cy, radius, halfStroke, distCenter, isHollow);
+
+        if (hitCount <= 0)
+        {
+            return;
+        }
+
+        double coverage = hitCount / 64.0;
+        byte baseAlpha = isHollow ? (byte)220 : (isHighlighter ? (byte)140 : color.A);
+        byte alpha = (byte)Math.Round(baseAlpha * coverage);
+
+        if (alpha > 0)
+        {
+            byte r = isHollow ? (byte)0 : color.R;
+            byte g = isHollow ? (byte)0 : color.G;
+            byte b = isHollow ? (byte)0 : color.B;
+
+            // Windows 32-bit DIB カーソル描画用の乗算済みアルファ（Premultiplied Alpha）
+            pixels[pixelOffset] = (byte)Math.Round(b * (alpha / 255.0));     // B
+            pixels[pixelOffset + 1] = (byte)Math.Round(g * (alpha / 255.0)); // G
+            pixels[pixelOffset + 2] = (byte)Math.Round(r * (alpha / 255.0)); // R
+            pixels[pixelOffset + 3] = alpha;                                 // A
+        }
+    }
+
+    /// <summary>
+    /// 距離判定と8x8スーパーサンプリング（64サンプル）によりサブピクセル内包含数を算出します。
+    /// </summary>
+    private static int CalculateSubpixelHits(
+        int x, int y, double cx, double cy, double radius, double halfStroke,
+        double distCenter, bool isHollow)
     {
         if (isHollow)
         {
-            // 部分消しゴム: 境界輪郭線＋中心ドット
-            bool isOutline = Math.Abs(dist - radius) <= 0.85;
-            bool isCenterDot = radius >= 5.0 && dist <= 1.0;
-
-            if (isOutline || isCenterDot)
+            // 部分消しゴム（中心ドットなしの滑らかな中空輪郭線）
+            double ringDist = Math.Abs(distCenter - radius);
+            if (ringDist <= halfStroke - 0.75)
             {
-                pixels[offset] = 0;       // B
-                pixels[offset + 1] = 0;   // G
-                pixels[offset + 2] = 0;   // R
-                pixels[offset + 3] = 220; // A
+                return 64;
+            }
+            if (ringDist >= halfStroke + 0.75)
+            {
+                return 0;
             }
         }
         else
         {
-            // ペン / 蛍光ペン: 塗りつぶし円（外枠なし・エッジアンチエイリアス処理）
-            if (dist <= radius + 0.5)
+            // ペン / 蛍光ペン（滑らかな塗りつぶし円）
+            if (distCenter <= radius - 0.75)
             {
-                byte baseAlpha = isHighlighter ? (byte)140 : color.A;
-                double edgeCoverage = Math.Clamp(radius + 0.5 - dist, 0.0, 1.0);
-                byte alpha = (byte)Math.Round(baseAlpha * edgeCoverage);
+                return 64;
+            }
+            if (distCenter >= radius + 0.75)
+            {
+                return 0;
+            }
+        }
 
-                if (alpha > 0)
+        // 境界ピクセルのみ8x8サンプリングを実行
+        return SampleBoundaryHits(x, y, cx, cy, radius, halfStroke, isHollow);
+    }
+
+    /// <summary>
+    /// サブピクセル8x8グリッド上のサンプルヒット数を集計します。
+    /// </summary>
+    private static int SampleBoundaryHits(
+        int x, int y, double cx, double cy, double radius, double halfStroke, bool isHollow)
+    {
+        int hitCount = 0;
+        for (int sy = 0; sy < 8; sy++)
+        {
+            double py = y + (sy + 0.5) / 8.0;
+            for (int sx = 0; sx < 8; sx++)
+            {
+                double px = x + (sx + 0.5) / 8.0;
+                double dist = Math.Sqrt(Math.Pow(px - cx, 2) + Math.Pow(py - cy, 2));
+
+                if (isHollow)
                 {
-                    pixels[offset] = color.B;
-                    pixels[offset + 1] = color.G;
-                    pixels[offset + 2] = color.R;
-                    pixels[offset + 3] = alpha;
+                    if (Math.Abs(dist - radius) <= halfStroke)
+                    {
+                        hitCount++;
+                    }
+                }
+                else
+                {
+                    if (dist <= radius)
+                    {
+                        hitCount++;
+                    }
                 }
             }
         }
+
+        return hitCount;
     }
 
     /// <summary>

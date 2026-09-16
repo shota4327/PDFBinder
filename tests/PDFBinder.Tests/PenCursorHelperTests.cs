@@ -183,6 +183,71 @@ public class PenCursorHelperTests
         });
     }
 
+    [Fact]
+    public void RenderCirclePixels_EraserPoint_HasNoCenterDot()
+    {
+        // 部分消しゴム（中空円）の中心点にドット（不透明ピクセル）が存在しないことを検証
+        int size = 32;
+        int hotspot = 16;
+        double diameter = 20.0;
+        byte[] pixels = PenCursorHelper.RenderCirclePixels(
+            size, hotspot, diameter, Colors.Black, isHollow: true, isHighlighter: false);
+
+        // hotspot位置のピクセルのアルファ値を取得（DIBボトムアップ順）
+        int dibRow = size - 1 - hotspot;
+        int centerPixelOffset = (dibRow * size + hotspot) * 4;
+        byte centerAlpha = pixels[centerPixelOffset + 3];
+
+        Assert.Equal(0, centerAlpha);
+    }
+
+    [Fact]
+    public void RenderCirclePixels_AntiAliasing_ProducesIntermediateAlphas()
+    {
+        // ペンおよび消しゴムの円周境界にスーパーサンプリングによる中間アルファ値が存在することを検証（ギザギザ防止）
+        int size = 32;
+        int hotspot = 16;
+        double diameter = 20.0;
+
+        // ペン（塗りつぶし円）
+        byte[] penPixels = PenCursorHelper.RenderCirclePixels(
+            size, hotspot, diameter, Colors.Red, isHollow: false, isHighlighter: false);
+        var penAlphas = penPixels.Where((p, i) => i % 4 == 3 && p > 0).Distinct().ToList();
+        // 0と255以外に中間階調が複数存在すること（アンチエイリアス）
+        Assert.True(penAlphas.Count > 2);
+
+        // 消しゴム（中空円）
+        byte[] eraserPixels = PenCursorHelper.RenderCirclePixels(
+            size, hotspot, diameter, Colors.Black, isHollow: true, isHighlighter: false);
+        var eraserAlphas = eraserPixels.Where((p, i) => i % 4 == 3 && p > 0).Distinct().ToList();
+        // 0と220以外に中間階調が複数存在すること（アンチエイリアス）
+        Assert.True(eraserAlphas.Count > 2);
+    }
+
+    [Fact]
+    public void RenderCirclePixels_PremultipliedAlpha_ColorChannelsDoNotExceedAlpha()
+    {
+        // Windows 32-bit DIB カーソルの乗算済みアルファ特性（R, G, B <= A）を検証
+        int size = 32;
+        int hotspot = 16;
+        double diameter = 18.0;
+
+        byte[] pixels = PenCursorHelper.RenderCirclePixels(
+            size, hotspot, diameter, Color.FromArgb(200, 255, 128, 64), isHollow: false, isHighlighter: false);
+
+        for (int i = 0; i < pixels.Length; i += 4)
+        {
+            byte b = pixels[i];
+            byte g = pixels[i + 1];
+            byte r = pixels[i + 2];
+            byte a = pixels[i + 3];
+
+            Assert.True(b <= a, $"B ({b}) should not exceed A ({a})");
+            Assert.True(g <= a, $"G ({g}) should not exceed A ({a})");
+            Assert.True(r <= a, $"R ({r}) should not exceed A ({a})");
+        }
+    }
+
     private static void RunOnStaThread(Action action)
     {
         Exception? exception = null;

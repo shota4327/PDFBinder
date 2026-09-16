@@ -13,9 +13,9 @@
 - **動的カーソル生成**:
   - 指定されたツール種別・描画色・太さ・ズーム倍率をもとに、メモリ上で 32-bit ARGB DIB（Device-Independent Bitmap）バイナリ形式のカーソルストリームを直接構築し、一時ファイルやアンマネージドリークなしで `System.Windows.Input.Cursor` をインスタンス化。
 - **ツール別ビジュアル表現**:
-  - **通常ペン**: 現在のペン描画色の塗りつぶし円（外枠なし・エッジアンチエイリアス処理）
-  - **蛍光ペン**: 半透明の蛍光色塗りつぶし円（アルファ 140、外枠なし・エッジアンチエイリアス処理）
-  - **部分消しゴム**: 消去範囲を示す輪郭線リング（中抜き円、アルファ 220） ＋ 中心ドット
+  - **通常ペン**: 現在のペン描画色の塗りつぶし円（8x8スーパーサンプリング、乗算済みアルファによる滑らかなアンチエイリアス）
+  - **蛍光ペン**: 半透明の蛍光色塗りつぶし円（アルファ 140、8x8スーパーサンプリング、乗算済みアルファによる滑らかなアンチエイリアス）
+  - **部分消しゴム**: 消去範囲を示す滑らかな輪郭線リング（中心ドットなし、8x8スーパーサンプリングによるアンチエイリアス輪郭線、アルファ 220）
 - **サイズクランプ＆キャッシュ**:
   - 最小 **3.0px**（極小ズーム時にも見失わないよう中心点を確保）から最大 **128.0px**（OSカーソル上限および描画負荷抑制）にクランプ。
   - 色・太さ・ズーム倍率をキーとする `ConcurrentDictionary` によるキャッシュ機構により、ホバー中やページ切り替え時の無駄な再生成を排除。
@@ -36,7 +36,7 @@
   ```
 
 ### 4. ドキュメントの同期更新
-- `docs/basic_design.md`: セクション 6.6（詳細手書きエディタビュー）に「拡大縮小連動ペンホバープレビューカーソル (WYSIWYG)」の仕様を追記。
+- `docs/basic_design.md`: セクション 6.6（詳細手書きエディタビュー）に「拡大縮小連動ペンホバープレビューカーソル (WYSIWYG)」の仕様を追記・更新（8x8スーパーサンプリング、乗算済みアルファ、中心ドットなし）。
 - `docs/PROJECT.md`: 機能インベントリに `F56` を追加（完了ステータス）。
 
 ---
@@ -44,7 +44,7 @@
 ## 検証結果
 
 ### 1. 単体テスト検証 (`dotnet test`)
-- 新設の `PenCursorHelperTests.cs`（10テスト）を含め、全260件の単体テストがすべて PASS。
+- 新設の `PenCursorHelperTests.cs`（13テスト）を含め、全263件の単体テストがすべて PASS。
   - `IsCircleCursorTool_IdentifiesTargetToolsCorrectly`: 対象ツールの判定検証
   - `GetCursor_NonCircleTool_ReturnsNull`: 対象外ツールでの null 返却検証
   - `GetCursor_CircleTools_ReturnsNonNullCursor`: Pen, Highlighter, EraserPoint でのカーソル生成検証
@@ -55,10 +55,14 @@
   - `EditorInkCanvas_ThicknessAndColorChange_UpdatesCursorOnStaThread`: 太さ・色変更時カーソル更新検証
   - `EditorInkCanvas_PointEraserMode_UsesPointEraserCursor`: 部分消しゴムでの輪郭線カーソル適用検証
   - `EditorInkCanvas_StraightLineMode_KeepsCrossCursor`: 直線モードでの十字カーソル維持検証
+  - `RenderCirclePixels_EraserPoint_HasNoCenterDot`: 部分消しゴムで中心ドットが存在しないことの検証
+  - `RenderCirclePixels_AntiAliasing_ProducesIntermediateAlphas`: 8x8スーパーサンプリングによる中間アルファ（ギザギザのない滑らかな階調）の検証
+  - `RenderCirclePixels_PremultipliedAlpha_ColorChannelsDoNotExceedAlpha`: 乗算済みアルファ（Windows 32-bit DIB カーソルの色飽和防止）の検証
 
 ```text
-成功!   -失敗: 0、合格: 260、スキップ: 0、合計: 260、期間: 2.05s - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗: 0、合格: 263、スキップ: 0、合計: 263、期間: 2 s - PDFBinder.Tests.dll (net10.0)
 ```
 
 ### 2. ビルド検証 (`dotnet build`)
 - 警告およびエラー 0 件で正常ビルド完了。
+
