@@ -126,22 +126,20 @@ public static class PenCursorHelper
         }
         else
         {
-            // ペン / 蛍光ペン: 塗りつぶし円＋外枠
-            if (dist <= radius - 0.5)
+            // ペン / 蛍光ペン: 塗りつぶし円（外枠なし・エッジアンチエイリアス処理）
+            if (dist <= radius + 0.5)
             {
-                byte alpha = isHighlighter ? (byte)140 : color.A;
-                pixels[offset] = color.B;
-                pixels[offset + 1] = color.G;
-                pixels[offset + 2] = color.R;
-                pixels[offset + 3] = alpha;
-            }
-            else if (dist <= radius + 0.75)
-            {
-                // 外側の視認性確保用境界線
-                pixels[offset] = 30;
-                pixels[offset + 1] = 30;
-                pixels[offset + 2] = 30;
-                pixels[offset + 3] = 180;
+                byte baseAlpha = isHighlighter ? (byte)140 : color.A;
+                double edgeCoverage = Math.Clamp(radius + 0.5 - dist, 0.0, 1.0);
+                byte alpha = (byte)Math.Round(baseAlpha * edgeCoverage);
+
+                if (alpha > 0)
+                {
+                    pixels[offset] = color.B;
+                    pixels[offset + 1] = color.G;
+                    pixels[offset + 2] = color.R;
+                    pixels[offset + 3] = alpha;
+                }
             }
         }
     }
