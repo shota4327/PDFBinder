@@ -329,10 +329,12 @@ public class InteractiveOverlayCanvas : FrameworkElement
     }
 
     /// <summary>
-    /// 指定座標に存在するリンク注釈を検索します。
+    /// 指定座標に存在するリンク注釈を検索します（手のひらツール時のみ有効）。
     /// </summary>
     private PdfLinkAnnotation? FindLinkAtPoint(Point pt)
     {
+        if (ToolMode != EditorToolMode.Hand) return null;
+
         var links = PageItem?.InteractiveData?.Links;
         if (links == null || links.Count == 0) return null;
 

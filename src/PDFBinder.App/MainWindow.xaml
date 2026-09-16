@@ -226,7 +226,7 @@
                                 </StackPanel>
                             </RadioButton>
 
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="テキスト選択ツール（文字の選択・コピー、リンク）"
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="文字選択ツール（文字のドラッグ選択・コピー）"
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=TextSelect, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.TextSelect}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -271,7 +271,7 @@
                                 </StackPanel>
                             </RadioButton>
 
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="画面のスクロール・移動"
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="移動ツール（画面のスクロール・リンクのクリック）"
                                          IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
                                          Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
