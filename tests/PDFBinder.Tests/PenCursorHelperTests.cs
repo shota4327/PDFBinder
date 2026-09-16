@@ -159,10 +159,18 @@ public class PenCursorHelperTests
             Assert.NotNull(canvas.Cursor);
             Assert.NotEqual(Cursors.Cross, canvas.Cursor);
 
-            // ストローク消しゴム時は従来のCrossカーソルであること
+            // ストローク消しゴム時は消しゴム形状カーソル（WPF標準）であり、UseCustomCursorがfalseであること
             canvas.ToolMode = EditorToolMode.EraserStroke;
-            Assert.Equal(Cursors.Cross, canvas.Cursor);
+            Assert.False(canvas.UseCustomCursor);
+            Assert.Equal(PenCursorHelper.GetStrokeEraserCursor(), canvas.Cursor);
         });
+    }
+
+    [Fact]
+    public void GetStrokeEraserCursor_ReturnsNonNullCursor()
+    {
+        var cursor = PenCursorHelper.GetStrokeEraserCursor();
+        Assert.NotNull(cursor);
     }
 
     [Fact]

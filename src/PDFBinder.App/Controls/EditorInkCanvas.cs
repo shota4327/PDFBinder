@@ -258,6 +258,8 @@ public class EditorInkCanvas : InkCanvas
             return;
         }
 
+        UseCustomCursor = ToolMode != EditorToolMode.EraserStroke;
+
         switch (ToolMode)
         {
             case EditorToolMode.Select:
@@ -274,7 +276,7 @@ public class EditorInkCanvas : InkCanvas
                 break;
             case EditorToolMode.EraserStroke:
                 EditingMode = InkCanvasEditingMode.EraseByStroke;
-                Cursor = Cursors.Cross;
+                Cursor = PenCursorHelper.GetStrokeEraserCursor();
                 break;
             case EditorToolMode.EraserPoint:
                 EditingMode = InkCanvasEditingMode.EraseByPoint;

@@ -45,10 +45,41 @@ public static class PenCursorHelper
     public static bool IsCircleCursorTool(EditorToolMode toolMode) =>
         toolMode is EditorToolMode.Pen or EditorToolMode.Highlighter or EditorToolMode.EraserPoint;
 
+    /// <summary>キャッシュされたWPF標準ストローク消しゴム形状カーソル</summary>
+    private static Cursor? _strokeEraserCursor;
+
     /// <summary>
     /// キャッシュをすべてクリアします（テスト用）。
     /// </summary>
     public static void ClearCache() => CursorCache.Clear();
+
+    /// <summary>
+    /// WPF標準のストローク消しゴム形状（消しゴムアイコン）カーソルを取得します。
+    /// </summary>
+    public static Cursor GetStrokeEraserCursor()
+    {
+        if (_strokeEraserCursor != null)
+        {
+            return _strokeEraserCursor;
+        }
+
+        try
+        {
+            var type = typeof(System.Windows.Controls.InkCanvas).Assembly.GetType("MS.Internal.Ink.PenCursorManager");
+            var method = type?.GetMethod("GetStrokeEraserCursor", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            if (method?.Invoke(null, null) is Cursor cursor)
+            {
+                _strokeEraserCursor = cursor;
+                return _strokeEraserCursor;
+            }
+        }
+        catch
+        {
+            // リフレクション取得失敗時はフォールバック
+        }
+
+        return Cursors.Arrow;
+    }
 
     /// <summary>
     /// ツール種別に応じた円形カーソルを生成します。

@@ -27,7 +27,8 @@
   - WPF 標準の等倍固定カーソルオーバーライドをバイパスし、アプリ側から動的に生成したカーソルを適用可能に設定。
 - **カーソル更新連携**:
   - `ToolMode`（ペン・蛍光ペン・部分消しゴム）、`DrawingColor`、`StrokeThickness`、および `Zoom` の変更時に `PenCursorHelper.GetCursor` を呼び出して `this.Cursor` を即時更新。
-  - 直線モードON時（`IsStraightLineActive`）やストローク消しゴム時は従来の十字カーソル（`Cursors.Cross`）を正しく維持。
+  - 直線モードON時（`IsStraightLineActive`）は十字カーソル（`Cursors.Cross`）を維持。
+  - ストローク消しゴム時は `UseCustomCursor = false` と `PenCursorHelper.GetStrokeEraserCursor()` により、WPF標準の消しゴム形状カーソルを正しく表示。
 
 ### 3. XAML バインディングの連携 (`DetailEditorView.xaml`)
 - `DetailPageItemTemplate` 内の `EditorInkCanvas` に対し、親 ViewModel の `Zoom` プロパティをバインド:
@@ -36,7 +37,7 @@
   ```
 
 ### 4. ドキュメントの同期更新
-- `docs/basic_design.md`: セクション 6.6（詳細手書きエディタビュー）に「拡大縮小連動ペンホバープレビューカーソル (WYSIWYG)」の仕様を追記・更新（8x8スーパーサンプリング、中心ドットなし）。
+- `docs/basic_design.md`: セクション 6.6（詳細手書きエディタビュー）に「拡大縮小連動ペンホバープレビューカーソル (WYSIWYG)」の仕様を追記・更新（8x8スーパーサンプリング、中心ドットなし、ストローク消しゴム時の消しゴムアイコンカーソル維持）。
 - `docs/PROJECT.md`: 機能インベントリに `F56` を追加（完了ステータス）。
 
 ---
@@ -44,7 +45,7 @@
 ## 検証結果
 
 ### 1. 単体テスト検証 (`dotnet test`)
-- 新設の `PenCursorHelperTests.cs`（13テスト）を含め、全263件の単体テストがすべて PASS。
+- 新設の `PenCursorHelperTests.cs`（14テスト）を含め、全264件の単体テストがすべて PASS。
   - `IsCircleCursorTool_IdentifiesTargetToolsCorrectly`: 対象ツールの判定検証
   - `GetCursor_NonCircleTool_ReturnsNull`: 対象外ツールでの null 返却検証
   - `GetCursor_CircleTools_ReturnsNonNullCursor`: Pen, Highlighter, EraserPoint でのカーソル生成検証
@@ -53,14 +54,15 @@
   - `GetCursor_ExtremeZoom_ClampsBetweenMinAndMax`: 最小3px・最大128pxクランプ検証
   - `EditorInkCanvas_ZoomChange_UpdatesCursorOnStaThread`: STAスレッドでのZoom変更時カーソル更新検証
   - `EditorInkCanvas_ThicknessAndColorChange_UpdatesCursorOnStaThread`: 太さ・色変更時カーソル更新検証
-  - `EditorInkCanvas_PointEraserMode_UsesPointEraserCursor`: 部分消しゴムでの輪郭線カーソル適用検証
+  - `EditorInkCanvas_PointEraserMode_UsesPointEraserCursor`: 部分消しゴムでの輪郭線カーソル適用およびストローク消しゴムでの標準消しゴムカーソル適用検証
   - `EditorInkCanvas_StraightLineMode_KeepsCrossCursor`: 直線モードでの十字カーソル維持検証
+  - `GetStrokeEraserCursor_ReturnsNonNullCursor`: WPF標準消しゴムカーソル取得検証
   - `RenderCirclePixels_EraserPoint_HasNoCenterDot`: 部分消しゴムで中心ドットが存在しないことの検証
   - `RenderCirclePixels_AntiAliasing_ProducesIntermediateAlphas`: 8x8スーパーサンプリングによる中間アルファ（ギザギザのない滑らかな階調）の検証
   - `RenderCirclePixels_StraightAlpha_PreservesSourceRgb`: ストレートアルファ（RGB値を直接維持し、アルファのみを調整）の検証
 
 ```text
-成功!   -失敗: 0、合格: 263、スキップ: 0、合計: 263、期間: 2 s - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗: 0、合格: 264、スキップ: 0、合計: 264、期間: 2 s - PDFBinder.Tests.dll (net10.0)
 ```
 
 ### 2. ビルド検証 (`dotnet build`)
