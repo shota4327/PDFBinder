@@ -48,6 +48,15 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>レンダリング最大ピクセル寸法（過大メモリ確保防止の上限保護）</summary>
     public const int MaxRenderDimension = 8192;
 
+    /// <summary>選択的レンダリングを適用する拡大率の閾値（600%超で現在ページのみに限定）</summary>
+    public const double SelectiveRenderZoomThreshold = 6.0;
+
+    /// <summary>ドキュメント初回読み込み時に先行レンダリングを行う最大ページ数（先頭10ページ）</summary>
+    public const int InitialLoadMaxPageCount = 10;
+
+    /// <summary>連続表示モードにおいて現在画面内（ビューポート内）に見えているページを取得するプロバイダー</summary>
+    public Func<IEnumerable<DetailPageItemViewModel>>? VisiblePagesProvider { get; set; }
+
     /// <summary>スクロールバー幅の見込み値（DIP）</summary>
     public const double ScrollBarWidth = 18.0;
 
@@ -280,6 +289,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             ScrollToPageRequested?.Invoke(CurrentPage);
         }
+
+        _ = ScheduleDynamicRender(immediate: true);
     }
 
     /// <summary>
@@ -380,7 +391,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         UpdatePageEdgeFlags();
         ApplyFitMode();
-        _ = LoadPageBackgroundAsync();
+        _ = LoadInitialDocumentBackgroundAsync();
     }
 
     /// <summary>
@@ -449,6 +460,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             ApplyFitMode();
         }
+
+        if (PageViewMode == DetailPageViewMode.SinglePage && newValue != null)
+        {
+            _ = ScheduleDynamicRender(immediate: true);
+        }
     }
 
     partial void OnZoomChanged(double value)
@@ -480,7 +496,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// ズームまたはページ変更に応じた動的レンダリングをスケジュールします。
     /// </summary>
-    public Task ScheduleDynamicRender(bool immediate = false)
+    public Task ScheduleDynamicRender(bool immediate = false, bool isInitialLoad = false)
     {
         _renderCts?.Cancel();
         _renderCts?.Dispose();
@@ -489,10 +505,119 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         var token = _renderCts.Token;
         long generation = Interlocked.Increment(ref _renderGeneration);
 
-        return PerformDynamicRenderAsync(generation, token, immediate);
+        return PerformDynamicRenderAsync(generation, token, immediate, isInitialLoad);
     }
 
-    private async Task PerformDynamicRenderAsync(long generation, CancellationToken token, bool immediate)
+    /// <summary>
+    /// 連続表示スクロール時の動的レンダリングを150msデバウンスでスケジュールします。
+    /// </summary>
+    public void ScheduleContinuousScrollRender()
+    {
+        if (PageViewMode == DetailPageViewMode.Continuous)
+        {
+            _ = ScheduleDynamicRender(immediate: false, isInitialLoad: false);
+        }
+    }
+
+    /// <summary>
+    /// 現在の表示モード、ズーム倍率、表示状態に基づいてレンダリング対象とすべきページ一覧を取得します。
+    /// 最優先でレンダリングすべきページ（現在ページなど）を先頭に配置します。
+    /// </summary>
+    public List<DetailPageItemViewModel> GetTargetPagesToRender(bool isInitialLoad = false)
+    {
+        if (Pages.Count == 0) return new List<DetailPageItemViewModel>();
+
+        if (isInitialLoad)
+        {
+            return GetInitialLoadPages();
+        }
+
+        return PageViewMode == DetailPageViewMode.Continuous
+            ? GetContinuousModeTargetPages()
+            : GetSinglePageModeTargetPages();
+    }
+
+    /// <summary>
+    /// 初回読み込み時の先行レンダリング対象ページ（最大10ページ）を取得します。
+    /// </summary>
+    private List<DetailPageItemViewModel> GetInitialLoadPages()
+    {
+        var result = new List<DetailPageItemViewModel>();
+        var current = CurrentPageItem;
+        if (current != null)
+        {
+            result.Add(current);
+        }
+
+        foreach (var item in Pages.Take(InitialLoadMaxPageCount))
+        {
+            if (item != current)
+            {
+                result.Add(item);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 単一ページ表示モード時のレンダリング対象ページを取得します。
+    /// </summary>
+    private List<DetailPageItemViewModel> GetSinglePageModeTargetPages()
+    {
+        var result = new List<DetailPageItemViewModel>();
+        var current = CurrentPageItem;
+        if (current == null) return result;
+
+        result.Add(current);
+
+        // ズーム倍率が600%以下の場合は前後1ページも先読み対象
+        if (Zoom <= SelectiveRenderZoomThreshold)
+        {
+            int idx = Pages.IndexOf(current);
+            if (idx > 0)
+            {
+                result.Add(Pages[idx - 1]);
+            }
+            if (idx >= 0 && idx < Pages.Count - 1)
+            {
+                result.Add(Pages[idx + 1]);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 連続表示モード時のレンダリング対象ページ（可視ページ）を取得します。
+    /// </summary>
+    private List<DetailPageItemViewModel> GetContinuousModeTargetPages()
+    {
+        var result = new List<DetailPageItemViewModel>();
+        var current = CurrentPageItem;
+        if (current != null)
+        {
+            result.Add(current);
+        }
+
+        var visible = VisiblePagesProvider?.Invoke() ?? Enumerable.Empty<DetailPageItemViewModel>();
+        foreach (var item in visible)
+        {
+            if (item != current && Pages.Contains(item))
+            {
+                result.Add(item);
+            }
+        }
+
+        if (result.Count == 0 && current != null)
+        {
+            result.Add(current);
+        }
+
+        return result;
+    }
+
+    private async Task PerformDynamicRenderAsync(long generation, CancellationToken token, bool immediate, bool isInitialLoad)
     {
         try
         {
@@ -504,12 +629,23 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             token.ThrowIfCancellationRequested();
             if (generation != Volatile.Read(ref _renderGeneration)) return;
 
-            foreach (var item in Pages.ToList())
+            var targetPages = GetTargetPagesToRender(isInitialLoad);
+
+            foreach (var item in targetPages)
             {
                 token.ThrowIfCancellationRequested();
                 if (generation != Volatile.Read(ref _renderGeneration)) return;
 
                 var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
+
+                // すでに目標解像度・回転でレンダリング済みの場合は無駄な再生成をスキップ
+                if (item.IsRenderedAt(targetWidth, targetHeight, item.Page.RenderRotation) &&
+                    item.InteractiveData != null &&
+                    item.InteractiveData.Rotation == item.Page.RenderRotation)
+                {
+                    continue;
+                }
+
                 var rendered = await _pdfRenderer.RenderPageAsync(
                     item.Page.SourceFilePath,
                     item.Page.OriginalPageIndex,
@@ -525,6 +661,9 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                     {
                         // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
                         item.PageBackground = rendered;
+                        item.LastRenderedWidth = targetWidth;
+                        item.LastRenderedHeight = targetHeight;
+                        item.LastRenderedRotation = item.Page.RenderRotation;
                     }
 
                     // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
@@ -570,11 +709,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// ドキュメント初回読み込み時に最大10ページ分を先行レンダリングします。
+    /// </summary>
+    public async Task LoadInitialDocumentBackgroundAsync()
+    {
+        await ScheduleDynamicRender(immediate: true, isInitialLoad: true);
+        OnPropertyChanged(nameof(HasPreviousPage));
+        OnPropertyChanged(nameof(HasNextPage));
+    }
+
+    /// <summary>
     /// ページの背景ビットマップを現在のズーム倍率に合わせて即座にレンダリングします。
     /// </summary>
     public async Task LoadPageBackgroundAsync()
     {
-        await ScheduleDynamicRender(immediate: true);
+        await ScheduleDynamicRender(immediate: true, isInitialLoad: false);
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
     }

@@ -28,6 +28,11 @@ public partial class DetailEditorView : UserControl
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         SinglePageContainer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+
+        if (ViewModel != null)
+        {
+            ViewModel.VisiblePagesProvider = GetVisiblePagesInViewport;
+        }
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -63,11 +68,13 @@ public partial class DetailEditorView : UserControl
         if (e.OldValue is DetailEditorViewModel oldVm)
         {
             oldVm.ScrollToPageRequested -= OnScrollToPageRequested;
+            oldVm.VisiblePagesProvider = null;
         }
 
         if (e.NewValue is DetailEditorViewModel newVm)
         {
             newVm.ScrollToPageRequested += OnScrollToPageRequested;
+            newVm.VisiblePagesProvider = GetVisiblePagesInViewport;
             UpdateViewportToViewModel();
         }
     }
@@ -137,6 +144,39 @@ public partial class DetailEditorView : UserControl
                 p.IsCurrent = (p == bestMatch);
             }
         }
+
+        // スクロール停止時に新しく可視領域に入ったページをデバウンス動的レンダリング
+        ViewModel.ScheduleContinuousScrollRender();
+    }
+
+    /// <summary>
+    /// 連続スクロール表示時に現在スクロールビューアの表示領域内に交差している可視ページ一覧を取得します。
+    /// </summary>
+    private IEnumerable<DetailPageItemViewModel> GetVisiblePagesInViewport()
+    {
+        if (ViewModel == null || DetailScrollViewer.ViewportHeight <= 0)
+        {
+            return Enumerable.Empty<DetailPageItemViewModel>();
+        }
+
+        var visible = new List<DetailPageItemViewModel>();
+        double viewportHeight = DetailScrollViewer.ViewportHeight;
+
+        foreach (var itemVm in ViewModel.Pages)
+        {
+            if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+            {
+                var transform = container.TransformToVisual(DetailScrollViewer);
+                Point pt = transform.Transform(new Point(0, 0));
+                // コンテナがビューポート範囲 [0, viewportHeight] と交差しているかを判定
+                if (pt.Y + container.ActualHeight >= 0 && pt.Y <= viewportHeight)
+                {
+                    visible.Add(itemVm);
+                }
+            }
+        }
+
+        return visible;
     }
 
     private void OnScrollViewerPreviewMouseWheel(object sender, MouseWheelEventArgs e)
