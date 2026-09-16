@@ -217,12 +217,12 @@
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
                                    Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=1}">
                             <!-- ツール -->
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="ストローク選択ツール"
-                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select, Mode=TwoWay}"
-                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Select}">
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="移動ツール（画面のスクロール・リンクのクリック）"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xEB03;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="選択" FontSize="11" HorizontalAlignment="Center" />
+                                    <TextBlock Text="&#xE925;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
 
@@ -271,12 +271,12 @@
                                 </StackPanel>
                             </RadioButton>
 
-                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="移動ツール（画面のスクロール・リンクのクリック）"
-                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Hand, Mode=TwoWay}"
-                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Hand}">
+                            <RadioButton GroupName="RibbonHandwritingToolGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="ストローク選択ツール"
+                                         IsChecked="{Binding DetailEditor.SelectedTool, Converter={StaticResource ToolToBooleanConverter}, ConverterParameter=Select, Mode=TwoWay}"
+                                         Command="{Binding DetailEditor.SelectToolCommand}" CommandParameter="{x:Static controls:EditorToolMode.Select}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE925;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
-                                    <TextBlock Text="移動" FontSize="11" HorizontalAlignment="Center" />
+                                    <TextBlock Text="&#xEB03;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="選択" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
 

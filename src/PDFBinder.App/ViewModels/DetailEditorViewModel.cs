@@ -132,7 +132,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     public event Action<PdfPageModel>? ScrollToPageRequested;
 
     [ObservableProperty]
-    private EditorToolMode _selectedTool = EditorToolMode.Pen;
+    private EditorToolMode _selectedTool = EditorToolMode.Hand;
 
     [ObservableProperty]
     private Color _selectedColor = Colors.Black;
