@@ -32,4 +32,15 @@ public interface IPdfRenderer
         System.Windows.Ink.StrokeCollection strokes,
         double originalPageWidth,
         double originalPageHeight);
+
+    /// <summary>
+    /// 指定されたPDFページのテキスト・文字座標およびリンク注釈データを抽出します。
+    /// </summary>
+    Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default);
 }

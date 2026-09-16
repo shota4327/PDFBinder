@@ -340,7 +340,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _onBackToGrid = onBackToGrid;
         _pageLookup = pageLookup;
 
-        Pages.Add(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
+        AddPageItem(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
         UpdatePageEdgeFlags();
 
         UpdateThicknessPresets(_selectedTool);
@@ -353,10 +353,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     public void InitializeDocument(PdfDocumentModel document)
     {
         var previousPage = CurrentPage;
-        Pages.Clear();
+        ClearPageItems();
         foreach (var page in document.Pages)
         {
-            Pages.Add(new DetailPageItemViewModel(page));
+            AddPageItem(new DetailPageItemViewModel(page));
         }
 
         // 以前のカレントページが存在する場合は維持し、存在しない場合は先頭ページを選択
@@ -381,6 +381,46 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         UpdatePageEdgeFlags();
         ApplyFitMode();
         _ = LoadPageBackgroundAsync();
+    }
+
+    /// <summary>
+    /// ページアイテムをコレクションに追加し、イベントを購読します。
+    /// </summary>
+    private void AddPageItem(DetailPageItemViewModel item)
+    {
+        item.PageJumpRequested += OnPageJumpRequested;
+        Pages.Add(item);
+    }
+
+    /// <summary>
+    /// ページアイテムのイベント購読を解除してコレクションをクリアします。
+    /// </summary>
+    private void ClearPageItems()
+    {
+        foreach (var item in Pages)
+        {
+            item.PageJumpRequested -= OnPageJumpRequested;
+        }
+        Pages.Clear();
+    }
+
+    /// <summary>
+    /// ページ内リンク等によるジャンプ要求を処理します。
+    /// </summary>
+    private void OnPageJumpRequested(int targetPageIndex)
+    {
+        NavigateToPageIndex(targetPageIndex);
+    }
+
+    /// <summary>
+    /// 指定されたページインデックスへジャンプします。
+    /// </summary>
+    public void NavigateToPageIndex(int targetPageIndex)
+    {
+        if (targetPageIndex >= 0 && targetPageIndex < Pages.Count)
+        {
+            ScrollToPage(Pages[targetPageIndex].Page);
+        }
     }
 
     /// <summary>
@@ -489,6 +529,17 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
                     // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
                     UpdatePageStrokeCache(item);
+
+                    if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
+                    {
+                        item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
+                            item.Page.SourceFilePath,
+                            item.Page.OriginalPageIndex,
+                            item.Page.DisplayWidth,
+                            item.Page.DisplayHeight,
+                            item.Page.RenderRotation,
+                            token);
+                    }
                 }
             }
 
