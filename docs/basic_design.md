@@ -119,10 +119,11 @@ PDFファイルの入出力、構造操作を担当。
 - `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
 
 ### 5.2 `IPdfRenderer`
-PDFページの画面表示用ビットマップ生成およびストローク合成を担当。
+PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。
 - `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation)`: サムネイル/詳細画面用レンダリング（サムネイル: 360x504px基準固定生成、詳細画面: 216 DPI相当 / 3.0倍スケール）
 - `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
+- `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用）
 
 ### 5.3 `IUndoRedoService`
 ページ操作およびインク操作の履歴管理。
@@ -201,7 +202,10 @@ stateDiagram-v2
       - ※詳細ビュー表示時、特定ページが明示選択されていない場合は現在操作・表示中のカレントページを対象として回転・削除・白紙挿入が実行される。
     - 履歴操作: 元に戻す (`Ctrl+Z`), やり直す (`Ctrl+Y`)
   - **「手書き」タブ**: 詳細ビュー表示時のみ選択可能（グリッドビュー時は非活性化、グリッド切替時は他タブへ自動遷移）
-    - ツール: 選択 (`Cursor`), ペン (`Pen`), 蛍光ペン (`Highlighter`), 全体消し (`EraserStroke`), 部分消し (`EraserPoint`), 移動 (`Pan`)
+    - ツール: ストローク選択 (`Cursor`), 文字選択 (`TextSelect` / I-Beamカーソル), ペン (`Pen`), 蛍光ペン (`Highlighter`), 全体消し (`EraserStroke`), 部分消し (`EraserPoint`), 移動 (`Pan`)
+    - テキスト選択・リンク操作（インタラクティブオーバーレイ）:
+      - 文字選択ツール時: PDF内の文字をマウスドラッグで自由に矩形・範囲選択でき、半透明ブルーでハイライト表示。`Ctrl+C` や右クリックコンテキストメニュー「コピー」によりクリップボードへテキストをコピー可能。
+      - リンク操作: 文字選択ツールまたは移動（手のひら）ツール時、PDF内のURLリンクをクリックすると既定ブラウザを起動、ページ内リンクをクリックすると該当ページへ即時ジャンプ。ペン・消しゴム使用時は手書き入力を最優先し誤動作を防止。
     - 描画オプション（直線・筆圧・太さ・色）:
       - 直線トグル: ペンまたは蛍光ペン使用時のみ有効化可能なトグルボタン（ON時は十字カーソルで直線描画、ツール切り替え時に自動リセット）
       - 筆圧トグル: 直線ボタンの右横に配置。ペン使用時かつ直線モード無効時のみ操作可能なトグルボタン（初期値OFF）。OFF時は線の太さを均一（`IgnorePressure = true`）にし、ON時はスタイラスペンの筆圧に応じた強弱・太さ変化（`IgnorePressure = false`）を反映。ツール切り替え時や別PDF読み込み時も設定状態を保持。

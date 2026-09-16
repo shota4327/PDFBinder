@@ -42,6 +42,10 @@
                                               DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Background="Transparent" />
+
+                    <!-- 最前面テキスト選択・リンク操作インタラクティブオーバーレイ -->
+                    <controls:InteractiveOverlayCanvas PageItem="{Binding}"
+                                                       ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                 </Grid>
             </Grid>
         </DataTemplate>

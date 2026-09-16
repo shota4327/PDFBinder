@@ -27,7 +27,9 @@ public enum EditorToolMode
     /// <summary>直線ツール</summary>
     StraightLine,
     /// <summary>手のひらツール（パン）</summary>
-    Hand
+    Hand,
+    /// <summary>テキスト選択ツール</summary>
+    TextSelect
 }
 
 /// <summary>
@@ -261,6 +263,10 @@ public class EditorInkCanvas : InkCanvas
             case EditorToolMode.Hand:
                 EditingMode = InkCanvasEditingMode.None;
                 Cursor = Cursors.Hand;
+                break;
+            case EditorToolMode.TextSelect:
+                EditingMode = InkCanvasEditingMode.None;
+                Cursor = Cursors.IBeam;
                 break;
         }
 

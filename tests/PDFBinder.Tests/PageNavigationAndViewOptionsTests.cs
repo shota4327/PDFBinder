@@ -58,6 +58,17 @@ public class PageNavigationAndViewOptionsTests
         {
             return baseImage;
         }
+
+        public Task<PageInteractiveData> ExtractInteractiveDataAsync(
+            string? filePath,
+            int pageIndex,
+            double displayWidth,
+            double displayHeight,
+            PageRotation rotation,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(PageInteractiveData.Empty);
+        }
     }
 
     private static PdfDocumentModel CreateSampleDocument(int pageCount)
