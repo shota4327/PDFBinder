@@ -300,6 +300,7 @@ public partial class MainViewModel : ObservableObject
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
         _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
+        _detailEditor.StatusMessageRequested += msg => StatusMessage = msg;
 
         _document.PropertyChanged += OnDocumentPropertyChanged;
 
