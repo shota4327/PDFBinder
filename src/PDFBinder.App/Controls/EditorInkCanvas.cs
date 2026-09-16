@@ -131,6 +131,27 @@ public class EditorInkCanvas : InkCanvas
         set => SetValue(StrokeThicknessProperty, value);
     }
 
+    public static readonly DependencyProperty ZoomProperty = DependencyProperty.Register(
+        nameof(Zoom),
+        typeof(double),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(1.0, OnZoomChanged));
+
+    /// <summary>キャンバスのズーム表示倍率</summary>
+    public double Zoom
+    {
+        get => (double)GetValue(ZoomProperty);
+        set => SetValue(ZoomProperty, value);
+    }
+
+    private static void OnZoomChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.UpdateCursor();
+        }
+    }
+
     /// <summary>
     /// 現在直線描画モードがアクティブであるか（直線ツール選択時、またはペン/蛍光ペン選択中に直線トグルが有効な場合）
     /// </summary>
@@ -176,6 +197,7 @@ public class EditorInkCanvas : InkCanvas
 
     public EditorInkCanvas()
     {
+        UseCustomCursor = true;
         DynamicRenderer = new PenOnlyDynamicRenderer();
         UpdateEditingMode();
         AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) => e.Handled = true), true);
@@ -204,6 +226,7 @@ public class EditorInkCanvas : InkCanvas
         if (d is EditorInkCanvas canvas)
         {
             canvas.ApplyDrawingAttributes();
+            canvas.UpdateCursor();
         }
     }
 
@@ -212,6 +235,7 @@ public class EditorInkCanvas : InkCanvas
         if (d is EditorInkCanvas canvas)
         {
             canvas.ApplyDrawingAttributes();
+            canvas.UpdateCursor();
         }
     }
 
@@ -234,6 +258,8 @@ public class EditorInkCanvas : InkCanvas
             return;
         }
 
+        UseCustomCursor = ToolMode != EditorToolMode.EraserStroke;
+
         switch (ToolMode)
         {
             case EditorToolMode.Select:
@@ -250,11 +276,11 @@ public class EditorInkCanvas : InkCanvas
                 break;
             case EditorToolMode.EraserStroke:
                 EditingMode = InkCanvasEditingMode.EraseByStroke;
-                Cursor = Cursors.Cross;
+                Cursor = PenCursorHelper.GetStrokeEraserCursor();
                 break;
             case EditorToolMode.EraserPoint:
                 EditingMode = InkCanvasEditingMode.EraseByPoint;
-                Cursor = Cursors.Cross;
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Cross;
                 break;
             case EditorToolMode.StraightLine:
                 EditingMode = InkCanvasEditingMode.None;
@@ -309,7 +335,25 @@ public class EditorInkCanvas : InkCanvas
         else
         {
             EditingMode = InkCanvasEditingMode.Ink;
-            Cursor = Cursors.Pen;
+            Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Pen;
+        }
+    }
+
+    /// <summary>
+    /// 現在のツール、太さ、色、ズーム倍率に基づいてカーソルを更新します。
+    /// </summary>
+    public void UpdateCursor()
+    {
+        if (PenCursorHelper.IsCircleCursorTool(ToolMode))
+        {
+            if (ToolMode == EditorToolMode.EraserPoint)
+            {
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Cross;
+            }
+            else if (!IsStraightLine)
+            {
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Pen;
+            }
         }
     }
 

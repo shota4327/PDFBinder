@@ -41,6 +41,7 @@
                                               IsPenPressureEnabled="{Binding DataContext.IsPenPressureEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               StrokeThickness="{Binding DataContext.StrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Zoom="{Binding DataContext.Zoom, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Background="Transparent" />
 
                     <!-- 最前面テキスト選択・リンク操作インタラクティブオーバーレイ -->

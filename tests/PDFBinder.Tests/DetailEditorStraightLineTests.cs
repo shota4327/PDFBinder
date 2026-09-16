@@ -136,41 +136,55 @@ public class DetailEditorStraightLineTests
     [Fact]
     public void EditorInkCanvas_IsStraightLine_TogglesEditingModeAndCursor()
     {
+        Exception? exception = null;
         var thread = new Thread(() =>
         {
-            var canvas = new EditorInkCanvas();
+            try
+            {
+                var canvas = new EditorInkCanvas();
 
-            // 通常ペン（直線オフ）: インクモード & ペンカーソル
-            canvas.ToolMode = EditorToolMode.Pen;
-            canvas.IsStraightLine = false;
-            Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
-            Assert.Equal(Cursors.Pen, canvas.Cursor);
-            Assert.False(canvas.IsStraightLineActive);
+                // 通常ペン（直線オフ）: インクモード & ペンプレビューカーソル（十字以外）
+                canvas.ToolMode = EditorToolMode.Pen;
+                canvas.IsStraightLine = false;
+                Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
+                Assert.NotNull(canvas.Cursor);
+                Assert.NotEqual(Cursors.Cross, canvas.Cursor);
+                Assert.False(canvas.IsStraightLineActive);
 
-            // 通常ペン（直線オン）: Noneモード & 十字カーソル
-            canvas.IsStraightLine = true;
-            Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
-            Assert.Equal(Cursors.Cross, canvas.Cursor);
-            Assert.True(canvas.IsStraightLineActive);
+                // 通常ペン（直線オン）: Noneモード & 十字カーソル
+                canvas.IsStraightLine = true;
+                Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
+                Assert.Equal(Cursors.Cross, canvas.Cursor);
+                Assert.True(canvas.IsStraightLineActive);
 
-            // 蛍光ペン（直線オン）: Noneモード & 十字カーソル & IsHighlighter=true
-            canvas.ToolMode = EditorToolMode.Highlighter;
-            Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
-            Assert.Equal(Cursors.Cross, canvas.Cursor);
-            Assert.True(canvas.DefaultDrawingAttributes.IsHighlighter);
-            Assert.True(canvas.IsStraightLineActive);
+                // 蛍光ペン（直線オン）: Noneモード & 十字カーソル & IsHighlighter=true
+                canvas.ToolMode = EditorToolMode.Highlighter;
+                Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
+                Assert.Equal(Cursors.Cross, canvas.Cursor);
+                Assert.True(canvas.DefaultDrawingAttributes.IsHighlighter);
+                Assert.True(canvas.IsStraightLineActive);
 
-            // 蛍光ペン（直線オフ）: インクモード & ペンカーソル
-            canvas.IsStraightLine = false;
-            Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
-            Assert.Equal(Cursors.Pen, canvas.Cursor);
-            Assert.False(canvas.IsStraightLineActive);
+                // 蛍光ペン（直線オフ）: インクモード & ペンプレビューカーソル（十字以外）
+                canvas.IsStraightLine = false;
+                Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
+                Assert.NotNull(canvas.Cursor);
+                Assert.NotEqual(Cursors.Cross, canvas.Cursor);
+                Assert.False(canvas.IsStraightLineActive);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
         });
 
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         bool finished = thread.Join(5000);
         Assert.True(finished, "Thread timed out");
+        if (exception != null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
+        }
     }
 
     [Fact]
