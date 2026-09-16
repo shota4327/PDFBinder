@@ -10,7 +10,11 @@
         Title="PDF Binder" Height="760" Width="1100"
         MinHeight="500" MinWidth="750"
         Icon="Assets/icon.png"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="{StaticResource AppFontFamily}">
     
     <!-- ウィンドウクローム設定（標準タイトルバー廃止・タブバー統合） -->
     <WindowChrome.WindowChrome>

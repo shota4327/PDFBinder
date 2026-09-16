@@ -12,7 +12,8 @@
         <!-- 空白時のウェルカム表示 -->
         <Border Visibility="{Binding Document.Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                Background="{StaticResource SurfaceBackgroundBrush}" CornerRadius="12" Padding="40,30" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1">
+                Background="{StaticResource SurfaceBackgroundBrush}" CornerRadius="12" Padding="40,30" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1"
+                SnapsToDevicePixels="True">
             <StackPanel HorizontalAlignment="Center">
                 <TextBlock Text="&#xE415;" FontFamily="{StaticResource IconFontFamily}" FontSize="48" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,10" />
                 <TextBlock Text="PDFファイルを開くか、ここにドラッグ＆ドロップしてください" 
