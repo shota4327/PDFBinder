@@ -215,6 +215,26 @@ public class InteractiveOverlayCanvas : FrameworkElement
         e.Handled = true;
     }
 
+    /// <inheritdoc/>
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        ClearHoverState();
+    }
+
+    /// <summary>
+    /// ホバー状態を解除してカーソルとツールチップをリセットします。
+    /// </summary>
+    private void ClearHoverState()
+    {
+        if (_hoveredLink != null)
+        {
+            _hoveredLink = null;
+            UpdateCursorAndToolTip(null);
+            InvalidateVisual();
+        }
+    }
+
     /// <summary>
     /// マウスドラッグによる文字範囲選択を処理します。
     /// </summary>
@@ -336,6 +356,7 @@ public class InteractiveOverlayCanvas : FrameworkElement
         {
             PageItem.SelectedText = string.Empty;
         }
+        ClearHoverState();
         InvalidateVisual();
     }
 
