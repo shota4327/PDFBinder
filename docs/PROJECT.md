@@ -62,6 +62,7 @@
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
 | **F55** | UI・レンダリング | ピクセル整合レンダリング＆テキスト整形最適化（UseLayoutRounding / TextFormattingMode=Display / ClearType / BaseFont継承） | **完了** | Issue #102 / MainWindow, GridView, DetailEditorView, App.xaml |
+| **F56** | 手書き詳細 | 拡大縮小連動ペンホバープレビューカーソル（通常ペン・蛍光ペン・部分消しゴムのズーム倍率連動動的プレビュー、WYSIWYG、最小3px・最大128pxクランプ、メモリ内DIBカーソル生成・キャッシュ） | **完了** | Issue #107 / PenCursorHelper & EditorInkCanvas |
 
 ---
 
