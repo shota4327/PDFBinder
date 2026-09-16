@@ -21,6 +21,30 @@ public partial class DetailPageItemViewModel : ObservableObject
     [ObservableProperty]
     private BitmapSource? _strokeCache;
 
+    /// <summary>
+    /// 最後にレンダリングした目標画像幅（px）
+    /// </summary>
+    public int LastRenderedWidth { get; set; }
+
+    /// <summary>
+    /// 最後にレンダリングした目標画像高さ（px）
+    /// </summary>
+    public int LastRenderedHeight { get; set; }
+
+    /// <summary>
+    /// 最後にレンダリングした差分回転角度
+    /// </summary>
+    public PageRotation LastRenderedRotation { get; set; } = PageRotation.Rotate0;
+
+    /// <summary>
+    /// 指定された目標解像度および回転角度ですでにレンダリング済みかどうかを判定します。
+    /// </summary>
+    public bool IsRenderedAt(int targetWidth, int targetHeight, PageRotation rotation) =>
+        PageBackground != null &&
+        LastRenderedWidth == targetWidth &&
+        LastRenderedHeight == targetHeight &&
+        LastRenderedRotation == rotation;
+
     [ObservableProperty]
     private bool _isCurrent;
 

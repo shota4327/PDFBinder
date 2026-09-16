@@ -862,4 +862,178 @@ public class DetailEditorViewModelTests
         Assert.Same(doc2.Pages[0], vm.CurrentPageItem.Page);
         Assert.True(vm.Pages[0].IsCurrent);
     }
+
+    [Fact]
+    public void GetTargetPagesToRender_InitialLoad_LimitsToFirst10PagesWithCurrentFirst()
+    {
+        // Arrange: 20ページのドキュメントを作成
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 20; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+
+        // Act: 初回読み込みフラグを指定して対象ページを取得
+        var targets = vm.GetTargetPagesToRender(isInitialLoad: true);
+
+        // Assert: 先頭10ページのみが対象であり、先頭はカレントページであること
+        Assert.Equal(10, targets.Count);
+        Assert.Same(vm.CurrentPageItem, targets[0]);
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.Contains(vm.Pages[i], targets);
+        }
+        for (int i = 10; i < 20; i++)
+        {
+            Assert.DoesNotContain(vm.Pages[i], targets);
+        }
+    }
+
+    [Fact]
+    public void GetTargetPagesToRender_SinglePageMode_Under600Percent_ReturnsCurrentAndAdjacentPages()
+    {
+        // Arrange: 10ページのドキュメントで5ページ目を表示中、Zoom = 2.0 (200% <= 600%)
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 10; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+        vm.CurrentPage = doc.Pages[4]; // 5ページ目（0-based index: 4）
+        vm.SetZoom(2.0);
+
+        // Act: 単一表示モード（200%）で対象ページを取得
+        var targets = vm.GetTargetPagesToRender(isInitialLoad: false);
+
+        // Assert: 現在ページ（インデックス4）および前後1ページ（インデックス3, 5）の計3ページのみ対象
+        Assert.Equal(3, targets.Count);
+        Assert.Same(vm.Pages[4], targets[0]); // 現在ページが最優先
+        Assert.Same(vm.Pages[3], targets[1]); // 前ページ
+        Assert.Same(vm.Pages[5], targets[2]); // 次ページ
+    }
+
+    [Fact]
+    public void GetTargetPagesToRender_SinglePageMode_Over600Percent_ReturnsCurrentPageOnly()
+    {
+        // Arrange: 10ページのドキュメントで5ページ目を表示中、Zoom = 7.0 (700% > 600%)
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 10; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+        vm.CurrentPage = doc.Pages[4]; // 5ページ目
+        vm.SetZoom(7.0);
+
+        // Act: 単一表示モード（700%）で対象ページを取得
+        var targets = vm.GetTargetPagesToRender(isInitialLoad: false);
+
+        // Assert: 600%超のため現在ページ（インデックス4）のみが対象であること
+        Assert.Single(targets);
+        Assert.Same(vm.Pages[4], targets[0]);
+    }
+
+    [Fact]
+    public void GetTargetPagesToRender_ContinuousMode_ReturnsVisiblePages()
+    {
+        // Arrange: 10ページのドキュメントで、可視プロバイダーがページ2と3を返す
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 10; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.Continuous;
+        vm.CurrentPage = doc.Pages[1]; // 2ページ目
+
+        // 可視ページプロバイダーを設定（インデックス1, 2）
+        vm.VisiblePagesProvider = () => new[] { vm.Pages[1], vm.Pages[2] };
+
+        // Act: 連続表示モードで対象ページを取得
+        var targets = vm.GetTargetPagesToRender(isInitialLoad: false);
+
+        // Assert: 可視ページ一覧（インデックス1, 2）のみが対象となること
+        Assert.Equal(2, targets.Count);
+        Assert.Same(vm.Pages[1], targets[0]);
+        Assert.Same(vm.Pages[2], targets[1]);
+    }
+
+    [Fact]
+    public async Task PerformDynamicRenderAsync_SkipsAlreadyRenderedPages()
+    {
+        // Arrange: 3ページのドキュメントで初回レンダリングを実行
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 3; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer) { DebounceDelayMs = 0 };
+        vm.InitializeDocument(doc);
+
+        // 初回ロード完了を待機
+        await vm.ScheduleDynamicRender(immediate: true, isInitialLoad: false);
+        int initialCallCount = renderer.RenderCallCount;
+        Assert.True(initialCallCount > 0);
+
+        // Act: 同一ズーム倍率・回転で再度動的レンダリングをトリガー
+        await vm.ScheduleDynamicRender(immediate: true, isInitialLoad: false);
+
+        // Assert: すでにレンダリング済みのため RenderPageAsync は呼ばれず、呼び出し回数が増加しないこと
+        Assert.Equal(initialCallCount, renderer.RenderCallCount);
+    }
+
+    [Fact]
+    public async Task PerformDynamicRenderAsync_RetainsBackgroundOfNonTargetPages()
+    {
+        // Arrange: 5ページのドキュメントで等倍レンダリングを実行
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 5; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer) { DebounceDelayMs = 0 };
+        vm.InitializeDocument(doc);
+
+        // 初回ロードで先頭ページ群をレンダリング
+        await vm.ScheduleDynamicRender(immediate: true, isInitialLoad: true);
+        var page5OriginalBackground = vm.Pages[4].PageBackground;
+
+        // Act: 1ページ目を700%（600%超）でレンダリング
+        vm.SetZoom(7.0);
+        await vm.ScheduleDynamicRender(immediate: true, isInitialLoad: false);
+
+        // Assert: 5ページ目は対象外だが既存の背景画像は破棄されず保持されていること
+        Assert.Equal(page5OriginalBackground, vm.Pages[4].PageBackground);
+    }
 }

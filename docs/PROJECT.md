@@ -50,13 +50,14 @@
 | **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム・自動スクロール抑止・タッチスロップ・タッチ描画遮断） | **完了** | Issue #9, #13, #41, #46 / EditorInkCanvas |
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
+| **F24** | レンダリング | 詳細ビューの選択的動的レンダリング（初回先頭10ページ制限、単一表示前後1ページ制限、600%超現在ページ限定、連続表示可視ページ限定） | **完了** | Issue #95 |
 | **F37** | UI・表示設定 | 表示オプション（100%、ウィンドウにあわせる、幅にあわせる、動的リサイズ追従、スクロールバー幅および余白補正） | **完了** | Issue #52, #65 / DetailViewFitMode |
 | **F38** | UI・ステータスバー | 高機能ステータスバー刷新・半透明オーバーレイ化（半透明ダーク `#E61E293B`（不透明度90%）、高さ約5px拡大 MinHeight 42px、ボタン・入力欄拡大、単一・連続表示時のステータスバー重複回避・スクロールバー誤出現防止、ページ移動 `< ページ 1 / 2 >`、ズームコントロール `[-] 100% [+]`） | **完了** | Issue #52, #77, #91 / MainWindow & DetailEditor |
 | **F39** | UI・表示設定 | 連続表示・単ページ表示切り替え機能（初期値: 単一ページ、ホイールページめくり、拡大率固定制御、PageUp/PageDown、高速ホイール追従・Delta累積） | **完了** | Issue #61, #73 / DetailPageViewMode |
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 229件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 235件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
