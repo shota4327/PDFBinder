@@ -89,9 +89,12 @@ PDFBinder/
 - `DisplayWidth`: `double` (回転考慮後の表示上の幅)
 - `DisplayHeight`: `double` (回転考慮後の表示上の高さ)
 - `Thumbnail`: `BitmapSource?` (画面プレビュー用キャッシュビットマップ)
-- `InkStrokes`: `StrokeCollection` (WPFインクストロークコレクション)
+- `InkStrokes`: `StrokeCollection` (WPFインクストロークコレクション。ページ回転時は `InkTransformHelper` により自動的に幾何学追従回転)
 - `IsModified`: `bool` (編集フラグ)
 - `IsThumbnailDirty`: `bool` (サムネイル再生成フラグ)
+- `RotateTo(PageRotation newRotation)`: 指定角度へページを回転し、インクストロークも連動して幾何学変換
+- `RotateClockwise()`: 時計回り90度回転（インク追従）
+- `RotateCounterClockwise()`: 反時計回り90度回転（インク追従）
 
 ### 4.2 `PdfDocumentModel`
 現在作業中のバインダー全体を表現するモデル。
@@ -135,6 +138,11 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 アプリケーション設定（`settings.json`）の読み込み・保存管理。
 - `AppSettings Load()`: 設定読み込み（未存在または破損時は既定値返却）
 - `void Save(AppSettings settings)`: 設定保存（例外安全）
+
+### 5.5 `InkTransformHelper`
+手書きストロークコレクションの幾何学的座標変換・追従回転を担当するコアヘルパー。
+- `void RotateStrokes(StrokeCollection? strokes, PageRotation deltaRotation, double currentDisplayWidth, double currentDisplayHeight)`: 差分回転角度と現在のページ寸法をもとに全ストロークの各頂点座標（およびペン先サイズ）を追従変換
+- `(double X, double Y) TransformPoint(double x, double y, PageRotation deltaRotation, double currentWidth, double currentHeight)`: 単一座標点の幾何学的回転変換
 
 ---
 

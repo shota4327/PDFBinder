@@ -878,6 +878,14 @@ public partial class MainViewModel : ObservableObject
     public void Undo()
     {
         _undoRedoService.Undo();
+        if (!IsDetailViewActive)
+        {
+            _ = EnsureThumbnailsGeneratedAsync();
+        }
+        else
+        {
+            _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+        }
         StatusMessage = "操作を取り消しました。";
     }
 
@@ -885,6 +893,14 @@ public partial class MainViewModel : ObservableObject
     public void Redo()
     {
         _undoRedoService.Redo();
+        if (!IsDetailViewActive)
+        {
+            _ = EnsureThumbnailsGeneratedAsync();
+        }
+        else
+        {
+            _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+        }
         StatusMessage = "操作をやり直しました。";
     }
 

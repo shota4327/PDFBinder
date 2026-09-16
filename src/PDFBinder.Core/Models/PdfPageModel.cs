@@ -1,6 +1,7 @@
 using System.Windows.Ink;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
+using PDFBinder.Core.Helpers;
 
 namespace PDFBinder.Core.Models;
 
@@ -73,24 +74,28 @@ public partial class PdfPageModel : ObservableObject
     }
 
     /// <summary>
+    /// ページを指定した回転角度へ変更し、手書きインクも追従回転します。
+    /// </summary>
+    /// <param name="newRotation">新しい回転角度</param>
+    public void RotateTo(PageRotation newRotation)
+    {
+        if (Rotation == newRotation) return;
+
+        int deltaDeg = ((int)newRotation - (int)Rotation + 360) % 360;
+        var delta = PageRotationExtensions.FromDegrees(deltaDeg);
+        InkTransformHelper.RotateStrokes(InkStrokes, delta, DisplayWidth, DisplayHeight);
+        Rotation = newRotation;
+    }
+
+    /// <summary>
     /// ページを時計回りに90度回転します。
     /// </summary>
-    public void RotateClockwise()
-    {
-        Rotation = Rotation.RotateClockwise();
-        IsModified = true;
-        IsThumbnailDirty = true;
-    }
+    public void RotateClockwise() => RotateTo(Rotation.RotateClockwise());
 
     /// <summary>
     /// ページを反時計回りに90度回転します。
     /// </summary>
-    public void RotateCounterClockwise()
-    {
-        Rotation = Rotation.RotateCounterClockwise();
-        IsModified = true;
-        IsThumbnailDirty = true;
-    }
+    public void RotateCounterClockwise() => RotateTo(Rotation.RotateCounterClockwise());
 
     /// <summary>
     /// ページの現在の表示上の幅（回転を考慮）を取得します。
