@@ -210,7 +210,13 @@ public class ViewModelsTests
             () => { },
             _ => null);
 
-        // 初期状態（通常ペン）の確認
+        // 初期状態（移動ツール）の確認
+        Assert.Equal(EditorToolMode.Hand, vm.SelectedTool);
+
+        // Act: 通常ペンに変更
+        vm.SelectedTool = EditorToolMode.Pen;
+
+        // Assert: 色が黒色、太さが1pxであることを確認
         Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
         Assert.Equal(Colors.Black, vm.SelectedColor);
         Assert.Equal(1.0, vm.StrokeThickness);

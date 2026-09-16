@@ -239,12 +239,31 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
-    public void InitialValues_PenDefaultIsBlackAnd1px()
+    public void InitialValues_DefaultToolIsHand()
     {
         // Arrange & Act
         var page = CreateSamplePage();
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Assert: 初期ツールは移動（Hand）
+        Assert.Equal(EditorToolMode.Hand, vm.SelectedTool);
+        Assert.False(vm.CanChangeThickness);
+        Assert.False(vm.CanChangeColor);
+        Assert.False(vm.CanToggleStraightLine);
+        Assert.False(vm.CanTogglePenPressure);
+    }
+
+    [Fact]
+    public void InitialValues_PenDefaultIsBlackAnd1px()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+
+        // Act: ペンツールを選択
+        vm.SelectedTool = EditorToolMode.Pen;
 
         // Assert: ペンの初期値は黒色・太さ1.0px
         Assert.Equal(EditorToolMode.Pen, vm.SelectedTool);
@@ -275,7 +294,8 @@ public class DetailEditorViewModelTests
         var renderer = new FakePdfRenderer();
         using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
 
-        // Act: ペンの色を赤、太さを2.0pxに変更
+        // Act: ペンを選択し、色を赤、太さを2.0pxに変更
+        vm.SelectedTool = EditorToolMode.Pen;
         var redColor = Color.FromRgb(0xEF, 0x44, 0x44);
         vm.SelectedColor = redColor;
         vm.StrokeThickness = 2.0;
