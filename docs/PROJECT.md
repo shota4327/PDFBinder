@@ -22,7 +22,7 @@
 | **F03** | プロジェクト基盤 | CI・コーディング規約 (`GEMINI.md`) 整備 | **完了** | 初期コミット済 |
 | **F04** | プロジェクト基盤 | 単一EXE発行環境（Self-Contained & Framework-Dependent / `build.ps1`） | **完了** | `dist/PDFBinder.exe` (フレームワーク依存版: 約8.4MB) & `dist/self-contained/PDFBinder.exe` (自己完結版: 約66MB) |
 | **F10** | PDF操作コア | 非破壊ドキュメント読み込み（メモリ展開/ファイルロック回避） | **完了** | PdfService (PdfSharp) |
-| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°） | **完了** | PdfPageModel / PageRotation |
+| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°、手書きインク追従幾何変換、Undo/Redo同期） | **完了** | Issue #70 / InkTransformHelper / PdfPageModel |
 | **F12** | PDF操作コア | ページ削除 | **完了** | PdfDocumentModel.RemovePage |
 | **F13** | PDF操作コア | ページ順序入れ替え（Reordering） | **完了** | MovePageCommand / PdfDocumentModel |
 | **F14** | PDF操作コア | 空白ページの追加（隣接サイズ継承 / A4標準） | **完了** | PdfService.CreateBlankPage |

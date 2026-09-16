@@ -93,8 +93,8 @@ public class RotatePageCommand : IUndoableCommand
         _newRotation = newRotation;
     }
 
-    public void Execute() => _page.Rotation = _newRotation;
-    public void Undo() => _page.Rotation = _oldRotation;
+    public void Execute() => _page.RotateTo(_newRotation);
+    public void Undo() => _page.RotateTo(_oldRotation);
 }
 
 /// <summary>
