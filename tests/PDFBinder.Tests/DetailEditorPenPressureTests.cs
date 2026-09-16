@@ -214,4 +214,27 @@ public class DetailEditorPenPressureTests
         bool finished = thread.Join(5000);
         Assert.True(finished, "Thread timed out");
     }
+
+    /// <summary>
+    /// ペンタブレット検出時にツールチップが更新され、ステータスメッセージ要求イベントが発火することを検証します。
+    /// </summary>
+    [Fact]
+    public void PenPressureToolTip_DefaultAndWhenTabletDetected()
+    {
+        // Arrange
+        using var vm = CreateViewModel();
+        Assert.Contains("Windows Ink・ペンタブレット対応", vm.PenPressureToolTip);
+
+        string? receivedStatus = null;
+        vm.StatusMessageRequested += msg => receivedStatus = msg;
+
+        // Act: タブレット検出を通知
+        vm.NotifyTabletDeviceDetected("Wacom Intuos Pro PTH-660");
+
+        // Assert
+        Assert.Equal("Wacom Intuos Pro PTH-660", vm.PenTabletDeviceName);
+        Assert.Contains("Wacom Intuos Pro PTH-660", vm.PenPressureToolTip);
+        Assert.NotNull(receivedStatus);
+        Assert.Contains("Wacom Intuos Pro PTH-660", receivedStatus);
+    }
 }

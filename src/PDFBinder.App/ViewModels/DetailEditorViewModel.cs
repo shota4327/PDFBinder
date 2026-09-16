@@ -147,6 +147,32 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isPenPressureEnabled;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PenPressureToolTip))]
+    private string? _penTabletDeviceName;
+
+    /// <summary>
+    /// 筆圧ボタンのツールチップテキスト（デバイス検出状態を反映）
+    /// </summary>
+    public string PenPressureToolTip => string.IsNullOrEmpty(PenTabletDeviceName)
+        ? "筆圧感知（ペン使用時のみ / Windows Ink・ペンタブレット対応）"
+        : $"筆圧感知（ペン使用時のみ / WinTab: {PenTabletDeviceName} 検出済み）";
+
+    /// <summary>
+    /// ステータスメッセージの表示要求イベント
+    /// </summary>
+    public event Action<string>? StatusMessageRequested;
+
+    /// <summary>
+    /// ペンタブレット（WinTab）デバイスが検出された際に呼び出し、ステータス通知とツールチップを更新します。
+    /// </summary>
+    /// <param name="deviceName">検出されたデバイス名</param>
+    public void NotifyTabletDeviceDetected(string deviceName)
+    {
+        PenTabletDeviceName = deviceName;
+        StatusMessageRequested?.Invoke($"ペンタブレット（WinTab）を検出しました: {deviceName}");
+    }
+
     /// <summary>
     /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
     /// </summary>
