@@ -45,6 +45,7 @@ public class PdfService : IPdfService
                 OriginalRotation = pageRotation,
                 Rotation = pageRotation
             };
+            RestoreInkStrokesIfPresent(pdfPage, pageModel);
             model.AddPage(pageModel);
         }
 
@@ -207,88 +208,55 @@ public class PdfService : IPdfService
         }
 
         destPage.Rotate = (int)pageModel.Rotation;
-        DrawInkStrokesOnPage(destPage, pageModel.InkStrokes, pageModel.Rotation);
+        AttachInkAnnotationToPage(outputDoc, destPage, pageModel.InkStrokes, pageModel.Rotation);
     }
 
     /// <summary>
-    /// PDFページ上に手書きストロークを描画します。
+    /// PDFページに手書き注釈を設定します。既存の自前注釈はクリーンアップし、最新ストロークが存在する場合は新設します。
     /// </summary>
-    private void DrawInkStrokesOnPage(PdfPage page, StrokeCollection strokes, PageRotation rotation)
+    private static void AttachInkAnnotationToPage(
+        PdfDocument outputDoc,
+        PdfPage page,
+        StrokeCollection? strokes,
+        PageRotation rotation)
     {
+        PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+
         if (strokes == null || strokes.Count == 0)
         {
             return;
         }
 
-        using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
         double pageWidth = page.Width.Point;
         double pageHeight = page.Height.Point;
 
-        foreach (var stroke in strokes)
-        {
-            DrawSingleStroke(gfx, stroke, rotation, pageWidth, pageHeight);
-        }
+        var annot = new PdfBinderInkAnnotation(outputDoc);
+        annot.Elements.SetRectangle("/Rect", new PdfRectangle(new XRect(0, 0, pageWidth, pageHeight)));
+        annot.Elements.SetString(PdfBinderInkAnnotation.InkKey, PdfBinderInkAnnotation.SerializeStrokes(strokes));
+        annot.Elements["/AP"] = PdfBinderInkAnnotation.CreateAppearanceStream(
+            outputDoc, strokes, rotation, pageWidth, pageHeight);
+
+        page.Annotations.Add(annot);
     }
 
     /// <summary>
-    /// 1本のストロークをXGraphicsに描画します。
+    /// ページ内の PDF Binder 専用手書き注釈からストロークを復元します。
     /// </summary>
-    private void DrawSingleStroke(
-        XGraphics gfx,
-        Stroke stroke,
-        PageRotation rotation,
-        double pageWidth,
-        double pageHeight)
+    private static void RestoreInkStrokesIfPresent(PdfPage pdfPage, PdfPageModel pageModel)
     {
-        var points = stroke.StylusPoints;
-        if (points.Count < 2)
+        for (int i = 0; i < pdfPage.Annotations.Count; i++)
         {
-            return;
+            var annot = pdfPage.Annotations[i];
+            if (annot != null && annot.Elements.ContainsKey(PdfBinderInkAnnotation.InkKey))
+            {
+                string? base64 = annot.Elements.GetString(PdfBinderInkAnnotation.InkKey);
+                if (!string.IsNullOrWhiteSpace(base64))
+                {
+                    pageModel.InkStrokes = PdfBinderInkAnnotation.DeserializeStrokes(base64);
+                    break;
+                }
+            }
         }
-
-        var attr = stroke.DrawingAttributes;
-        var mediaColor = attr.Color;
-        byte alpha = attr.IsHighlighter ? (byte)120 : mediaColor.A;
-
-        var color = XColor.FromArgb(alpha, mediaColor.R, mediaColor.G, mediaColor.B);
-        var pen = new XPen(color, attr.Width)
-        {
-            LineCap = XLineCap.Round,
-            LineJoin = XLineJoin.Round
-        };
-
-        var xPoints = new XPoint[points.Count];
-        for (int i = 0; i < points.Count; i++)
-        {
-            xPoints[i] = TransformDisplayToPagePoint(
-                points[i].X,
-                points[i].Y,
-                rotation,
-                pageWidth,
-                pageHeight);
-        }
-
-        gfx.DrawLines(pen, xPoints);
-    }
-
-    /// <summary>
-    /// 画面表示座標系（DisplayWidth × DisplayHeight）の点を、
-    /// PDFページの未回転用紙座標系（Width × Height）へ逆回転変換します。
-    /// </summary>
-    private static XPoint TransformDisplayToPagePoint(
-        double x,
-        double y,
-        PageRotation rotation,
-        double pageWidth,
-        double pageHeight)
-    {
-        return rotation switch
-        {
-            PageRotation.Rotate90 => new XPoint(y, pageHeight - x),
-            PageRotation.Rotate180 => new XPoint(pageWidth - x, pageHeight - y),
-            PageRotation.Rotate270 => new XPoint(pageWidth - y, x),
-            _ => new XPoint(x, y)
-        };
     }
 
     /// <summary>

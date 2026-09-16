@@ -36,13 +36,15 @@ public class PdfiumRenderer : IPdfRenderer
             {
                 byte[] bytes = File.ReadAllBytes(filePath);
                 cancellationToken.ThrowIfCancellationRequested();
+                byte[] renderBytes = SanitizeForRendering(bytes, pageIndex);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
                 int minDim = Math.Min(targetWidth, targetHeight);
                 int maxDim = Math.Max(targetWidth, targetHeight);
                 var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
 
-                using var docReader = DocLib.Instance.GetDocReader(bytes, dimensions);
+                using var docReader = DocLib.Instance.GetDocReader(renderBytes, dimensions);
                 if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
                 {
                     return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
@@ -52,7 +54,7 @@ public class PdfiumRenderer : IPdfRenderer
                 using var pageReader = docReader.GetPageReader(pageIndex);
                 int actualWidth = pageReader.GetPageWidth();
                 int actualHeight = pageReader.GetPageHeight();
-                byte[] rawBytes = pageReader.GetImage();
+                byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var bitmap = BitmapSource.Create(
@@ -420,5 +422,38 @@ public class PdfiumRenderer : IPdfRenderer
                 rect.Width),
             _ => rect
         };
+    }
+
+    /// <summary>
+    /// レンダリング用に PDF バイト列から自前の手書き注釈を除外します（他社製注釈はそのまま保持）。
+    /// </summary>
+    private static byte[] SanitizeForRendering(byte[] pdfBytes, int pageIndex)
+    {
+        try
+        {
+            using var msIn = new MemoryStream(pdfBytes);
+            using var doc = PdfSharp.Pdf.IO.PdfReader.Open(msIn, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
+
+            if (pageIndex < 0 || pageIndex >= doc.PageCount)
+            {
+                return pdfBytes;
+            }
+
+            var page = doc.Pages[pageIndex];
+            if (!PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+            {
+                return pdfBytes;
+            }
+
+            PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+
+            using var msOut = new MemoryStream();
+            doc.Save(msOut);
+            return msOut.ToArray();
+        }
+        catch
+        {
+            return pdfBytes;
+        }
     }
 }

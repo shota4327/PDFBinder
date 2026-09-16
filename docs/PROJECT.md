@@ -46,7 +46,7 @@
 | **F44** | 手書き詳細 | 直線トグル描画（ペン・蛍光ペン連動トグル化・十字カーソルプレビュー） | **完了** | Issue #25 / IsStraightLine & CommitStraightLine |
 | **F36** | UI・タイトルバー | タイトルバー廃止とタブバー統合（Chrome/Edgeスタイル・WindowChrome） | **完了** | Issue #28 / WindowChrome |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひら／移動ツール、初期デフォルトツール化、50%〜3200%適応型スナップズーム、最大レンダリング解像度8192px拡張） | **完了** | Issue #60, #93 / ScaleTransform & ZoomSnapSteps |
-| **F46** | 手書き詳細 | 手書きストロークのベクター/透過PNGハイブリッド保存 | **完了** | DrawInkStrokesOnPage (PdfSharp) |
+| **F46** | 手書き詳細 | 手書きストロークの再編集可能保存・復元（アピアランス付き注釈 /AP ＋ ISFメタデータ埋め込み＆他社注釈分離背景描画） | **完了** | Issue #89 / PdfBinderInkAnnotation & PdfService |
 | **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム・自動スクロール抑止・タッチスロップ・タッチ描画遮断） | **完了** | Issue #9, #13, #41, #46 / EditorInkCanvas |
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
@@ -57,7 +57,7 @@
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 236件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 240件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
