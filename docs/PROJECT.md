@@ -61,6 +61,7 @@
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
+| **F55** | UI・レンダリング | ピクセル整合レンダリング＆テキスト整形最適化（UseLayoutRounding / TextFormattingMode=Display / ClearType / BaseFont継承） | **完了** | Issue #102 / MainWindow, GridView, DetailEditorView, App.xaml |
 
 ---
 

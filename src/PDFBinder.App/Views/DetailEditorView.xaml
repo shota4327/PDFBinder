@@ -55,7 +55,8 @@
         <!-- 空白時のウェルカム表示 -->
         <Border Visibility="{Binding Pages.Count, Converter={StaticResource InverseCountToVisibilityConverter}, FallbackValue=Visible}"
                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                Background="{StaticResource SurfaceBackgroundBrush}" CornerRadius="12" Padding="40,30" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1">
+                Background="{StaticResource SurfaceBackgroundBrush}" CornerRadius="12" Padding="40,30" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1"
+                SnapsToDevicePixels="True">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Opacity="0.4" Color="#000000" />
             </Border.Effect>
