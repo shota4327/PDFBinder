@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using PDFBinder.App.Models;
+using PDFBinder.App.Services;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 
@@ -19,6 +20,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfService _pdfService;
     private readonly IPdfRenderer _pdfRenderer;
     private readonly IUndoRedoService _undoRedoService;
+    private readonly IPrintService _printService;
+    private readonly PrintSettings _persistentPrintSettings = new();
 
     /// <summary>開いているすべてのドキュメントセッション</summary>
     public ObservableCollection<DocumentSession> Documents { get; } = new();
@@ -99,6 +102,19 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private bool _isDragOver;
+
+    /// <summary>
+    /// 印刷確認ダイアログ（インアプリオーバーレイ）を表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanExecutePrint))]
+    private bool _isPrintDialogVisible;
+
+    /// <summary>
+    /// 現在表示中の印刷ダイアログViewModel
+    /// </summary>
+    [ObservableProperty]
+    private PrintViewModel? _printViewModel;
 
     /// <summary>
     /// サムネイル最小表示サイズ（px）
@@ -347,11 +363,13 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         IPdfService? pdfService = null,
         IPdfRenderer? pdfRenderer = null,
-        IUndoRedoService? undoRedoService = null)
+        IUndoRedoService? undoRedoService = null,
+        IPrintService? printService = null)
     {
         _pdfService = pdfService ?? new PdfService();
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _undoRedoService = undoRedoService ?? new UndoRedoService();
+        _printService = printService ?? new WpfPrintService();
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
         _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
@@ -531,8 +549,10 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CanGoToPreviousPage));
         OnPropertyChanged(nameof(CanGoToNextPage));
         OnPropertyChanged(nameof(CurrentPageNumber));
+        OnPropertyChanged(nameof(CanExecutePrint));
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
         GoToNextPageCommand.NotifyCanExecuteChanged();
+        ShowPrintDialogCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -1308,5 +1328,100 @@ public partial class MainViewModel : ObservableObject
                 page.Thumbnail = baseBitmap;
             }
         }
+    }
+
+    /// <summary>
+    /// 印刷コマンドが実行可能かどうかを取得します。
+    /// </summary>
+    public bool CanExecutePrint => Document.Pages.Count > 0 && !IsPrintDialogVisible;
+
+    /// <summary>
+    /// 印刷確認ダイアログ（インアプリオーバーレイ）を表示します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanExecutePrint))]
+    public void ShowPrintDialog()
+    {
+        if (Document.Pages.Count == 0) return;
+
+        int currentIdx = DetailEditor != null ? DetailEditor.CurrentPageIndex : 0;
+        if (currentIdx < 0 || currentIdx >= Document.Pages.Count)
+        {
+            currentIdx = 0;
+        }
+
+        PrintViewModel = new PrintViewModel(
+            _printService,
+            _persistentPrintSettings,
+            Document.Pages.Count,
+            currentIdx,
+            (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
+            (idx, ct) => RenderPageWithInkAsync(idx, 2480, 3508, ct));
+
+        PrintViewModel.RequestClose += OnPrintDialogRequestClose;
+        IsPrintDialogVisible = true;
+    }
+
+    /// <summary>
+    /// 印刷確認ダイアログを閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void ClosePrintDialog()
+    {
+        PrintViewModel?.CancelCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// 印刷ダイアログからの終了通知を処理します。
+    /// </summary>
+    private void OnPrintDialogRequestClose(bool printed)
+    {
+        IsPrintDialogVisible = false;
+        if (PrintViewModel != null)
+        {
+            PrintViewModel.RequestClose -= OnPrintDialogRequestClose;
+            PrintViewModel.Cleanup();
+            PrintViewModel = null;
+        }
+
+        if (printed)
+        {
+            StatusMessage = "印刷ジョブを送信しました。";
+        }
+    }
+
+    /// <summary>
+    /// 手書きストロークを合成した指定サイズのページビットマップを生成します。
+    /// </summary>
+    private async Task<BitmapSource?> RenderPageWithInkAsync(
+        int pageIndex,
+        int width,
+        int height,
+        CancellationToken ct)
+    {
+        if (pageIndex < 0 || pageIndex >= Document.Pages.Count) return null;
+        var page = Document.Pages[pageIndex];
+
+        BitmapSource? baseBitmap;
+        if (string.IsNullOrEmpty(page.SourceFilePath))
+        {
+            baseBitmap = _pdfRenderer.CreateBlankPageBitmap(width, height, page.Rotation);
+        }
+        else
+        {
+            baseBitmap = await _pdfRenderer.RenderPageAsync(
+                page.SourceFilePath,
+                page.OriginalPageIndex,
+                width,
+                height,
+                page.RenderRotation,
+                ct);
+        }
+
+        if (baseBitmap != null && page.InkStrokes.Count > 0)
+        {
+            return _pdfRenderer.CompositeStrokes(baseBitmap, page.InkStrokes, page.DisplayWidth, page.DisplayHeight);
+        }
+
+        return baseBitmap;
     }
 }

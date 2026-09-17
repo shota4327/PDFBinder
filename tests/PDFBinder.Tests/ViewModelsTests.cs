@@ -373,4 +373,33 @@ public class ViewModelsTests
         Assert.NotNull(page.Thumbnail);
         Assert.NotSame(initialThumbnail, page.Thumbnail);
     }
+
+    [Fact]
+    public void MainViewModel_ShowPrintDialog_WhenNoPages_CannotExecute()
+    {
+        var vm = new MainViewModel();
+
+        Assert.False(vm.CanExecutePrint);
+        Assert.False(vm.ShowPrintDialogCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void MainViewModel_ShowPrintDialog_WithPages_OpensDialog()
+    {
+        var vm = new MainViewModel();
+        vm.AddBlankPage();
+
+        Assert.True(vm.CanExecutePrint);
+        Assert.True(vm.ShowPrintDialogCommand.CanExecute(null));
+
+        vm.ShowPrintDialogCommand.Execute(null);
+
+        Assert.True(vm.IsPrintDialogVisible);
+        Assert.NotNull(vm.PrintViewModel);
+
+        // キャンセルで閉じる
+        vm.ClosePrintDialogCommand.Execute(null);
+        Assert.False(vm.IsPrintDialogVisible);
+        Assert.Null(vm.PrintViewModel);
+    }
 }

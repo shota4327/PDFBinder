@@ -19,6 +19,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        EnsureLeftAlignedPopups();
+
         var parseResult = CommandLineArgsHelper.Parse(e.Args);
 
         var mainWindow = new MainWindow();
@@ -55,6 +57,26 @@ public partial class App : Application
         }
 
         await vm.OpenDocumentAsync(filePath);
+    }
+
+    /// <summary>
+    /// タブレットモード等のOS設定によりポップアップやメニューが右揃えになる現象を防止し、
+    /// 常に左揃えで開くように強制します。
+    /// </summary>
+    private static void EnsureLeftAlignedPopups()
+    {
+        try
+        {
+            if (SystemParameters.MenuDropAlignment)
+            {
+                var field = typeof(SystemParameters).GetField("_menuDropAlignment", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                field?.SetValue(null, false);
+            }
+        }
+        catch
+        {
+            // リフレクション失敗時は安全に無視
+        }
     }
 }
 

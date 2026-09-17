@@ -54,7 +54,10 @@ public partial class MainWindow : Window
         // 1. 保存確認ダイアログのキー制御
         if (HandleSaveConfirmationKeyDown(vm, e)) return;
 
-        // 2. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
+        // 2. 印刷確認ダイアログのキー制御
+        if (HandlePrintDialogKeyDown(vm, e)) return;
+
+        // 3. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
         if (Keyboard.FocusedElement is TextBoxBase || e.OriginalSource is TextBoxBase)
         {
             return;
@@ -82,6 +85,30 @@ public partial class MainWindow : Window
         }
 
         // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 印刷確認ダイアログ表示中のキーボード操作（Escによるキャンセル等）を先行処理します。
+    /// </summary>
+    private static bool HandlePrintDialogKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsPrintDialogVisible) return false;
+
+        if (e.Key == Key.Escape)
+        {
+            vm.ClosePrintDialogCommand.Execute(null);
+            e.Handled = true;
+            return true;
+        }
+
+        // 印刷ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
         if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
         {
             e.Handled = true;
