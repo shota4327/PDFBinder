@@ -808,33 +808,33 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- 用紙の向き ＆ 用紙サイズ（横並び配置） -->
+                                <!-- 用紙サイズ ＆ 用紙の向き（横並び配置・余白詰め） -->
                                 <Grid Margin="0,0,0,14">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="10" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- 左列：用紙の向き -->
+                                    <!-- 左列：用紙サイズ -->
                                     <StackPanel Grid.Column="0">
-                                        <TextBlock Text="用紙の向き" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
-                                        <StackPanel Orientation="Horizontal">
-                                            <RadioButton Content="縦" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6" Margin="0,0,6,0"
-                                                         IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Portrait}" />
-                                            <RadioButton Content="横" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6"
-                                                         IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Landscape}" />
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- 右列：用紙サイズ -->
-                                    <StackPanel Grid.Column="2">
                                         <TextBlock Text="用紙サイズ" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
                                         <StackPanel Orientation="Horizontal">
                                             <RadioButton Content="A4" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6" Margin="0,0,6,0"
                                                          IsChecked="{Binding Settings.PaperSize, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=A4}" />
                                             <RadioButton Content="A3" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6"
                                                          IsChecked="{Binding Settings.PaperSize, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=A3}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- 右列：用紙の向き -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="用紙の向き" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton Content="縦" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6" Margin="0,0,6,0"
+                                                         IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Portrait}" />
+                                            <RadioButton Content="横" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="16,6"
+                                                         IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Landscape}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>
@@ -852,48 +852,56 @@
                                                  IsChecked="{Binding Settings.DuplexMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=TwoSidedShortEdge}" />
                                 </StackPanel>
 
-                                <!-- 印刷範囲（縦並びボタントグル + 必要な場合のみカスタム入力欄表示） -->
+                                <!-- 印刷範囲（縦並びボタントグル + ページ指定の右横にテキストボックス） -->
                                 <TextBlock Text="印刷範囲" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
                                 <StackPanel Orientation="Vertical" Margin="0,0,0,14">
-                                    <RadioButton Content="すべて" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
+                                    <RadioButton Content="すべて" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
                                                  IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=AllPages}" />
-                                    <RadioButton Content="現在のページ" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
+                                    <RadioButton Content="現在のページ" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
                                                  IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=CurrentPage}" />
-                                    <RadioButton Content="ページ指定" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" HorizontalAlignment="Left" x:Name="CustomRangeToggle"
-                                                 IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Custom}" />
                                     
-                                    <!-- ページ指定選択時のみ展開表示 -->
-                                    <StackPanel Margin="18,4,0,0"
-                                                Visibility="{Binding IsChecked, ElementName=CustomRangeToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <!-- ページ指定行：ボタンの右横に入力欄をインライン配置 -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <RadioButton Content="ページ指定" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" x:Name="CustomRangeToggle"
+                                                     IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Custom}" />
+                                        
+                                        <!-- ページ指定選択時のみ右横に表示 -->
                                         <TextBox Text="{Binding Settings.CustomRangeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource DarkTextBoxStyle}"
-                                                 ToolTip="例: 1-3, 5, 8" Width="200" HorizontalAlignment="Left" />
-                                        <TextBlock Text="{Binding RangeErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" Margin="0,3,0,0"
-                                                   Visibility="{Binding RangeErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" />
+                                                 ToolTip="例: 1-3, 5, 8" Width="150" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                 Visibility="{Binding IsChecked, ElementName=CustomRangeToggle, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     </StackPanel>
+                                    
+                                    <!-- 入力エラーメッセージ（入力欄の下に表示） -->
+                                    <TextBlock Text="{Binding RangeErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" Margin="128,3,0,0"
+                                               Visibility="{Binding RangeErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" />
                                 </StackPanel>
 
-                                <!-- 印刷モード（縦並びボタントグル + 必要な場合のみ集約数表示） -->
+                                <!-- 印刷モード（縦並びボタントグル + 1ページに集約の右横に集約数表示） -->
                                 <TextBlock Text="印刷モード" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
                                 <StackPanel Orientation="Vertical" Margin="0,0,0,14">
-                                    <RadioButton Content="サイズに合わせる" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
+                                    <RadioButton Content="サイズに合わせる" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="140" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=FitToPage}" />
-                                    <RadioButton Content="1ページに集約" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" HorizontalAlignment="Left" x:Name="NUpToggle"
-                                                 IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=NUp}" />
                                     
-                                    <!-- 1ページに集約選択時のみ展開表示 -->
-                                    <DockPanel Margin="18,4,0,4"
-                                               HorizontalAlignment="Left"
-                                               Visibility="{Binding IsChecked, ElementName=NUpToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="集約数:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <ComboBox ItemsSource="{Binding AvailableNUpOptions}"
-                                                  SelectedValue="{Binding Settings.NUpCount, Mode=TwoWay}"
-                                                  SelectedValuePath="Count"
-                                                  DisplayMemberPath="DisplayName"
-                                                  Style="{StaticResource ModernDarkComboBoxStyle}" />
-                                    </DockPanel>
+                                    <!-- 1ページに集約行：ボタンの右横に集約数プルダウンをインライン配置 -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <RadioButton Content="1ページに集約" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="140" HorizontalContentAlignment="Center" x:Name="NUpToggle"
+                                                     IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=NUp}" />
+                                        
+                                        <!-- 1ページに集約選択時のみ右横に表示 -->
+                                        <DockPanel Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   Visibility="{Binding IsChecked, ElementName=NUpToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="集約数:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                            <ComboBox ItemsSource="{Binding AvailableNUpOptions}"
+                                                      SelectedValue="{Binding Settings.NUpCount, Mode=TwoWay}"
+                                                      SelectedValuePath="Count"
+                                                      DisplayMemberPath="DisplayName"
+                                                      Style="{StaticResource ModernDarkComboBoxStyle}"
+                                                      VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </StackPanel>
 
-                                    <RadioButton Content="冊子(製本)" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="160" HorizontalContentAlignment="Center" Margin="0,4,0,0" HorizontalAlignment="Left"
+                                    <RadioButton Content="冊子(製本)" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="140" HorizontalContentAlignment="Center" Margin="0,4,0,0" HorizontalAlignment="Left"
                                                  ToolTip="二つ折り中綴じ用に自動面付け（用紙は横向き・両面短辺とじ）"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Booklet}" />
                                 </StackPanel>
