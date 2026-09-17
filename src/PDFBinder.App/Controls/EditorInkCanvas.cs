@@ -3,10 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Input.StylusPlugIns;
-using System.Windows.Interop;
 using System.Windows.Media;
 using PDFBinder.App.Helpers;
-using PDFBinder.App.Interop.WinTab;
 using PDFBinder.App.ViewModels;
 
 namespace PDFBinder.App.Controls;
@@ -194,11 +192,6 @@ public class EditorInkCanvas : InkCanvas
     private double? _initialPinchDistance;
     private Point? _lastPinchCenter;
 
-    // WinTab（外付けペンタブレット）連携管理
-    private IWinTabService? _winTabService;
-    private Stroke? _activeWinTabStroke;
-    private bool _isWinTabDrawing;
-
     /// <summary>現在のDynamicRendererを取得します（テスト・検証用）。</summary>
     public DynamicRenderer? CurrentDynamicRenderer => DynamicRenderer;
 
@@ -209,8 +202,6 @@ public class EditorInkCanvas : InkCanvas
         UpdateEditingMode();
         AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) => e.Handled = true), true);
         Strokes.StrokesChanged += OnCanvasStrokesChanged;
-        Loaded += OnEditorInkCanvasLoaded;
-        Unloaded += OnEditorInkCanvasUnloaded;
     }
 
     private static void OnToolModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -368,12 +359,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
-        if (_isWinTabDrawing)
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (e.LeftButton == MouseButtonState.Pressed)
         {
             if (IsStraightLineActive)
@@ -401,12 +386,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseMove(MouseEventArgs e)
     {
-        if (_isWinTabDrawing)
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (_isDrawingLine && _lineStartPoint.HasValue)
         {
             _currentLinePoint = e.GetPosition(this);
@@ -432,12 +411,6 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseUp(MouseButtonEventArgs e)
     {
-        if (_isWinTabDrawing)
-        {
-            e.Handled = true;
-            return;
-        }
-
         if (_isDrawingLine && _lineStartPoint.HasValue && _currentLinePoint.HasValue)
         {
             ReleaseMouseCapture();
@@ -560,158 +533,6 @@ public class EditorInkCanvas : InkCanvas
 
     internal static bool IsStylusDevice(StylusEventArgs e) =>
         e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus;
-
-    #endregion
-
-    #region WinTab（ペンタブレット）入力処理
-
-    /// <summary>
-    /// テストまたは外部からWinTabサービスを設定します。
-    /// </summary>
-    internal void SetWinTabService(IWinTabService service)
-    {
-        if (_winTabService != null)
-        {
-            _winTabService.PacketReceived -= OnWinTabPacketReceived;
-            _winTabService.Dispose();
-        }
-        _winTabService = service;
-        _winTabService.PacketReceived += OnWinTabPacketReceived;
-    }
-
-    private void OnEditorInkCanvasLoaded(object sender, RoutedEventArgs e)
-    {
-        if (_winTabService == null)
-        {
-            _winTabService = new WinTabService();
-            _winTabService.PacketReceived += OnWinTabPacketReceived;
-        }
-
-        var window = Window.GetWindow(this);
-        if (window != null && !_winTabService.IsAvailable)
-        {
-            var handle = new WindowInteropHelper(window).Handle;
-            if (handle != IntPtr.Zero && _winTabService.Initialize(handle))
-            {
-                var vm = (DataContext as DetailEditorViewModel) ?? FindParentViewModel<DetailEditorViewModel>(this);
-                vm?.NotifyTabletDeviceDetected(_winTabService.DeviceName);
-            }
-        }
-    }
-
-    private void OnEditorInkCanvasUnloaded(object sender, RoutedEventArgs e)
-    {
-        if (_winTabService != null)
-        {
-            _winTabService.PacketReceived -= OnWinTabPacketReceived;
-            _winTabService.Dispose();
-            _winTabService = null;
-        }
-    }
-
-    private void OnWinTabPacketReceived(object? sender, WinTabPacketEventArgs e)
-    {
-        if (IsStraightLine || (ToolMode != EditorToolMode.Pen && ToolMode != EditorToolMode.Highlighter))
-        {
-            return;
-        }
-
-        switch (e.PacketType)
-        {
-            case WinTabPacketType.Down:
-                HandleWinTabPenDown(e);
-                break;
-            case WinTabPacketType.Move:
-                HandleWinTabPenMove(e);
-                break;
-            case WinTabPacketType.Up:
-                HandleWinTabPenUp(e);
-                break;
-        }
-    }
-
-    private void HandleWinTabPenDown(WinTabPacketEventArgs e)
-    {
-        if (!IsLoaded || ActualWidth <= 0 || ActualHeight <= 0) return;
-
-        Point canvasPoint;
-        try
-        {
-            canvasPoint = PointFromScreen(e.ScreenPoint);
-        }
-        catch
-        {
-            return;
-        }
-
-        if (canvasPoint.X < 0 || canvasPoint.X > ActualWidth ||
-            canvasPoint.Y < 0 || canvasPoint.Y > ActualHeight)
-        {
-            return;
-        }
-
-        var attr = DefaultDrawingAttributes.Clone();
-        if (IsPenPressureActive)
-        {
-            attr.IgnorePressure = false;
-        }
-
-        var stylusPoint = new StylusPoint(canvasPoint.X, canvasPoint.Y, e.PressureFactor);
-        var pointCollection = new StylusPointCollection(new[] { stylusPoint });
-        _activeWinTabStroke = new Stroke(pointCollection, attr);
-
-        _isWinTabDrawing = true;
-        _isInternalStrokeSync = true;
-        try
-        {
-            Strokes.Add(_activeWinTabStroke);
-        }
-        finally
-        {
-            _isInternalStrokeSync = false;
-        }
-    }
-
-    private void HandleWinTabPenMove(WinTabPacketEventArgs e)
-    {
-        if (!_isWinTabDrawing || _activeWinTabStroke == null) return;
-
-        Point canvasPoint;
-        try
-        {
-            canvasPoint = PointFromScreen(e.ScreenPoint);
-        }
-        catch
-        {
-            return;
-        }
-
-        _activeWinTabStroke.StylusPoints.Add(new StylusPoint(canvasPoint.X, canvasPoint.Y, e.PressureFactor));
-    }
-
-    private void HandleWinTabPenUp(WinTabPacketEventArgs e)
-    {
-        if (!_isWinTabDrawing || _activeWinTabStroke == null) return;
-
-        var stroke = _activeWinTabStroke;
-        _activeWinTabStroke = null;
-        _isWinTabDrawing = false;
-
-        if (PageItem != null && !IsEraserOrSelectMode(ToolMode))
-        {
-            _isInternalStrokeSync = true;
-            try
-            {
-                Strokes.Remove(stroke);
-            }
-            finally
-            {
-                _isInternalStrokeSync = false;
-            }
-
-            CommitNewStroke(stroke);
-        }
-    }
 
     #endregion
 
