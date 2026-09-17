@@ -29,7 +29,7 @@
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
-| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54 / インアプリオーバーレイ & OnClosing |
+| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、手書き既存ファイル復元後の変更検知、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54, #111 / インアプリオーバーレイ & OnClosing |
 | **F19** | PDF操作コア / 起動 | 起動時コマンドライン引数処理（「プログラムから開く」・関連付け起動・複数ファイル個別プロセス起動） | **完了** | Issue #83 / CommandLineArgsHelper & App.OnStartup |
 | **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
 | **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
@@ -57,7 +57,7 @@
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 240件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 268件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
