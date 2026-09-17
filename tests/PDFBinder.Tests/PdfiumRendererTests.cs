@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Ink;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 using PdfSharp.Drawing;
@@ -138,5 +139,33 @@ public class PdfiumRendererTests : IDisposable
         {
             await _renderer.RenderPageAsync(pdfPath, 0, 200, 300, PageRotation.Rotate0, cts.Token);
         });
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_ConcurrentCalls_ExecuteSafelyWithoutCrashing()
+    {
+        // Arrange
+        string pdfPath = CreateSamplePdf("test_concurrent.pdf");
+        int concurrency = 10;
+        var tasks = new List<Task<BitmapSource?>>();
+
+        // Act: 10個のタスクを並行起動して同時レンダリング
+        for (int i = 0; i < concurrency; i++)
+        {
+            var priority = (i % 2 == 0) ? RenderPriority.High : RenderPriority.Low;
+            tasks.Add(Task.Run(() => _renderer.RenderPageAsync(pdfPath, 0, 200, 300, PageRotation.Rotate0, CancellationToken.None, priority)));
+        }
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert: すべてのタスクがクラッシュせず正常なBitmapSourceを生成できたことを検証
+        Assert.Equal(concurrency, results.Length);
+        foreach (var bitmap in results)
+        {
+            Assert.NotNull(bitmap);
+            Assert.Equal(200, bitmap.PixelWidth);
+            Assert.Equal(300, bitmap.PixelHeight);
+            Assert.True(bitmap.IsFrozen);
+        }
     }
 }

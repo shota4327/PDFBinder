@@ -26,7 +26,11 @@
 
                 <!-- ページ描画コンテナ（Effectがかかっていないため超高速描画） -->
                 <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}" ClipToBounds="True">
-                    <!-- 背景PDFレンダリング画像 -->
+                    <!-- 高解像度レンダリング完了前の仮プレビューサムネイル画像 -->
+                    <Image Source="{Binding Page.Thumbnail}" Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- 背景PDF高解像度レンダリング画像（完成時にサムネイルの上に重なりシームレスに表示） -->
                     <Image Source="{Binding PageBackground}" Stretch="Fill"
                            RenderOptions.BitmapScalingMode="HighQuality" />
 

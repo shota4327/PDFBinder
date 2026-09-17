@@ -33,6 +33,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     public int DebounceDelayMs { get; set; } = 150;
 
     /// <summary>
+    /// ページ切り替え後の動的レンダリング遅延（デバウンス）時間（ミリ秒）
+    /// </summary>
+    public int PageSwitchDebounceDelayMs { get; set; } = 75;
+
+    /// <summary>
     /// ポイント単位（72pt/inch）をWPF論理ピクセル（96DIP/inch）に変換する標準基準スケール係数（約1.333）
     /// </summary>
     public const double PtToDipScale = 96.0 / 72.0;
@@ -463,7 +468,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         if (PageViewMode == DetailPageViewMode.SinglePage && newValue != null)
         {
-            _ = ScheduleDynamicRender(immediate: true);
+            _ = ScheduleDynamicRender(immediate: false, isInitialLoad: false, isPageSwitch: true);
         }
     }
 
@@ -496,16 +501,23 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// ズームまたはページ変更に応じた動的レンダリングをスケジュールします。
     /// </summary>
-    public Task ScheduleDynamicRender(bool immediate = false, bool isInitialLoad = false)
+    public Task ScheduleDynamicRender(bool immediate = false, bool isInitialLoad = false, bool isPageSwitch = false)
     {
-        _renderCts?.Cancel();
-        _renderCts?.Dispose();
+        var oldCts = _renderCts;
         _renderCts = new CancellationTokenSource();
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch
+        {
+            // キャンセル例外のハンドリング
+        }
 
         var token = _renderCts.Token;
         long generation = Interlocked.Increment(ref _renderGeneration);
 
-        return PerformDynamicRenderAsync(generation, token, immediate, isInitialLoad);
+        return PerformDynamicRenderAsync(generation, token, immediate, isInitialLoad, isPageSwitch);
     }
 
     /// <summary>
@@ -617,13 +629,19 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         return result;
     }
 
-    private async Task PerformDynamicRenderAsync(long generation, CancellationToken token, bool immediate, bool isInitialLoad)
+    private async Task PerformDynamicRenderAsync(
+        long generation,
+        CancellationToken token,
+        bool immediate,
+        bool isInitialLoad,
+        bool isPageSwitch = false)
     {
         try
         {
-            if (!immediate && DebounceDelayMs > 0)
+            int delay = isPageSwitch ? PageSwitchDebounceDelayMs : DebounceDelayMs;
+            if (!immediate && delay > 0)
             {
-                await Task.Delay(DebounceDelayMs, token);
+                await Task.Delay(delay, token);
             }
 
             token.ThrowIfCancellationRequested();
@@ -636,50 +654,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 token.ThrowIfCancellationRequested();
                 if (generation != Volatile.Read(ref _renderGeneration)) return;
 
-                var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
-
-                // すでに目標解像度・回転でレンダリング済みの場合は無駄な再生成をスキップ
-                if (item.IsRenderedAt(targetWidth, targetHeight, item.Page.RenderRotation) &&
-                    item.InteractiveData != null &&
-                    item.InteractiveData.Rotation == item.Page.RenderRotation)
-                {
-                    continue;
-                }
-
-                var rendered = await _pdfRenderer.RenderPageAsync(
-                    item.Page.SourceFilePath,
-                    item.Page.OriginalPageIndex,
-                    targetWidth,
-                    targetHeight,
-                    item.Page.RenderRotation,
-                    token);
-
-                token.ThrowIfCancellationRequested();
-                if (generation == Volatile.Read(ref _renderGeneration))
-                {
-                    if (rendered != null)
-                    {
-                        // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
-                        item.PageBackground = rendered;
-                        item.LastRenderedWidth = targetWidth;
-                        item.LastRenderedHeight = targetHeight;
-                        item.LastRenderedRotation = item.Page.RenderRotation;
-                    }
-
-                    // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
-                    UpdatePageStrokeCache(item);
-
-                    if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
-                    {
-                        item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
-                            item.Page.SourceFilePath,
-                            item.Page.OriginalPageIndex,
-                            item.Page.DisplayWidth,
-                            item.Page.DisplayHeight,
-                            item.Page.RenderRotation,
-                            token);
-                    }
-                }
+                await RenderPageItemAsync(item, generation, token);
             }
 
             OnPropertyChanged(nameof(PageBackground));
@@ -691,6 +666,63 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         catch
         {
             // レンダリング例外時もクラッシュを防止
+        }
+    }
+
+    /// <summary>
+    /// 個々のページアイテムに対して動的レンダリングおよびインタラクティブデータ抽出を実行します。
+    /// </summary>
+    private async Task RenderPageItemAsync(
+        DetailPageItemViewModel item,
+        long generation,
+        CancellationToken token)
+    {
+        var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
+
+        // すでに目標解像度・回転でレンダリング済みの場合は無駄な再生成をスキップ
+        if (item.IsRenderedAt(targetWidth, targetHeight, item.Page.RenderRotation) &&
+            item.InteractiveData != null &&
+            item.InteractiveData.Rotation == item.Page.RenderRotation)
+        {
+            return;
+        }
+
+        var priority = (item == CurrentPageItem) ? RenderPriority.High : RenderPriority.Low;
+
+        var rendered = await _pdfRenderer.RenderPageAsync(
+            item.Page.SourceFilePath,
+            item.Page.OriginalPageIndex,
+            targetWidth,
+            targetHeight,
+            item.Page.RenderRotation,
+            token,
+            priority);
+
+        token.ThrowIfCancellationRequested();
+        if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+        if (rendered != null)
+        {
+            // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
+            item.PageBackground = rendered;
+            item.LastRenderedWidth = targetWidth;
+            item.LastRenderedHeight = targetHeight;
+            item.LastRenderedRotation = item.Page.RenderRotation;
+        }
+
+        // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
+        UpdatePageStrokeCache(item);
+
+        if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
+        {
+            item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
+                item.Page.SourceFilePath,
+                item.Page.OriginalPageIndex,
+                item.Page.DisplayWidth,
+                item.Page.DisplayHeight,
+                item.Page.RenderRotation,
+                token,
+                priority);
         }
     }
 
