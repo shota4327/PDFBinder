@@ -117,10 +117,12 @@
                     </ToggleButton>
 
                     <!-- ドロップダウンポップアップ -->
-                    <Popup IsOpen="{Binding IsChecked, ElementName=FileDropdownToggle, Mode=TwoWay}"
+                    <Popup x:Name="FileDropdownPopup"
+                           IsOpen="{Binding IsChecked, ElementName=FileDropdownToggle, Mode=TwoWay}"
                            StaysOpen="False"
                            PlacementTarget="{Binding ElementName=FileDropdownToggle}"
-                           Placement="Bottom"
+                           Placement="Custom"
+                           CustomPopupPlacementCallback="OnFileDropdownPopupPlacement"
                            AllowsTransparency="True">
                         <Border Background="{StaticResource SurfaceBackgroundBrush}"
                                 BorderBrush="{StaticResource SurfaceBorderBrush}"

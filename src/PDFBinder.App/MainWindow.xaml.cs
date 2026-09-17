@@ -288,6 +288,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// タイトルバー中央のファイル切り替えポップアップをトグルボタンの中央揃えで配置します。
+    /// </summary>
+    private CustomPopupPlacement[] OnFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        return CalculateFileDropdownPopupPlacement(popupSize, targetSize, offset);
+    }
+
+    /// <summary>
+    /// ポップアップがトグルボタンの中央下部に揃う座標を計算します（テスト用ヘルパー）。
+    /// </summary>
+    internal static CustomPopupPlacement[] CalculateFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        // トグルボタンの中心とポップアップの中心が一致するように X 座標をオフセット
+        double x = (targetSize.Width - popupSize.Width) / 2.0;
+        double y = targetSize.Height + 2.0;
+        return [new CustomPopupPlacement(new Point(x, y), PopupPrimaryAxis.Horizontal)];
+    }
+
+    /// <summary>
     /// ウィンドウが閉じられた際の最終処理を行います。
     /// </summary>
     protected override void OnClosed(EventArgs e)

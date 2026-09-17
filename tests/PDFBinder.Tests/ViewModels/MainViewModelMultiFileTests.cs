@@ -1,4 +1,5 @@
 using System.IO;
+using PDFBinder.App;
 using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
@@ -342,5 +343,23 @@ public class MainViewModelMultiFileTests
 
         // Assert - 変更後
         Assert.Equal("DocA.pdf *", session.DisplayTitle);
+    }
+
+    [Fact]
+    public void CalculateFileDropdownPopupPlacement_CentersPopupHorizontallyBelowTarget()
+    {
+        // Arrange: トグルボタン幅 160, 高さ 32, ポップアップ幅 320, 高さ 200
+        var targetSize = new System.Windows.Size(160, 32);
+        var popupSize = new System.Windows.Size(320, 200);
+
+        // Act
+        var placements = MainWindow.CalculateFileDropdownPopupPlacement(popupSize, targetSize, new System.Windows.Point(0, 0));
+
+        // Assert
+        Assert.Single(placements);
+        // x は (160 - 320) / 2 = -80 (ポップアップの中心がトグルボタンの中心 80 に一致)
+        Assert.Equal(-80.0, placements[0].Point.X);
+        Assert.Equal(34.0, placements[0].Point.Y);
+        Assert.Equal(System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal, placements[0].PrimaryAxis);
     }
 }

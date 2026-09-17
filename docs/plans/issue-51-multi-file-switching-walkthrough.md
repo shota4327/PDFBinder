@@ -34,15 +34,19 @@ Issue #51 に基づき、PDF Binder において複数のPDFファイルを同�
   - 各項目に「アクティブチェックマーク」「ファイル名（変更時は * 付き）」「フルパスツールチップ」「右端の個別閉じるボタン（×）」を配置。
   - ドキュメント未読み込み時はプルダウンを非表示化。
   - ウィンドウタイトル（`Window.Title`）を `ActiveSession.DisplayTitle - PDF Binder` にバインド。
+  - ポップアップの配置を `Placement="Custom"` および `CustomPopupPlacementCallback` に設定し、トグルボタンの中央に揃えて展開するように調整。
 - `src/PDFBinder.App/App.xaml` [MODIFY]:
   - `FileDropdownToggleButtonStyle`, `FileDropdownItemButtonStyle`, `ItemCloseButtonStyle` を定義。
 - `src/PDFBinder.App/MainWindow.xaml.cs` [MODIFY]:
   - `OnClosing` にて `vm.ConfirmSaveAllAsync()` を呼び出し、キャンセル時は `e.Cancel = true` で終了を中断するように連携。
   - プルダウン内の項目選択時および閉じるボタン押下時にポップアップを閉じるイベントハンドラーを追加。
+  - `OnFileDropdownPopupPlacement` / `CalculateFileDropdownPopupPlacement`: トグルボタンの中心とポップアップの中心を水平方向に一致させる座標計算ロジックを実装。
+- `tests/PDFBinder.Tests/TestCollectionBehavior.cs` [NEW]:
+  - Docnet / PDFium ネイティブライブラリの並列リソース競合を防止するテスト実行設定を追加。
 
 ### 5. 基本設計書およびプロジェクト台帳・READMEの更新
 - `docs/basic_design.md`: 複数ファイル起動・切り替え仕様、タイトルバー中央プルダウン仕様、`DocumentSession` モデル定義を反映。
-- `docs/PROJECT.md`: 機能インベントリに `F57` を追加、テスト総数を280件に更新。
+- `docs/PROJECT.md`: 機能インベントリに `F57` を追加、テスト総数を281件に更新。
 - `README.md`: 複数ファイル切り替え機能、起動引数統合、ドラッグ＆ドロップ仕様の更新を反映。
 
 ---
@@ -53,8 +57,8 @@ Issue #51 に基づき、PDF Binder において複数のPDFファイルを同�
 ```pwsh
 dotnet test
 ```
-- **実行結果**: 全280件のテストが **100% PASS**（エラー・スキップ0件）。
-- **新規追加テスト**: `tests/PDFBinder.Tests/ViewModels/MainViewModelMultiFileTests.cs` (12件)
+- **実行結果**: 全281件のテストが **100% PASS**（エラー・スキップ0件）。
+- **新規追加テスト**: `tests/PDFBinder.Tests/ViewModels/MainViewModelMultiFileTests.cs` (13件)
   1. `OpenDocument_WhenMultipleFiles_CreatesSeparateSessionsAndIncreasesDropdownCount`: 複数ファイルオープン時の個別セッション作成とプルダウン件数増加を検証。
   2. `OpenDocument_WhenDuplicateFilePath_ActivatesExistingSessionWithoutDuplicating`: 同一ファイルオープン時の重複防止と既存セッションアクティブ化を検証。
   3. `SwitchDocument_ChangesActiveSessionAndRestoresState`: ドキュメント切り替え時の表示モード・ズーム・ファイル名復元を検証。
@@ -67,6 +71,7 @@ dotnet test
   10. `ConfirmSaveAllAsync_WhenMultipleModifiedDocuments_PromptsSequentially`: 複数変更ドキュメント終了時の順次確認フローを検証。
   11. `ConfirmSaveAllAsync_WhenUserCancels_AbortsAndReturnsFalse`: 終了確認キャンセル時の中断動作を検証。
   12. `DisplayTitle_WhenModified_DisplaysAsterisk`: 変更フラグに応じた `*` 付与表示を検証。
+  13. `CalculateFileDropdownPopupPlacement_CentersPopupHorizontallyBelowTarget`: ポップアップがトグルボタンの中央揃えで配置される座標計算を検証。
 
 ### 2. ビルド検証
 ```pwsh
