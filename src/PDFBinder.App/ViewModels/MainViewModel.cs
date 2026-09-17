@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using PDFBinder.App.Models;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 
@@ -19,17 +20,64 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfRenderer _pdfRenderer;
     private readonly IUndoRedoService _undoRedoService;
 
+    /// <summary>開いているすべてのドキュメントセッション</summary>
+    public ObservableCollection<DocumentSession> Documents { get; } = new();
+
+    /// <summary>現在アクティブなドキュメントセッション</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayFileName))]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
+    [NotifyPropertyChangedFor(nameof(HasOpenDocuments))]
+    [NotifyPropertyChangedFor(nameof(CanUndo))]
+    [NotifyPropertyChangedFor(nameof(CanRedo))]
+    private DocumentSession? _activeSession;
+
+    /// <summary>開いているドキュメントが存在するかどうか</summary>
+    public bool HasOpenDocuments => Documents.Count > 0 && ActiveSession != null;
+
+    /// <summary>タイトルバーに表示するウィンドウタイトル</summary>
+    public string WindowTitle => ActiveSession != null
+        ? $"{ActiveSession.DisplayTitle} - PDF Binder"
+        : "PDF Binder";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayFileName))]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
+    [NotifyPropertyChangedFor(nameof(HasOpenDocuments))]
     private PdfDocumentModel _document = new();
 
     /// <summary>
     /// タイトルバー中央に表示するファイル名を取得します。
     /// 未読み込み時は空文字を返します。
     /// </summary>
-    public string DisplayFileName => string.IsNullOrEmpty(Document.FilePath)
-        ? string.Empty
-        : Path.GetFileName(Document.FilePath);
+    public string DisplayFileName
+    {
+        get
+        {
+            if (ActiveSession != null)
+            {
+                if (!string.IsNullOrEmpty(ActiveSession.Document.FilePath))
+                {
+                    return Path.GetFileName(ActiveSession.Document.FilePath);
+                }
+                if (ActiveSession.Document.Pages.Count > 0)
+                {
+                    return ActiveSession.Document.FileName;
+                }
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrEmpty(Document.FilePath))
+            {
+                return Path.GetFileName(Document.FilePath);
+            }
+            if (Document.Pages.Count > 0)
+            {
+                return Document.FileName;
+            }
+            return string.Empty;
+        }
+    }
 
     [ObservableProperty]
     private bool _isDetailViewActive = true;
@@ -286,8 +334,15 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
-    public bool CanUndo => _undoRedoService.CanUndo;
-    public bool CanRedo => _undoRedoService.CanRedo;
+    public IUndoRedoService CurrentUndoRedoService => ActiveSession?.UndoRedoService ?? _undoRedoService;
+
+    public bool CanUndo => CurrentUndoRedoService.CanUndo;
+    public bool CanRedo => CurrentUndoRedoService.CanRedo;
+
+    /// <summary>
+    /// 未保存の変更を持つドキュメントが1つ以上存在するかどうかを取得します。
+    /// </summary>
+    public bool HasModifiedDocuments => Documents.Any(d => d.Document.IsModified && d.Document.Pages.Count > 0);
 
     public MainViewModel(
         IPdfService? pdfService = null,
@@ -302,11 +357,20 @@ public partial class MainViewModel : ObservableObject
         _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
 
         _document.PropertyChanged += OnDocumentPropertyChanged;
+        _document.Pages.CollectionChanged += OnDocumentPagesCollectionChanged;
 
         _undoRedoService.StateChanged += (s, e) =>
         {
             OnPropertyChanged(nameof(CanUndo));
             OnPropertyChanged(nameof(CanRedo));
+            UndoCommand.NotifyCanExecuteChanged();
+            RedoCommand.NotifyCanExecuteChanged();
+        };
+
+        Documents.CollectionChanged += (s, e) =>
+        {
+            OnPropertyChanged(nameof(HasOpenDocuments));
+            OnPropertyChanged(nameof(WindowTitle));
         };
     }
 
@@ -341,15 +405,128 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    partial void OnActiveSessionChanged(DocumentSession? oldValue, DocumentSession? newValue)
+    {
+        if (oldValue != null)
+        {
+            oldValue.IsActive = false;
+            oldValue.IsDetailViewActive = IsDetailViewActive;
+            oldValue.CurrentPageNumber = DetailEditor?.CurrentPageNumber ?? 1;
+            oldValue.ZoomFactor = DetailEditor?.Zoom ?? 1.0;
+            oldValue.SelectedRibbonTabIndex = SelectedRibbonTabIndex;
+            oldValue.UndoRedoService.StateChanged -= OnSessionUndoRedoStateChanged;
+            oldValue.PropertyChanged -= OnSessionPropertyChanged;
+        }
+
+        if (newValue != null)
+        {
+            newValue.IsActive = true;
+            newValue.UndoRedoService.StateChanged += OnSessionUndoRedoStateChanged;
+            newValue.PropertyChanged += OnSessionPropertyChanged;
+
+            Document = newValue.Document;
+            IsDetailViewActive = newValue.IsDetailViewActive;
+            SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
+
+            DetailEditor?.InitializeDocument(newValue.Document);
+            if (DetailEditor != null)
+            {
+                DetailEditor.Zoom = newValue.ZoomFactor;
+                DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+            }
+        }
+        else
+        {
+            Document = new PdfDocumentModel();
+            DetailEditor?.InitializeDocument(Document);
+            IsDetailViewActive = true;
+            SelectedRibbonTabIndex = 0;
+        }
+
+        NotifySessionStateChanged();
+    }
+
+    private void OnSessionUndoRedoStateChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DocumentSession.DisplayTitle) ||
+            e.PropertyName == nameof(DocumentSession.FullPathOrTitle))
+        {
+            OnPropertyChanged(nameof(DisplayFileName));
+            OnPropertyChanged(nameof(WindowTitle));
+        }
+    }
+
+    private void NotifySessionStateChanged()
+    {
+        OnPropertyChanged(nameof(DisplayFileName));
+        OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(HasOpenDocuments));
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
     partial void OnDocumentChanged(PdfDocumentModel? oldValue, PdfDocumentModel newValue)
     {
         if (oldValue != null)
         {
             oldValue.PropertyChanged -= OnDocumentPropertyChanged;
+            oldValue.Pages.CollectionChanged -= OnDocumentPagesCollectionChanged;
         }
         newValue.PropertyChanged += OnDocumentPropertyChanged;
+        newValue.Pages.CollectionChanged += OnDocumentPagesCollectionChanged;
+
+        if (ActiveSession?.Document != newValue)
+        {
+            var matchedSession = Documents.FirstOrDefault(s => s.Document == newValue);
+            if (matchedSession != null)
+            {
+                ActiveSession = matchedSession;
+            }
+            else if (!string.IsNullOrEmpty(newValue.FilePath) || newValue.Pages.Count > 0)
+            {
+                var newSession = new DocumentSession(newValue);
+                Documents.Add(newSession);
+                ActiveSession = newSession;
+            }
+        }
+
         DetailEditor?.InitializeDocument(newValue);
         OnPropertyChanged(nameof(DisplayFileName));
+        OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(HasOpenDocuments));
+        UpdateDocumentNavigationProperties();
+    }
+
+    private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfDocumentModel.FilePath) ||
+            e.PropertyName == nameof(PdfDocumentModel.FileName) ||
+            e.PropertyName == nameof(PdfDocumentModel.IsModified))
+        {
+            OnPropertyChanged(nameof(DisplayFileName));
+            OnPropertyChanged(nameof(WindowTitle));
+        }
+    }
+
+    private void OnDocumentPagesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(DisplayFileName));
+        OnPropertyChanged(nameof(WindowTitle));
+        UpdateDocumentNavigationProperties();
+    }
+
+    private void UpdateDocumentNavigationProperties()
+    {
         OnPropertyChanged(nameof(CanNavigatePages));
         OnPropertyChanged(nameof(CanGoToPreviousPage));
         OnPropertyChanged(nameof(CanGoToNextPage));
@@ -358,16 +535,101 @@ public partial class MainViewModel : ObservableObject
         GoToNextPageCommand.NotifyCanExecuteChanged();
     }
 
-    private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    /// <summary>
+    /// 指定されたドキュメントセッションへ表示を切り替えます。
+    /// </summary>
+    [RelayCommand]
+    public void SwitchDocument(DocumentSession? session)
     {
-        if (e.PropertyName == nameof(PdfDocumentModel.FilePath) || e.PropertyName == nameof(PdfDocumentModel.FileName))
-        {
-            OnPropertyChanged(nameof(DisplayFileName));
-        }
+        if (session == null || session == ActiveSession) return;
+        if (!Documents.Contains(session)) return;
+
+        ActiveSession = session;
+        StatusMessage = $"{session.Document.FileName} に切り替えました。";
     }
 
     /// <summary>
-    /// PDFファイルを開きます。
+    /// 指定されたドキュメントセッション（省略時はアクティブセッション）を閉じます。
+    /// 未保存の変更がある場合は保存確認を行います。
+    /// </summary>
+    [RelayCommand]
+    public async Task<bool> CloseDocumentAsync(DocumentSession? session = null)
+    {
+        var target = session ?? ActiveSession;
+        if (target == null || !Documents.Contains(target)) return true;
+
+        if (target.Document.IsModified && target.Document.Pages.Count > 0)
+        {
+            ActiveSession = target;
+            var choice = await PromptSaveConfirmationAsync(target.Document.FileName);
+            if (choice == SaveConfirmationResult.Cancel)
+            {
+                return false;
+            }
+            if (choice == SaveConfirmationResult.Save)
+            {
+                bool saved = await SaveDocumentSessionAsync(target);
+                if (!saved)
+                {
+                    return false;
+                }
+            }
+        }
+
+        int targetIndex = Documents.IndexOf(target);
+        bool wasActive = (ActiveSession == target);
+
+        Documents.Remove(target);
+
+        if (wasActive)
+        {
+            if (Documents.Count > 0)
+            {
+                int nextIndex = Math.Clamp(targetIndex, 0, Documents.Count - 1);
+                ActiveSession = Documents[nextIndex];
+            }
+            else
+            {
+                ActiveSession = null;
+            }
+        }
+
+        StatusMessage = Documents.Count > 0
+            ? $"{target.Document.FileName} を閉じました。"
+            : "すべてのドキュメントを閉じました。";
+
+        return true;
+    }
+
+    /// <summary>
+    /// アプリケーション終了時などに、変更のある全ドキュメントの保存確認を順次実行します。
+    /// </summary>
+    public async Task<bool> ConfirmSaveAllAsync()
+    {
+        var modifiedSessions = Documents.Where(d => d.Document.IsModified && d.Document.Pages.Count > 0).ToList();
+        foreach (var session in modifiedSessions)
+        {
+            ActiveSession = session;
+            var choice = await PromptSaveConfirmationAsync(session.Document.FileName);
+            if (choice == SaveConfirmationResult.Cancel)
+            {
+                return false;
+            }
+            if (choice == SaveConfirmationResult.Save)
+            {
+                bool saved = await SaveDocumentSessionAsync(session);
+                if (!saved)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// PDFファイルを開きます。複数選択された場合は別ドキュメントとして順次追加します。
     /// </summary>
     [RelayCommand]
     public async Task OpenDocumentAsync(string? filePath = null)
@@ -377,15 +639,48 @@ public partial class MainViewModel : ObservableObject
             var dialog = new OpenFileDialog
             {
                 Filter = "PDFファイル (*.pdf)|*.pdf|すべてのファイル (*.*)|*.*",
-                Title = "PDFファイルを開く"
+                Title = "PDFファイルを開く",
+                Multiselect = true
             };
 
             if (dialog.ShowDialog() != true) return;
-            filePath = dialog.FileName;
+
+            foreach (var file in dialog.FileNames)
+            {
+                await OpenSingleDocumentAsync(file);
+            }
+            return;
         }
 
-        if (!await ConfirmSaveAndProceedAsync())
+        await OpenSingleDocumentAsync(filePath);
+    }
+
+    /// <summary>
+    /// 単一のPDFファイルを読み込み、新規ドキュメントセッションとして追加・アクティブ化します。
+    /// 既に開かれているファイルの場合は、既存のセッションへ切り替えます。
+    /// </summary>
+    public async Task OpenSingleDocumentAsync(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return;
+
+        string fullPath;
+        try
         {
+            fullPath = Path.GetFullPath(filePath);
+        }
+        catch
+        {
+            fullPath = filePath;
+        }
+
+        var existing = Documents.FirstOrDefault(d =>
+            !string.IsNullOrEmpty(d.Document.FilePath) &&
+            string.Equals(Path.GetFullPath(d.Document.FilePath), fullPath, StringComparison.OrdinalIgnoreCase));
+
+        if (existing != null)
+        {
+            ActiveSession = existing;
+            StatusMessage = $"{existing.Document.FileName} を表示しました。";
             return;
         }
 
@@ -395,11 +690,21 @@ public partial class MainViewModel : ObservableObject
             StatusMessage = "PDFを読み込んでいます...";
 
             var doc = await _pdfService.LoadDocumentAsync(filePath);
-            IsDetailViewActive = true;
-            Document = doc;
-            _undoRedoService.Clear();
+            var session = new DocumentSession(doc);
 
-            StatusMessage = $"{Document.FileName} を読み込みました（全 {Document.PageCount} ページ）";
+            // 未編集かつ0ページの「名称未設定」セッションが存在する場合はそれを除去
+            var emptyUntitled = Documents.FirstOrDefault(d =>
+                string.IsNullOrEmpty(d.Document.FilePath) &&
+                d.Document.Pages.Count == 0 &&
+                !d.Document.IsModified);
+            if (emptyUntitled != null)
+            {
+                Documents.Remove(emptyUntitled);
+            }
+
+            Documents.Add(session);
+            ActiveSession = session;
+            StatusMessage = $"{doc.FileName} を読み込みました（全 {doc.PageCount} ページ）";
         }
         catch (Exception ex)
         {
@@ -412,7 +717,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 外部PDFを末尾または任意の位置に結合・追加します。
+    /// 外部PDFを現在のアクティブドキュメントの末尾または任意の位置に結合・追加します。
     /// </summary>
     [RelayCommand]
     public async Task AppendDocumentAsync(string? filePath = null)
@@ -427,6 +732,12 @@ public partial class MainViewModel : ObservableObject
 
             if (dialog.ShowDialog() != true) return;
             filePath = dialog.FileName;
+        }
+
+        if (ActiveSession == null || Documents.Count == 0)
+        {
+            await OpenSingleDocumentAsync(filePath);
+            return;
         }
 
         try
@@ -455,8 +766,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// ドロップされた外部ファイル群（PDFファイル）を順次読み込み・結合処理します。
-    /// 未読み込み時は先頭ファイルを新規オープンし、以降のファイルを末尾に順次結合します。
+    /// ドロップされた外部ファイル群（PDFファイル）を別ドキュメントとして順次開きます。
     /// </summary>
     /// <param name="filePaths">ドロップされたファイルパス一覧</param>
     public async Task HandleFileDropAsync(IEnumerable<string>? filePaths)
@@ -471,14 +781,7 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var file in pdfFiles)
         {
-            if (Document.Pages.Count == 0)
-            {
-                await OpenDocumentAsync(file);
-            }
-            else
-            {
-                await AppendDocumentAsync(file);
-            }
+            await OpenSingleDocumentAsync(file);
         }
     }
 
@@ -593,42 +896,63 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     /// <returns>保存に成功した場合はtrue、キャンセルまたは失敗した場合はfalse</returns>
     [RelayCommand]
-    public async Task<bool> SaveDocumentAsync()
-    {
-        if (string.IsNullOrEmpty(Document.FilePath))
-        {
-            return await SaveDocumentAsAsync();
-        }
-
-        return await ExecuteSaveAsync(Document.FilePath);
-    }
+    public async Task<bool> SaveDocumentAsync() => await SaveDocumentSessionAsync(ActiveSession);
 
     /// <summary>
     /// 名前を付けて保存を実行します。
     /// </summary>
     /// <returns>保存に成功した場合はtrue、キャンセルまたは失敗した場合はfalse</returns>
     [RelayCommand]
-    public async Task<bool> SaveDocumentAsAsync()
+    public async Task<bool> SaveDocumentAsAsync() => await SaveDocumentAsSessionAsync(ActiveSession);
+
+    /// <summary>
+    /// 指定されたセッション（未指定時はアクティブセッションまたは現在のDocument）を上書き保存します。
+    /// </summary>
+    public async Task<bool> SaveDocumentSessionAsync(DocumentSession? session = null)
     {
+        var targetDoc = session?.Document ?? ActiveSession?.Document ?? Document;
+
+        if (string.IsNullOrEmpty(targetDoc.FilePath))
+        {
+            return await SaveDocumentAsSessionAsync(session);
+        }
+
+        return await ExecuteSaveForDocumentAsync(targetDoc, targetDoc.FilePath);
+    }
+
+    /// <summary>
+    /// 指定されたセッション（未指定時はアクティブセッションまたは現在のDocument）を名前を付けて保存します。
+    /// </summary>
+    public async Task<bool> SaveDocumentAsSessionAsync(DocumentSession? session = null)
+    {
+        var targetDoc = session?.Document ?? ActiveSession?.Document ?? Document;
+
         var dialog = new SaveFileDialog
         {
             Filter = "PDFファイル (*.pdf)|*.pdf",
             Title = "PDFファイルを保存",
-            FileName = Document.FileName
+            FileName = targetDoc.FileName
         };
 
         if (dialog.ShowDialog() != true) return false;
-        return await ExecuteSaveAsync(dialog.FileName);
+        return await ExecuteSaveForDocumentAsync(targetDoc, dialog.FileName);
     }
 
     private async Task<bool> ExecuteSaveAsync(string targetPath)
+    {
+        return await ExecuteSaveForDocumentAsync(Document, targetPath);
+    }
+
+    private async Task<bool> ExecuteSaveForDocumentAsync(PdfDocumentModel doc, string targetPath)
     {
         try
         {
             IsLoading = true;
             StatusMessage = "保存しています...";
 
-            await _pdfService.SaveDocumentAsync(Document, targetPath);
+            await _pdfService.SaveDocumentAsync(doc, targetPath);
+            doc.FilePath = targetPath;
+            doc.IsModified = false;
             StatusMessage = $"保存しました: {targetPath}";
             return true;
         }
@@ -644,11 +968,27 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 白紙ページを追加します。
+    /// 白紙ページを追加します。ドキュメント未読み込み時は新規「名称未設定.pdf」を作成します。
     /// </summary>
     [RelayCommand]
     public void AddBlankPage()
     {
+        if (ActiveSession == null || Documents.Count == 0)
+        {
+            var newDoc = new PdfDocumentModel();
+            var blankPage = _pdfService.CreateBlankPage(595.28, 841.89);
+            var session = new DocumentSession(newDoc);
+            Documents.Add(session);
+            ActiveSession = session;
+
+            var insertCmd = new InsertPageCommand(newDoc, blankPage, 0);
+            session.UndoRedoService.Execute(insertCmd);
+
+            DetailEditor?.InitializeDocument(newDoc);
+            StatusMessage = "白紙ページを追加しました。";
+            return;
+        }
+
         var selected = Document.Pages.FirstOrDefault(p => p.IsSelected) ?? (IsDetailViewActive ? DetailEditor?.CurrentPage : null);
         double w = selected?.Width ?? 595.28;
         double h = selected?.Height ?? 841.89;
@@ -657,7 +997,7 @@ public partial class MainViewModel : ObservableObject
         int insertIdx = selected != null ? Document.Pages.IndexOf(selected) + 1 : Document.Pages.Count;
 
         var cmd = new InsertPageCommand(Document, blank, insertIdx);
-        _undoRedoService.Execute(cmd);
+        CurrentUndoRedoService.Execute(cmd);
 
         if (!IsDetailViewActive)
         {
@@ -701,7 +1041,7 @@ public partial class MainViewModel : ObservableObject
 
         if (commands.Count > 0)
         {
-            _undoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの回転"));
+            CurrentUndoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの回転"));
             if (!IsDetailViewActive)
             {
                 _ = RefreshSelectedThumbnailsAsync(targets);
@@ -734,7 +1074,7 @@ public partial class MainViewModel : ObservableObject
             commands.Add(new RemovePageCommand(Document, page, idx));
         }
 
-        _undoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの削除"));
+        CurrentUndoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの削除"));
         DetailEditor?.InitializeDocument(Document);
         StatusMessage = $"{targets.Count} ページを削除しました。";
     }
@@ -817,7 +1157,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (oldIndex == newIndex) return;
         var cmd = new MovePageCommand(Document, oldIndex, newIndex);
-        _undoRedoService.Execute(cmd);
+        CurrentUndoRedoService.Execute(cmd);
         StatusMessage = $"ページ {oldIndex + 1} を {newIndex + 1} へ移動しました。";
     }
 
@@ -877,7 +1217,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void Undo()
     {
-        _undoRedoService.Undo();
+        CurrentUndoRedoService.Undo();
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();
@@ -892,7 +1232,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void Redo()
     {
-        _undoRedoService.Redo();
+        CurrentUndoRedoService.Redo();
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();

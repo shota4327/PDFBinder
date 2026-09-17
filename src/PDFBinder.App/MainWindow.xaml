@@ -7,7 +7,7 @@
         xmlns:vm="clr-namespace:PDFBinder.App.ViewModels"
         xmlns:controls="clr-namespace:PDFBinder.App.Controls"
         mc:Ignorable="d"
-        Title="PDF Binder" Height="760" Width="1100"
+        Title="{Binding WindowTitle}" Height="760" Width="1100"
         MinHeight="500" MinWidth="750"
         Icon="Assets/icon.png"
         WindowStartupLocation="CenterScreen"
@@ -94,12 +94,94 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- 中央：開いているファイル名（ドラッグ可能・クリック透過） -->
-                <TextBlock Text="{Binding DisplayFileName}"
-                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           IsHitTestVisible="False" TextTrimming="CharacterEllipsis"
-                           MaxWidth="500" />
+                <!-- 中央：ファイル切り替えプルダウン（クリック可能にするため IsHitTestVisibleInChrome="True"） -->
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+                      WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- ドキュメントが開かれている場合：プルダウントグルボタン -->
+                    <ToggleButton x:Name="FileDropdownToggle"
+                                  Style="{StaticResource FileDropdownToggleButtonStyle}"
+                                  Visibility="{Binding HasOpenDocuments, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  ToolTip="{Binding ActiveSession.FullPathOrTitle}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ActiveSession.DisplayTitle}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="420"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE5CF;" FontFamily="{StaticResource IconFontFamily}"
+                                       FontSize="16" Margin="4,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <!-- ドロップダウンポップアップ -->
+                    <Popup IsOpen="{Binding IsChecked, ElementName=FileDropdownToggle, Mode=TwoWay}"
+                           StaysOpen="False"
+                           PlacementTarget="{Binding ElementName=FileDropdownToggle}"
+                           Placement="Bottom"
+                           AllowsTransparency="True">
+                        <Border Background="{StaticResource SurfaceBackgroundBrush}"
+                                BorderBrush="{StaticResource SurfaceBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="4"
+                                MinWidth="280" MaxWidth="500" MaxHeight="350">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.4" Color="#000000" />
+                            </Border.Effect>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding Documents}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="1,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- ファイル選択ボタン -->
+                                                <Button Grid.Column="0"
+                                                        Style="{StaticResource FileDropdownItemButtonStyle}"
+                                                        Command="{Binding DataContext.SwitchDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Click="OnFileDropdownItemClick"
+                                                        ToolTip="{Binding FullPathOrTitle}">
+                                                    <Grid HorizontalAlignment="Stretch">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="22" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- アクティブチェックマーク -->
+                                                        <TextBlock Grid.Column="0" Text="&#xE876;" FontFamily="{StaticResource IconFontFamily}" FontSize="14"
+                                                                   Foreground="{StaticResource AccentBrush}"
+                                                                   HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                        <!-- ファイル名（変更時は * 付き） -->
+                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayTitle}"
+                                                                   FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="2,0,4,0" />
+                                                    </Grid>
+                                                </Button>
+
+                                                <!-- 個別閉じるボタン（×） -->
+                                                <Button Grid.Column="1"
+                                                        Style="{StaticResource ItemCloseButtonStyle}"
+                                                        Command="{Binding DataContext.CloseDocumentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Click="OnFileDropdownCloseClick"
+                                                        ToolTip="閉じる">
+                                                    <TextBlock Text="&#xE5CD;" FontFamily="{StaticResource IconFontFamily}" FontSize="12" />
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
 
                 <!-- 右側：ウィンドウキャプションボタン（最小化・最大化・閉じる） -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch"

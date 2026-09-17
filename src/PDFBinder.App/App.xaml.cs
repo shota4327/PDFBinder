@@ -12,7 +12,7 @@ public partial class App : Application
 {
     /// <summary>
     /// アプリケーション起動時の処理を行います。
-    /// コマンドライン引数を解析し、対象PDFの自動読み込みおよび複数ファイル指定時の別プロセス起動を制御します。
+    /// コマンドライン引数を解析し、対象PDFの自動読み込みおよび複数ファイル指定時の同一ウィンドウ内オープンを制御します。
     /// </summary>
     /// <param name="e">起動イベント引数</param>
     protected override async void OnStartup(StartupEventArgs e)
@@ -21,19 +21,20 @@ public partial class App : Application
 
         var parseResult = CommandLineArgsHelper.Parse(e.Args);
 
-        // 複数ファイルが渡された場合、2つ目以降のファイルを別プロセスとして起動
-        foreach (var additionalFile in parseResult.AdditionalFiles)
-        {
-            CommandLineArgsHelper.LaunchAdditionalProcess(additionalFile);
-        }
-
         var mainWindow = new MainWindow();
         MainWindow = mainWindow;
         mainWindow.Show();
 
+        var startupFiles = new List<string>();
         if (!string.IsNullOrEmpty(parseResult.PrimaryFile))
         {
-            await LoadStartupFileAsync(mainWindow, parseResult.PrimaryFile);
+            startupFiles.Add(parseResult.PrimaryFile);
+        }
+        startupFiles.AddRange(parseResult.AdditionalFiles);
+
+        foreach (var file in startupFiles)
+        {
+            await LoadStartupFileAsync(mainWindow, file);
         }
     }
 
