@@ -296,7 +296,7 @@
                                 </StackPanel>
                             </ToggleButton>
 
-                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="{Binding DetailEditor.PenPressureToolTip}"
+                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="筆圧感知（ペン使用時のみ）"
                                           IsChecked="{Binding DetailEditor.IsPenPressureEnabled, Mode=TwoWay}"
                                           IsEnabled="{Binding DetailEditor.CanTogglePenPressure}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
