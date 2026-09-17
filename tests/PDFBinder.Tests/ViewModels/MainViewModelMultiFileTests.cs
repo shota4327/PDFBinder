@@ -362,4 +362,57 @@ public class MainViewModelMultiFileTests
         Assert.Equal(34.0, placements[0].Point.Y);
         Assert.Equal(System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal, placements[0].PrimaryAxis);
     }
+
+    [Fact]
+    public async Task OpenSecondDocument_WithFitToWindow_MaintainsFitToWindowAndCalculatesFitZoom()
+    {
+        // Arrange
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+        vm.DetailEditor!.UpdateViewportSize(1000, 800);
+
+        // Act 1: 1つ目のファイルを開く
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocA.pdf");
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+        double fitZoomA = vm.DetailEditor.Zoom;
+        Assert.NotEqual(1.0, fitZoomA);
+
+        // Act 2: 2つ目のファイルを開く（別ページサイズ）
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocB.pdf");
+
+        // Assert: 2つ目のファイルでも FitToWindow が維持され、1.0 に上書きされないこと
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+        Assert.Equal(vm.DetailEditor.FitMode, vm.ActiveSession!.FitMode);
+        Assert.NotEqual(1.0, vm.DetailEditor.Zoom);
+        Assert.Equal(fitZoomA, vm.DetailEditor.Zoom);
+    }
+
+    [Fact]
+    public async Task SwitchDocument_WithManualZoom_RestoresManualZoomWhenFitModeIsNone()
+    {
+        // Arrange
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+        vm.DetailEditor!.UpdateViewportSize(1000, 800);
+
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocA.pdf");
+        var sessionA = vm.ActiveSession!;
+
+        // 手動ズーム（200%）に設定 -> FitMode は None になる
+        vm.DetailEditor.SetZoom(2.0);
+        vm.DetailEditor.FitMode = DetailViewFitMode.None;
+        Assert.Equal(2.0, vm.DetailEditor.Zoom);
+
+        // 2つ目のファイルを開く
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocB.pdf");
+        var sessionB = vm.ActiveSession!;
+        Assert.Equal(DetailViewFitMode.FitToWindow, sessionB.FitMode);
+
+        // Act: DocA に切り替え
+        vm.SwitchDocument(sessionA);
+
+        // Assert: DocA の手動ズーム（2.0）および FitMode.None が復元されること
+        Assert.Equal(DetailViewFitMode.None, vm.DetailEditor.FitMode);
+        Assert.Equal(2.0, vm.DetailEditor.Zoom);
+    }
 }

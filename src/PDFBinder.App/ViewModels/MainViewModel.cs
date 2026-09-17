@@ -182,6 +182,14 @@ public partial class MainViewModel : ObservableObject
             // 2. 未生成または編集済みのサムネイルがあればオンデマンド生成
             _ = EnsureThumbnailsGeneratedAsync();
         }
+        else
+        {
+            // 詳細ビューへ切り替わった際、フィットモードが有効であれば再計算を適用
+            if (DetailEditor != null && DetailEditor.FitMode != DetailViewFitMode.None)
+            {
+                DetailEditor.ApplyFitMode();
+            }
+        }
 
         OnPropertyChanged(nameof(CurrentZoomText));
         OnPropertyChanged(nameof(CanZoomIn));
@@ -394,8 +402,19 @@ public partial class MainViewModel : ObservableObject
 
     private void OnDetailEditorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(DetailEditorViewModel.Zoom))
+        if (e.PropertyName == nameof(DetailEditorViewModel.FitMode))
         {
+            if (ActiveSession != null && DetailEditor != null)
+            {
+                ActiveSession.FitMode = DetailEditor.FitMode;
+            }
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.Zoom))
+        {
+            if (ActiveSession != null && DetailEditor != null)
+            {
+                ActiveSession.ZoomFactor = DetailEditor.Zoom;
+            }
             OnPropertyChanged(nameof(CurrentZoomText));
             OnPropertyChanged(nameof(CanZoomIn));
             OnPropertyChanged(nameof(CanZoomOut));
@@ -431,6 +450,7 @@ public partial class MainViewModel : ObservableObject
             oldValue.IsDetailViewActive = IsDetailViewActive;
             oldValue.CurrentPageNumber = DetailEditor?.CurrentPageNumber ?? 1;
             oldValue.ZoomFactor = DetailEditor?.Zoom ?? 1.0;
+            oldValue.FitMode = DetailEditor?.FitMode ?? DetailViewFitMode.FitToWindow;
             oldValue.SelectedRibbonTabIndex = SelectedRibbonTabIndex;
             oldValue.UndoRedoService.StateChanged -= OnSessionUndoRedoStateChanged;
             oldValue.PropertyChanged -= OnSessionPropertyChanged;
@@ -449,7 +469,15 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(newValue.Document);
             if (DetailEditor != null)
             {
-                DetailEditor.Zoom = newValue.ZoomFactor;
+                DetailEditor.FitMode = newValue.FitMode;
+                if (newValue.FitMode != DetailViewFitMode.None)
+                {
+                    DetailEditor.ApplyFitMode();
+                }
+                else
+                {
+                    DetailEditor.Zoom = newValue.ZoomFactor;
+                }
                 DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
             }
         }

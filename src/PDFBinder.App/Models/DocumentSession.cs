@@ -28,6 +28,10 @@ public partial class DocumentSession : ObservableObject
     [ObservableProperty]
     private double _zoomFactor = 1.0;
 
+    /// <summary>詳細エディタの表示フィットモード（初期値: ウィンドウに合わせる）</summary>
+    [ObservableProperty]
+    private DetailViewFitMode _fitMode = DetailViewFitMode.FitToWindow;
+
     /// <summary>選択中のリボンタブインデックス（0: PDF編集, 1: 手書き, 2: 表示）</summary>
     [ObservableProperty]
     private int _selectedRibbonTabIndex = 0;
