@@ -59,6 +59,17 @@ public partial class PrintViewModel : ObservableObject
 
     private List<PrintSheetLayout> _currentSheets = new();
 
+    /// <summary>集約数（N-up）の選択項目</summary>
+    public record NUpOptionItem(NUpPagesPerSheet Count, string DisplayName);
+
+    /// <summary>選択可能な集約数の一覧</summary>
+    public IReadOnlyList<NUpOptionItem> AvailableNUpOptions { get; } = new[]
+    {
+        new NUpOptionItem(NUpPagesPerSheet.Two, "2 ページ"),
+        new NUpOptionItem(NUpPagesPerSheet.Four, "4 ページ"),
+        new NUpOptionItem(NUpPagesPerSheet.Eight, "8 ページ")
+    };
+
     /// <summary>印刷完了またはキャンセル時のコールバック</summary>
     public event Action<bool>? RequestClose;
 

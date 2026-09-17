@@ -123,4 +123,17 @@ public class PrintViewModelTests
         vm.PreviousSheetCommand.Execute(null);
         Assert.Equal(1, vm.CurrentSheetIndex);
     }
+
+    [Fact]
+    public void AvailableNUpOptions_ContainsStandardOptions()
+    {
+        var vm = CreateViewModel();
+
+        Assert.NotNull(vm.AvailableNUpOptions);
+        Assert.Equal(3, vm.AvailableNUpOptions.Count);
+        Assert.Equal(NUpPagesPerSheet.Two, vm.AvailableNUpOptions[0].Count);
+        Assert.Equal("2 ページ", vm.AvailableNUpOptions[0].DisplayName);
+        Assert.Equal(NUpPagesPerSheet.Four, vm.AvailableNUpOptions[1].Count);
+        Assert.Equal(NUpPagesPerSheet.Eight, vm.AvailableNUpOptions[2].Count);
+    }
 }
