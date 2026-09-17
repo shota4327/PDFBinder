@@ -925,6 +925,7 @@
                                        AllowsTransparency="True"
                                        Focusable="False"
                                        IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                       PlacementTarget="{Binding ElementName=ToggleButton}"
                                        Placement="Bottom"
                                        PopupAnimation="Slide"
                                        StaysOpen="False">
@@ -934,7 +935,7 @@
                                             BorderThickness="1"
                                             CornerRadius="6"
                                             Margin="0,2,0,0"
-                                            MinWidth="{Binding ActualWidth, ElementName=MainGrid}"
+                                            MinWidth="220"
                                             MaxHeight="260">
                                         <Border.Effect>
                                             <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.4" Color="#000000" />
