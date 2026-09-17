@@ -409,6 +409,13 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm)
         {
             vm.IsDragOver = false;
+
+            // グリッドビュー表示中かつページが存在する場合は、GridView 側の OnGridDrop に委ねる
+            if (!vm.IsDetailViewActive && vm.Document.Pages.Count > 0)
+            {
+                return;
+            }
+
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
@@ -430,11 +437,16 @@ public partial class MainWindow : Window
             if (hasPdf)
             {
                 e.Effects = DragDropEffects.Copy;
-                if (vm.Document.Pages.Count > 0)
+                // 詳細ビュー表示中のみ全画面ドロップオーバーレイを表示
+                if (vm.Document.Pages.Count > 0 && vm.IsDetailViewActive)
                 {
                     vm.IsDragOver = true;
+                    e.Handled = true;
                 }
-                e.Handled = true;
+                else
+                {
+                    vm.IsDragOver = false;
+                }
                 return;
             }
         }
@@ -445,6 +457,7 @@ public partial class MainWindow : Window
             vmReset.IsDragOver = false;
         }
     }
+
 
     /// <summary>
     /// ステータスバーのページ番号入力欄でのEnterキー押下時にバインディングを更新してフォーカスを外します。
