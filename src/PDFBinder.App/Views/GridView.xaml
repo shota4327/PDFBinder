@@ -26,20 +26,22 @@
         </Border>
 
         <!-- サムネイル一覧グリッド（最下部スクロール時にカードがステータスバーに隠れないよう下部オフセット62pxを確保） -->
-        <!-- サムネイル一覧グリッド（最下部スクロール時にカードがステータスバーに隠れないよう下部オフセット62pxを確保） -->
         <ScrollViewer x:Name="GridScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Padding="20,20,20,62"
                       Background="Transparent"
                       AllowDrop="True"
-                      MouseLeftButtonDown="OnBackgroundMouseLeftButtonDown"
-                      MouseMove="OnBackgroundMouseMove"
-                      MouseLeftButtonUp="OnBackgroundMouseLeftButtonUp"
+                      PreviewMouseLeftButtonDown="OnGridPreviewMouseLeftButtonDown"
+                      PreviewMouseMove="OnGridPreviewMouseMove"
+                      PreviewMouseLeftButtonUp="OnGridPreviewMouseLeftButtonUp"
                       DragOver="OnGridDragOver"
                       DragLeave="OnGridDragLeave"
                       Drop="OnGridDrop">
-            <Grid x:Name="ItemsHostGrid" Background="Transparent">
+            <Grid x:Name="ItemsHostGrid"
+                  Background="Transparent"
+                  MinHeight="{Binding ViewportHeight, ElementName=GridScrollViewer}"
+                  MinWidth="{Binding ViewportWidth, ElementName=GridScrollViewer}">
                 <ItemsControl x:Name="ThumbnailItemsControl" ItemsSource="{Binding Document.Pages}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -52,7 +54,7 @@
                                     Margin="10"
                                     Background="{StaticResource SurfaceBackgroundBrush}"
                                     CornerRadius="4"
-                                    BorderThickness="2"
+                                    BorderThickness="5"
                                     SnapsToDevicePixels="True"
                                     Cursor="Hand"
                                     MouseLeftButtonDown="OnPageMouseLeftButtonDown"

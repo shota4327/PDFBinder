@@ -384,24 +384,35 @@ public partial class GridView : UserControl
                 double midX = item.Bounds.Left + item.Bounds.Width / 2.0;
                 if (mousePos.X < midX)
                 {
-                    double barX = item.Bounds.Left - 5;
-                    return (item.Index, new Rect(barX, item.Bounds.Top, 4, item.Bounds.Height));
+                    // 先頭アイテムの場合は左側余白に収まるよう配置
+                    double barX = (i == 0) ? Math.Max(4, item.Bounds.Left + 3) : item.Bounds.Left - 2;
+                    double barY = item.Bounds.Top + 10;
+                    double barHeight = Math.Max(20, item.Bounds.Height - 20);
+                    return (item.Index, new Rect(barX, barY, 4, barHeight));
                 }
             }
 
             var lastInRow = rowItems[^1];
-            double afterX = lastInRow.Bounds.Right + 1;
-            return (lastInRow.Index + 1, new Rect(afterX, lastInRow.Bounds.Top, 4, lastInRow.Bounds.Height));
+            double afterX = lastInRow.Bounds.Right - 7;
+            double lastY = lastInRow.Bounds.Top + 10;
+            double lastHeight = Math.Max(20, lastInRow.Bounds.Height - 20);
+            return (lastInRow.Index + 1, new Rect(afterX, lastY, 4, lastHeight));
         }
 
         if (mousePos.Y < itemBounds[0].Bounds.Top)
         {
             var first = itemBounds[0];
-            return (0, new Rect(first.Bounds.Left - 5, first.Bounds.Top, 4, first.Bounds.Height));
+            double barX = Math.Max(4, first.Bounds.Left + 3);
+            double barY = first.Bounds.Top + 10;
+            double barHeight = Math.Max(20, first.Bounds.Height - 20);
+            return (0, new Rect(barX, barY, 4, barHeight));
         }
 
         var last = itemBounds[^1];
-        return (count, new Rect(last.Bounds.Right + 1, last.Bounds.Top, 4, last.Bounds.Height));
+        double endX = last.Bounds.Right - 7;
+        double endY = last.Bounds.Top + 10;
+        double endHeight = Math.Max(20, last.Bounds.Height - 20);
+        return (count, new Rect(endX, endY, 4, endHeight));
     }
 
     /// <summary>
@@ -431,10 +442,32 @@ public partial class GridView : UserControl
     #region ラバーバンド矩形選択（余白ドラッグ複数選択）
 
     /// <summary>
-    /// 余白クリック時に全選択解除および矩形選択ドラッグを開始します。
+    /// 指定された依存関係オブジェクトから祖先の PageBorder を探索します。
     /// </summary>
-    private void OnBackgroundMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private static Border? FindPageBorder(object? originalSource)
     {
+        var dep = originalSource as DependencyObject;
+        while (dep != null)
+        {
+            if (dep is Border border && border.Name == "PageBorder" && border.DataContext is PdfPageModel)
+            {
+                return border;
+            }
+            dep = VisualTreeHelper.GetParent(dep);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// グリッド全体のプレビュー押下を検知し、サムネイル以外の余白クリックであれば全選択解除および矩形選択ドラッグを開始します。
+    /// </summary>
+    private void OnGridPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+
+        // サムネイル上のクリックであればサムネイル側の処理に委ねる
+        if (FindPageBorder(e.OriginalSource) != null) return;
+
         if (ViewModel == null) return;
 
         bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
@@ -459,12 +492,13 @@ public partial class GridView : UserControl
         RubberBandBorder.Visibility = Visibility.Visible;
 
         GridScrollViewer.CaptureMouse();
+        e.Handled = true;
     }
 
     /// <summary>
     /// 矩形選択ドラッグ中の選択ボックス描画および接触アイテムの選択更新を行います。
     /// </summary>
-    private void OnBackgroundMouseMove(object sender, MouseEventArgs e)
+    private void OnGridPreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (!_isRubberBandActive || ViewModel == null) return;
 
@@ -496,18 +530,20 @@ public partial class GridView : UserControl
                     : intersects;
             }
         }
+        e.Handled = true;
     }
 
     /// <summary>
     /// 矩形選択ドラッグを終了します。
     /// </summary>
-    private void OnBackgroundMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void OnGridPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (_isRubberBandActive)
         {
             _isRubberBandActive = false;
             RubberBandBorder.Visibility = Visibility.Collapsed;
             GridScrollViewer.ReleaseMouseCapture();
+            e.Handled = true;
         }
     }
 
