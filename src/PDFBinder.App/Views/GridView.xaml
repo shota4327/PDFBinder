@@ -26,85 +26,94 @@
         </Border>
 
         <!-- サムネイル一覧グリッド（最下部スクロール時にカードがステータスバーに隠れないよう下部オフセット62pxを確保） -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,20,20,62">
-            <ItemsControl ItemsSource="{Binding Document.Pages}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type models:PdfPageModel}">
-                        <Border Width="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Margin="12"
-                                Background="{StaticResource SurfaceBackgroundBrush}"
-                                CornerRadius="8"
-                                BorderThickness="2"
-                                MouseLeftButtonDown="OnCardMouseLeftButtonDown"
-                                MouseMove="OnCardMouseMove"
-                                MouseLeftButtonUp="OnCardMouseLeftButtonUp"
-                                AllowDrop="True"
-                                Drop="OnCardDrop"
-                                DragOver="OnCardDragOver"
-                                Cursor="Hand">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
-                                    <Setter Property="Effect">
-                                        <Setter.Value>
-                                            <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.3" Color="#000000" />
-                                        </Setter.Value>
-                                    </Setter>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                            <Setter Property="Effect">
-                                                <Setter.Value>
-                                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#007ACC" Opacity="0.45" />
-                                                </Setter.Value>
-                                            </Setter>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
+        <!-- サムネイル一覧グリッド（最下部スクロール時にカードがステータスバーに隠れないよう下部オフセット62pxを確保） -->
+        <ScrollViewer x:Name="GridScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="20,20,20,62"
+                      Background="Transparent"
+                      AllowDrop="True"
+                      MouseLeftButtonDown="OnBackgroundMouseLeftButtonDown"
+                      MouseMove="OnBackgroundMouseMove"
+                      MouseLeftButtonUp="OnBackgroundMouseLeftButtonUp"
+                      DragOver="OnGridDragOver"
+                      DragLeave="OnGridDragLeave"
+                      Drop="OnGridDrop">
+            <Grid x:Name="ItemsHostGrid" Background="Transparent">
+                <ItemsControl x:Name="ThumbnailItemsControl" ItemsSource="{Binding Document.Pages}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel x:Name="ThumbnailWrapPanel" Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:PdfPageModel}">
+                            <Border x:Name="PageBorder"
+                                    Margin="10"
+                                    Background="{StaticResource SurfaceBackgroundBrush}"
+                                    CornerRadius="4"
+                                    BorderThickness="2"
+                                    SnapsToDevicePixels="True"
+                                    Cursor="Hand"
+                                    MouseLeftButtonDown="OnPageMouseLeftButtonDown"
+                                    MouseLeftButtonUp="OnPageMouseLeftButtonUp"
+                                    MouseMove="OnPageMouseMove">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="#2E2E2E" />
+                                        <Setter Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="270" Opacity="0.4" Color="#000000" />
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#007ACC" Opacity="0.8" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
 
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                                <!-- サムネイル画像（余計なコンテナ枠を排した純粋表示） -->
+                                <Image Source="{Binding Thumbnail}"
+                                       Width="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                       Stretch="Uniform"
+                                       SnapsToDevicePixels="True"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                                <!-- カード上部: 選択チェックボックス & ページ番号 -->
-                                <Grid Grid.Row="0" Margin="8,6,8,4">
-                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                                    <TextBlock Text="{Binding PageNumber, StringFormat='P.{0}'}" 
-                                               FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" 
-                                               HorizontalAlignment="Right" VerticalAlignment="Center" />
-                                </Grid>
+                <!-- 青い挿入バー（ドラッグ時の移動先・外部PDF追加位置プレビュー） -->
+                <Border x:Name="InsertionIndicator"
+                        Width="4"
+                        Background="#007ACC"
+                        CornerRadius="2"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#0098FF" BlurRadius="8" ShadowDepth="0" Opacity="0.9" />
+                    </Border.Effect>
+                </Border>
 
-                                <!-- カード中央: サムネイル画像 -->
-                                <Border Grid.Row="1" Margin="8,0,8,0" Background="{StaticResource AppBackgroundBrush}" MinHeight="140" CornerRadius="4" ClipToBounds="True">
-                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
-                                </Border>
-
-                                <!-- カード下部: クイックアクションボタン -->
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="4,6">
-                                    <Button ToolTip="左に90°回転" Click="OnRotateCounterClockwiseClick" Style="{StaticResource MiniIconButtonStyle}">
-                                        <TextBlock Text="&#xE419;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
-                                    </Button>
-                                    <Button ToolTip="右に90°回転" Click="OnRotateClockwiseClick" Style="{StaticResource MiniIconButtonStyle}">
-                                        <TextBlock Text="&#xE41A;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
-                                    </Button>
-                                    <Button ToolTip="ページ削除" Click="OnDeletePageClick" Style="{StaticResource MiniIconButtonStyle}" Foreground="{StaticResource DangerBrush}">
-                                        <TextBlock Text="&#xE92E;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                <!-- ラバーバンド矩形選択用のオーバーレイ -->
+                <Canvas x:Name="SelectionCanvas" IsHitTestVisible="False">
+                    <Border x:Name="RubberBandBorder"
+                            BorderBrush="{StaticResource AccentBrush}"
+                            BorderThickness="1"
+                            Background="#33007ACC"
+                            CornerRadius="2"
+                            Visibility="Collapsed" />
+                </Canvas>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </UserControl>

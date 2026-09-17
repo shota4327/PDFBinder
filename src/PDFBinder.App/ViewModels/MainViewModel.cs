@@ -805,6 +805,60 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 外部PDFファイル群の全ページを指定したインデックス位置に挿入・結合します（Undo/Redo対応）。
+    /// </summary>
+    /// <param name="filePaths">PDFファイルのパス一覧</param>
+    /// <param name="insertIndex">挿入先インデックス（0始まり）</param>
+    public async Task InsertPdfFilesAsync(IEnumerable<string>? filePaths, int insertIndex)
+    {
+        if (filePaths == null) return;
+
+        var pdfFiles = filePaths
+            .Where(f => !string.IsNullOrWhiteSpace(f) && f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (pdfFiles.Count == 0) return;
+
+        if (ActiveSession == null || Documents.Count == 0)
+        {
+            await HandleFileDropAsync(pdfFiles);
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "PDFページを挿入しています...";
+
+            var pagesToInsert = new List<PdfPageModel>();
+            foreach (var file in pdfFiles)
+            {
+                var importedDoc = await _pdfService.LoadDocumentAsync(file);
+                pagesToInsert.AddRange(importedDoc.Pages);
+            }
+
+            if (pagesToInsert.Count == 0) return;
+
+            int targetIndex = Math.Clamp(insertIndex, 0, Document.Pages.Count);
+            var cmd = new InsertPagesCommand(Document, pagesToInsert, targetIndex);
+            CurrentUndoRedoService.Execute(cmd);
+
+            DetailEditor?.InitializeDocument(Document);
+            _ = EnsureThumbnailsGeneratedAsync();
+            StatusMessage = $"{pdfFiles.Count} 件のファイルから {pagesToInsert.Count} ページを挿入しました。";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"PDF挿入エラー: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
     [ObservableProperty]
     private bool _isSaveConfirmationVisible;
 
@@ -1180,6 +1234,33 @@ public partial class MainViewModel : ObservableObject
         CurrentUndoRedoService.Execute(cmd);
         StatusMessage = $"ページ {oldIndex + 1} を {newIndex + 1} へ移動しました。";
     }
+
+    /// <summary>
+    /// 指定されたページリストを指定した挿入位置へ一括移動します（Undo/Redo対応）。
+    /// </summary>
+    /// <param name="pagesToMove">移動対象のページ一覧</param>
+    /// <param name="targetIndex">挿入先インデックス</param>
+    public void MovePages(IReadOnlyList<PdfPageModel> pagesToMove, int targetIndex)
+    {
+        if (pagesToMove == null || pagesToMove.Count == 0) return;
+
+        var currentPages = Document.Pages.ToList();
+        var remaining = currentPages.Where(p => !pagesToMove.Contains(p)).ToList();
+
+        int boundedTarget = Math.Clamp(targetIndex, 0, currentPages.Count);
+        int selectedBeforeTarget = currentPages.Take(boundedTarget).Count(pagesToMove.Contains);
+        int effectiveIndex = Math.Clamp(boundedTarget - selectedBeforeTarget, 0, remaining.Count);
+
+        var newOrder = new List<PdfPageModel>(remaining);
+        newOrder.InsertRange(effectiveIndex, pagesToMove);
+
+        if (currentPages.SequenceEqual(newOrder)) return;
+
+        var cmd = new ReorderPagesCommand(Document, currentPages, newOrder);
+        CurrentUndoRedoService.Execute(cmd);
+        StatusMessage = $"{pagesToMove.Count} ページを並び替えました。";
+    }
+
 
     /// <summary>
     /// ページ詳細エディタを開き、指定ページへスクロールします。
