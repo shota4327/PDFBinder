@@ -424,6 +424,100 @@
                 </Setter>
             </Style>
 
+            <!-- タイトルバー用ファイル切替プルダウン トグルボタンスタイル -->
+            <Style TargetType="ToggleButton" x:Key="FileDropdownToggleButtonStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="{StaticResource ControlHoverBrush}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
+                                    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="{StaticResource ControlPressedBrush}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource SurfaceBorderLightBrush}" />
+                                    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- プルダウンリスト内アイテムボタンスタイル -->
+            <Style TargetType="Button" x:Key="FileDropdownItemButtonStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="8,6" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="{StaticResource ControlHoverBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="{StaticResource ControlPressedBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- プルダウン内個別ファイル閉じる（×）ボタンスタイル -->
+            <Style TargetType="Button" x:Key="ItemCloseButtonStyle" BasedOn="{StaticResource BaseFont}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="{StaticResource DangerBackgroundHoverBrush}" />
+                                    <Setter Property="Foreground" Value="{StaticResource DangerHoverBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#5E2020" />
+                                    <Setter Property="Foreground" Value="{StaticResource DangerHoverBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- リボンツールバー用ラジオボタンスタイル（上アイコン・下テキスト・選択状態トグル） -->
             <Style TargetType="RadioButton" x:Key="RibbonToolRadioStyle" BasedOn="{StaticResource BaseFont}">
                 <Setter Property="Background" Value="Transparent" />

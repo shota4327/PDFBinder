@@ -246,7 +246,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DataContext is not MainViewModel vm || !vm.Document.IsModified || vm.Document.Pages.Count == 0)
+        if (DataContext is not MainViewModel vm || !vm.HasModifiedDocuments)
         {
             SaveWindowSettings();
             return;
@@ -259,33 +259,51 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、インアプリオーバーレイを表示
+        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、順次確認を実施
         e.Cancel = true;
 
-        var choice = await vm.PromptSaveConfirmationAsync(vm.Document.FileName);
-        if (choice == SaveConfirmationResult.Cancel)
-        {
-            return;
-        }
-
-        if (choice == SaveConfirmationResult.Discard)
+        bool canClose = await vm.ConfirmSaveAllAsync();
+        if (canClose)
         {
             _isClosingConfirmed = true;
             SaveWindowSettings();
             Close();
-            return;
         }
+    }
 
-        if (choice == SaveConfirmationResult.Save)
+    private void OnFileDropdownItemClick(object sender, RoutedEventArgs e)
+    {
+        if (FindName("FileDropdownToggle") is System.Windows.Controls.Primitives.ToggleButton toggle)
         {
-            bool saved = await vm.SaveDocumentAsync();
-            if (saved)
-            {
-                _isClosingConfirmed = true;
-                SaveWindowSettings();
-                Close();
-            }
+            toggle.IsChecked = false;
         }
+    }
+
+    private void OnFileDropdownCloseClick(object sender, RoutedEventArgs e)
+    {
+        if (FindName("FileDropdownToggle") is System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            toggle.IsChecked = false;
+        }
+    }
+
+    /// <summary>
+    /// タイトルバー中央のファイル切り替えポップアップをトグルボタンの中央揃えで配置します。
+    /// </summary>
+    private CustomPopupPlacement[] OnFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        return CalculateFileDropdownPopupPlacement(popupSize, targetSize, offset);
+    }
+
+    /// <summary>
+    /// ポップアップがトグルボタンの中央下部に揃う座標を計算します（テスト用ヘルパー）。
+    /// </summary>
+    internal static CustomPopupPlacement[] CalculateFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        // トグルボタンの中心とポップアップの中心が一致するように X 座標をオフセット
+        double x = (targetSize.Width - popupSize.Width) / 2.0;
+        double y = targetSize.Height + 2.0;
+        return [new CustomPopupPlacement(new Point(x, y), PopupPrimaryAxis.Horizontal)];
     }
 
     /// <summary>
