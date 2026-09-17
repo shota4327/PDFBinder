@@ -58,19 +58,37 @@ public partial class PdfPageModel : ObservableObject
         IsThumbnailDirty = true;
     }
 
+    private StrokeCollection _inkStrokes = new();
+
     /// <summary>ユーザーによる手書きストロークコレクション</summary>
-    public StrokeCollection InkStrokes { get; set; } = new();
+    public StrokeCollection InkStrokes
+    {
+        get => _inkStrokes;
+        set
+        {
+            if (_inkStrokes == value) return;
+            if (_inkStrokes != null)
+            {
+                _inkStrokes.StrokesChanged -= OnInkStrokesChanged;
+            }
+            _inkStrokes = value ?? new StrokeCollection();
+            _inkStrokes.StrokesChanged += OnInkStrokesChanged;
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>
     /// コンストラクタ
     /// </summary>
     public PdfPageModel()
     {
-        InkStrokes.StrokesChanged += (s, e) =>
-        {
-            IsModified = true;
-            IsThumbnailDirty = true;
-        };
+        _inkStrokes.StrokesChanged += OnInkStrokesChanged;
+    }
+
+    private void OnInkStrokesChanged(object? sender, StrokeCollectionChangedEventArgs e)
+    {
+        IsModified = true;
+        IsThumbnailDirty = true;
     }
 
     /// <summary>
