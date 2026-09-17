@@ -10,11 +10,18 @@ namespace PDFBinder.App.Helpers;
 /// <summary>
 /// コマンドライン引数の解析結果を保持するレコード
 /// </summary>
-/// <param name="PrimaryFile">現在のプロセスで開くべき先頭のPDFファイルパス（存在しない場合はnull）</param>
-/// <param name="AdditionalFiles">別プロセスで開くべき後続のPDFファイルパス一覧</param>
+/// <param name="Files">開くべきPDFファイルパス一覧</param>
+/// <param name="ForceNewWindow">新しいウィンドウでの起動を強制するかどうか</param>
 public readonly record struct CommandLineArgsResult(
-    string? PrimaryFile,
-    IReadOnlyList<string> AdditionalFiles);
+    IReadOnlyList<string> Files,
+    bool ForceNewWindow)
+{
+    /// <summary>後方互換用: 先頭のPDFファイルパス（存在しない場合はnull）</summary>
+    public string? PrimaryFile => Files.Count > 0 ? Files[0] : null;
+
+    /// <summary>後方互換用: 先頭を除く後続のPDFファイルパス一覧</summary>
+    public IReadOnlyList<string> AdditionalFiles => Files.Count > 1 ? Files.Skip(1).ToList() : Array.Empty<string>();
+}
 
 /// <summary>
 /// 起動時コマンドライン引数の解析、PDFファイルパスの抽出、および外部プロセス起動を行うヘルパークラス
@@ -22,18 +29,20 @@ public readonly record struct CommandLineArgsResult(
 public static class CommandLineArgsHelper
 {
     /// <summary>
-    /// 引数一覧からPDFファイルパスを抽出し、先頭ファイルと後続ファイルに分類します。
+    /// 引数一覧からPDFファイルパスを抽出し、新規ウィンドウ指定オプションの有無を解析します。
     /// </summary>
     /// <param name="args">コマンドライン引数のコレクション</param>
-    /// <returns>解析結果（PrimaryFile, AdditionalFiles）</returns>
+    /// <returns>解析結果（Files, ForceNewWindow）</returns>
     public static CommandLineArgsResult Parse(IEnumerable<string>? args)
     {
         if (args == null)
         {
-            return new CommandLineArgsResult(null, Array.Empty<string>());
+            return new CommandLineArgsResult(Array.Empty<string>(), false);
         }
 
         var pdfFiles = new List<string>();
+        bool forceNewWindow = false;
+
         foreach (var rawArg in args)
         {
             if (string.IsNullOrWhiteSpace(rawArg)) continue;
@@ -42,7 +51,15 @@ public static class CommandLineArgsHelper
             var arg = rawArg.Trim().Trim('"', '\'');
             if (string.IsNullOrWhiteSpace(arg)) continue;
 
-            // オプション引数（- または / で始まるもの）は除外
+            // 新規ウィンドウ起動オプション（--new-window または -n）の判定
+            if (string.Equals(arg, "--new-window", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "-n", StringComparison.OrdinalIgnoreCase))
+            {
+                forceNewWindow = true;
+                continue;
+            }
+
+            // その他のオプション引数（- または / で始まるもの）は除外
             if (arg.StartsWith('-') || arg.StartsWith('/')) continue;
 
             // .pdf 拡張子を持つ引数のみを抽出
@@ -51,7 +68,10 @@ public static class CommandLineArgsHelper
             try
             {
                 var fullPath = Path.GetFullPath(arg);
-                pdfFiles.Add(fullPath);
+                if (!pdfFiles.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+                {
+                    pdfFiles.Add(fullPath);
+                }
             }
             catch (Exception)
             {
@@ -59,14 +79,7 @@ public static class CommandLineArgsHelper
             }
         }
 
-        if (pdfFiles.Count == 0)
-        {
-            return new CommandLineArgsResult(null, Array.Empty<string>());
-        }
-
-        var primary = pdfFiles[0];
-        var additional = pdfFiles.Skip(1).ToList();
-        return new CommandLineArgsResult(primary, additional);
+        return new CommandLineArgsResult(pdfFiles, forceNewWindow);
     }
 
     /// <summary>

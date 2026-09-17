@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         StateChanged += OnWindowStateChanged;
 
         RestoreWindowSettings();
+        WindowActivationHelper.RegisterWindow(this);
     }
 
     /// <summary>
