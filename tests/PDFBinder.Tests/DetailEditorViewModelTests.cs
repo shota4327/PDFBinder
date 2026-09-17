@@ -21,7 +21,21 @@ public class DetailEditorViewModelTests
         public int RenderCallCount { get; private set; }
         public int LastTargetWidth { get; private set; }
         public int LastTargetHeight { get; private set; }
+        public RenderPriority LastPriority { get; private set; } = RenderPriority.Normal;
         public TimeSpan Delay { get; set; } = TimeSpan.Zero;
+
+        public Task<BitmapSource?> RenderPageAsync(
+            string? filePath,
+            int pageIndex,
+            int targetWidth,
+            int targetHeight,
+            PageRotation rotation,
+            CancellationToken cancellationToken,
+            RenderPriority priority)
+        {
+            LastPriority = priority;
+            return RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken);
+        }
 
         public async Task<BitmapSource?> RenderPageAsync(
             string? filePath,
@@ -1055,5 +1069,54 @@ public class DetailEditorViewModelTests
 
         // Assert: 5ページ目は対象外だが既存の背景画像は破棄されず保持されていること
         Assert.Equal(page5OriginalBackground, vm.Pages[4].PageBackground);
+    }
+
+    [Fact]
+    public async Task OnCurrentPageChanged_RapidPageSwitch_DebouncesSafelyWithoutExceptions()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 5; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer) { PageSwitchDebounceDelayMs = 50 };
+        vm.InitializeDocument(doc);
+
+        // Act: ページを高速に切り替え（0 -> 1 -> 2）
+        vm.CurrentPage = doc.Pages[1];
+        await Task.Delay(10);
+        vm.CurrentPage = doc.Pages[2];
+
+        // デバウンス時間経過まで待機
+        await Task.Delay(100);
+
+        // Assert: 例外なく完了し、最終ページの背景画像が生成されていること
+        Assert.Equal(doc.Pages[2], vm.CurrentPage);
+        Assert.NotNull(vm.Pages[2].PageBackground);
+    }
+
+    [Fact]
+    public async Task RenderPageItemAsync_CurrentPageUsesHighPriority()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 700);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer) { DebounceDelayMs = 0 };
+        vm.InitializeDocument(doc);
+
+        // Act
+        await vm.ScheduleDynamicRender(immediate: true, isInitialLoad: false);
+
+        // Assert: カレントページには RenderPriority.High が指定されること
+        Assert.Equal(RenderPriority.High, renderer.LastPriority);
     }
 }

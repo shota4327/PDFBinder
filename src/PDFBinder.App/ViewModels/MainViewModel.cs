@@ -1310,7 +1310,9 @@ public partial class MainViewModel : ObservableObject
                 page.OriginalPageIndex,
                 ThumbnailRenderWidth,
                 ThumbnailRenderHeight,
-                page.RenderRotation);
+                page.RenderRotation,
+                CancellationToken.None,
+                RenderPriority.Low);
         }
 
         if (baseBitmap != null)
@@ -1414,7 +1416,8 @@ public partial class MainViewModel : ObservableObject
                 width,
                 height,
                 page.RenderRotation,
-                ct);
+                ct,
+                RenderPriority.Normal);
         }
 
         if (baseBitmap != null && page.InkStrokes.Count > 0)
