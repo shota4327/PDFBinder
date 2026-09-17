@@ -243,7 +243,7 @@
                             </Button>
                             <Button Command="{Binding ShowPrintDialogCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="印刷 (Ctrl+P)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xE749;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xE8AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="印刷" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
@@ -740,14 +740,16 @@
               Background="#80000000"
               Focusable="False"
               Panel.ZIndex="1001">
-            <Border Width="880" Height="600" MaxWidth="960" MaxHeight="660"
-                    HorizontalAlignment="Center"
+            <Border HorizontalAlignment="Stretch"
                     VerticalAlignment="Center"
+                    Height="750"
+                    MaxHeight="780"
+                    Margin="24,0"
                     Background="{StaticResource SurfaceBackgroundBrush}"
                     BorderBrush="{StaticResource SurfaceBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="12"
-                    Padding="20"
+                    Padding="22"
                     DataContext="{Binding PrintViewModel}">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="28" Color="#000000" Direction="270" Opacity="0.5" ShadowDepth="8" />
@@ -760,173 +762,217 @@
                     </Grid.RowDefinitions>
 
                     <!-- ヘッダー（アイコンとタイトル） -->
-                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,12">
-                        <Border Width="32" Height="32" Background="#094771" CornerRadius="16" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE749;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="{StaticResource AccentBrush}"
+                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="34" Height="34" Background="#094771" CornerRadius="17" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE8AD;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="{StaticResource AccentBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="印刷" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="印刷" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </DockPanel>
 
-                    <!-- メインコンテンツ（左右2分割） -->
+                    <!-- メインコンテンツ（左右2分割：左=設定パネル、右=全幅連動プレビュー） -->
                     <Grid Grid.Row="1" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="340" />
+                            <ColumnDefinition Width="360" />
                             <ColumnDefinition Width="1" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <!-- 左側：設定パネル -->
-                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,0">
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,16,0">
                             <StackPanel>
-                                <!-- プリンター選択 -->
-                                <TextBlock Text="プリンター" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                                <!-- プリンター選択（タイトルバー風モダン ComboBox） -->
+                                <TextBlock Text="プリンター" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
                                 <ComboBox ItemsSource="{Binding Printers}"
                                           SelectedItem="{Binding Settings.PrinterName, Mode=TwoWay}"
-                                          Style="{StaticResource DarkComboBoxStyle}"
-                                          Margin="0,0,0,12" />
+                                          Style="{StaticResource ModernDarkComboBoxStyle}"
+                                          Margin="0,0,0,14" />
 
-                                <!-- 部数 -->
-                                <TextBlock Text="部数" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <Grid HorizontalAlignment="Left" Margin="0,0,0,12">
+                                <!-- 部数（ステータスバーズームコントロールと同様の一体型デザイン） -->
+                                <TextBlock Text="部数" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Border Background="#1E1E1E" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1" CornerRadius="4"
+                                        HorizontalAlignment="Left" Margin="0,0,0,14">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Command="{Binding DecreaseCopiesCommand}" Style="{StaticResource MiniIconButtonStyle}"
+                                                ToolTip="部数を減らす" Width="34" Height="30">
+                                            <TextBlock Text="&#xE15B;" FontFamily="{StaticResource IconFontFamily}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        </Button>
+                                        <TextBox Text="{Binding Settings.Copies, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Foreground="{StaticResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0"
+                                                 FontSize="13" FontWeight="SemiBold" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                 Width="44" Height="30" CaretBrush="{StaticResource TextPrimaryBrush}" />
+                                        <Button Command="{Binding IncreaseCopiesCommand}" Style="{StaticResource MiniIconButtonStyle}"
+                                                ToolTip="部数を増やす" Width="34" Height="30">
+                                            <TextBlock Text="&#xE145;" FontFamily="{StaticResource IconFontFamily}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 印刷の向き（ボタントグル） -->
+                                <TextBlock Text="用紙の向き" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Grid Margin="0,0,0,14">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="50" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Command="{Binding DecreaseCopiesCommand}" Content="-" Style="{StaticResource SecondaryButtonStyle}" Padding="8,3" MinWidth="28" />
-                                    <TextBox Grid.Column="1" Text="{Binding Settings.Copies, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource DarkTextBoxStyle}" HorizontalContentAlignment="Center" Margin="4,0" />
-                                    <Button Grid.Column="2" Command="{Binding IncreaseCopiesCommand}" Content="+" Style="{StaticResource SecondaryButtonStyle}" Padding="8,3" MinWidth="28" />
+                                    <RadioButton Grid.Column="0" Content="縦" Style="{StaticResource DarkToggleRadioButtonStyle}"
+                                                 IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Portrait}" />
+                                    <RadioButton Grid.Column="2" Content="横" Style="{StaticResource DarkToggleRadioButtonStyle}"
+                                                 IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Landscape}" />
                                 </Grid>
 
-                                <!-- 印刷の向き -->
-                                <TextBlock Text="用紙の向き" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                    <RadioButton Content="縦" Style="{StaticResource DarkRadioButtonStyle}" Margin="0,0,16,0"
-                                                 IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Portrait}" />
-                                    <RadioButton Content="横" Style="{StaticResource DarkRadioButtonStyle}"
-                                                 IsChecked="{Binding Settings.Orientation, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Landscape}" />
-                                </StackPanel>
-
-                                <!-- 用紙サイズ -->
-                                <TextBlock Text="用紙サイズ" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                    <RadioButton Content="A4" Style="{StaticResource DarkRadioButtonStyle}" Margin="0,0,16,0"
+                                <!-- 用紙サイズ（ボタントグル） -->
+                                <TextBlock Text="用紙サイズ" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0" Content="A4" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.PaperSize, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=A4}" />
-                                    <RadioButton Content="A3" Style="{StaticResource DarkRadioButtonStyle}"
+                                    <RadioButton Grid.Column="2" Content="A3" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.PaperSize, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=A3}" />
-                                </StackPanel>
+                                </Grid>
 
-                                <!-- 両面印刷 -->
-                                <TextBlock Text="両面印刷" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <StackPanel Margin="0,0,0,12">
-                                    <RadioButton Content="片面" Style="{StaticResource DarkRadioButtonStyle}"
+                                <!-- 両面印刷（横並びボタントグル） -->
+                                <TextBlock Text="両面印刷" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="1.35*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="1.35*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0" Content="片面" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.DuplexMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=OneSided}" />
-                                    <RadioButton Content="両面（長辺とじ）" Style="{StaticResource DarkRadioButtonStyle}"
+                                    <RadioButton Grid.Column="2" Content="両面(長辺)" Style="{StaticResource DarkToggleRadioButtonStyle}"
+                                                 ToolTip="両面印刷（長辺とじ）"
                                                  IsChecked="{Binding Settings.DuplexMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=TwoSidedLongEdge}" />
-                                    <RadioButton Content="両面（短辺とじ）" Style="{StaticResource DarkRadioButtonStyle}"
+                                    <RadioButton Grid.Column="4" Content="両面(短辺)" Style="{StaticResource DarkToggleRadioButtonStyle}"
+                                                 ToolTip="両面印刷（短辺とじ）"
                                                  IsChecked="{Binding Settings.DuplexMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=TwoSidedShortEdge}" />
-                                </StackPanel>
+                                </Grid>
 
-                                <!-- 印刷範囲 -->
-                                <TextBlock Text="印刷範囲" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <StackPanel Margin="0,0,0,12">
-                                    <RadioButton Content="すべてのページ" Style="{StaticResource DarkRadioButtonStyle}"
+                                <!-- 印刷範囲（ボタントグル + 直下にカスタム入力欄） -->
+                                <TextBlock Text="印刷範囲" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="1.3*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="1.1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0" Content="すべて" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=AllPages}" />
-                                    <RadioButton Content="現在のページのみ" Style="{StaticResource DarkRadioButtonStyle}"
+                                    <RadioButton Grid.Column="2" Content="現在のページ" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=CurrentPage}" />
-                                    <RadioButton Content="ページ指定" Style="{StaticResource DarkRadioButtonStyle}" x:Name="CustomRangeRadio"
+                                    <RadioButton Grid.Column="4" Content="ページ指定" Style="{StaticResource DarkToggleRadioButtonStyle}" x:Name="CustomRangeToggle"
                                                  IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Custom}" />
+                                </Grid>
+                                <StackPanel Margin="0,0,0,14">
                                     <TextBox Text="{Binding Settings.CustomRangeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource DarkTextBoxStyle}"
-                                             IsEnabled="{Binding ElementName=CustomRangeRadio, Path=IsChecked}"
-                                             Margin="20,2,0,0" ToolTip="例: 1-3, 5, 8" />
-                                    <TextBlock Text="{Binding RangeErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" Margin="20,2,0,0"
+                                             IsEnabled="{Binding ElementName=CustomRangeToggle, Path=IsChecked}"
+                                             ToolTip="例: 1-3, 5, 8" Margin="0,2,0,0" />
+                                    <TextBlock Text="{Binding RangeErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" Margin="0,3,0,0"
                                                Visibility="{Binding RangeErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" />
                                 </StackPanel>
 
-                                <!-- 印刷モード -->
-                                <TextBlock Text="印刷モード" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                                <StackPanel Margin="0,0,0,8">
-                                    <RadioButton Content="用紙サイズに合わせる" Style="{StaticResource DarkRadioButtonStyle}"
+                                <!-- 印刷モード（ボタントグル + 集約数プルダウン） -->
+                                <TextBlock Text="印刷モード" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.4*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="4" />
+                                        <ColumnDefinition Width="1.2*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0" Content="サイズに合わせる" Style="{StaticResource DarkToggleRadioButtonStyle}"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=FitToPage}" />
-                                    <RadioButton Content="１ページに集約" Style="{StaticResource DarkRadioButtonStyle}" x:Name="NUpRadio"
+                                    <RadioButton Grid.Column="2" Content="1Pに集約" Style="{StaticResource DarkToggleRadioButtonStyle}" x:Name="NUpToggle"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=NUp}" />
-                                    <StackPanel Orientation="Horizontal" Margin="20,2,0,4" IsEnabled="{Binding ElementName=NUpRadio, Path=IsChecked}">
-                                        <TextBlock Text="集約数:" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                        <ComboBox SelectedValue="{Binding Settings.NUpCount, Mode=TwoWay}"
-                                                  SelectedValuePath="Tag"
-                                                  Style="{StaticResource DarkComboBoxStyle}" Width="100">
-                                            <ComboBoxItem Content="2ページ" Tag="{x:Static core:NUpPagesPerSheet.Two}" />
-                                            <ComboBoxItem Content="4ページ" Tag="{x:Static core:NUpPagesPerSheet.Four}" />
-                                            <ComboBoxItem Content="8ページ" Tag="{x:Static core:NUpPagesPerSheet.Eight}" />
-                                        </ComboBox>
-                                    </StackPanel>
-                                    <RadioButton Content="冊子形式（製本）" Style="{StaticResource DarkRadioButtonStyle}"
+                                    <RadioButton Grid.Column="4" Content="冊子(製本)" Style="{StaticResource DarkToggleRadioButtonStyle}"
+                                                 ToolTip="二つ折り中綴じ用に自動面付け（用紙は横向き・両面短辺とじ）"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Booklet}" />
-                                </StackPanel>
+                                </Grid>
+                                <DockPanel Margin="0,2,0,8" IsEnabled="{Binding ElementName=NUpToggle, Path=IsChecked}">
+                                    <TextBlock Text="集約数:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <ComboBox SelectedValue="{Binding Settings.NUpCount, Mode=TwoWay}"
+                                              SelectedValuePath="Tag"
+                                              Style="{StaticResource ModernDarkComboBoxStyle}" Width="140" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="2 ページ" Tag="{x:Static core:NUpPagesPerSheet.Two}" />
+                                        <ComboBoxItem Content="4 ページ" Tag="{x:Static core:NUpPagesPerSheet.Four}" />
+                                        <ComboBoxItem Content="8 ページ" Tag="{x:Static core:NUpPagesPerSheet.Eight}" />
+                                    </ComboBox>
+                                </DockPanel>
                             </StackPanel>
                         </ScrollViewer>
 
                         <!-- 縦仕切り線 -->
                         <Border Grid.Column="1" Background="{StaticResource SurfaceBorderBrush}" Margin="0,4" />
 
-                        <!-- 右側：プレビュー領域 -->
-                        <Grid Grid.Column="2" Margin="14,0,0,0">
+                        <!-- 右側：全幅連動プレビュー領域 -->
+                        <Grid Grid.Column="2" Margin="16,0,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <!-- 用紙プレビュー表示領域（ダーク背景） -->
-                            <Border Grid.Row="0" Background="#161616" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+                            <Border Grid.Row="0" Background="#161616" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="18">
                                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <!-- 用紙シャドウと紙面 -->
                                     <Border Background="White" CornerRadius="2">
                                         <Border.Effect>
-                                            <DropShadowEffect BlurRadius="12" Color="#000000" Direction="270" Opacity="0.6" ShadowDepth="4" />
+                                            <DropShadowEffect BlurRadius="14" Color="#000000" Direction="270" Opacity="0.6" ShadowDepth="5" />
                                         </Border.Effect>
                                         <Image Source="{Binding PreviewImage}" Stretch="Uniform" />
                                     </Border>
 
                                     <!-- 読み込み中インジケータ -->
-                                    <TextBlock Text="プレビュー生成中..." FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                                    <TextBlock Text="プレビュー生成中..." FontSize="13" Foreground="{StaticResource TextMutedBrush}"
                                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                                Visibility="{Binding IsLoadingPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 </Grid>
                             </Border>
 
                             <!-- プレビュー下部ナビゲーション -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0">
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,12,0,0">
                                 <Button Command="{Binding PreviousSheetCommand}" Style="{StaticResource MiniIconButtonStyle}" Content="◀" ToolTip="前の用紙" Margin="0,0,8,0" />
-                                <TextBlock Text="{Binding DisplaySheetPageText}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding DisplaySheetPageText}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <Button Command="{Binding NextSheetCommand}" Style="{StaticResource MiniIconButtonStyle}" Content="▶" ToolTip="次の用紙" />
                             </StackPanel>
                         </Grid>
                     </Grid>
 
                     <!-- フッター（進捗表示とアクションボタン） -->
-                    <DockPanel Grid.Row="2" LastChildFill="True" Margin="0,4,0,0">
+                    <DockPanel Grid.Row="2" LastChildFill="True" Margin="0,6,0,0">
                         <!-- 進捗情報 -->
                         <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0"
                                     Visibility="{Binding IsPrinting, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Text="{Binding PrintProgressText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                            <ProgressBar Value="{Binding PrintProgressValue}" Style="{StaticResource DarkProgressBarStyle}" Width="200" />
+                            <ProgressBar Value="{Binding PrintProgressValue}" Style="{StaticResource DarkProgressBarStyle}" Width="220" />
                         </StackPanel>
 
                         <!-- アクションボタンエリア -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <Button Style="{StaticResource PrimaryButtonStyle}"
                                     Content="印刷"
-                                    MinWidth="84"
+                                    MinWidth="90"
+                                    Padding="16,7"
                                     Margin="0,0,8,0"
                                     Command="{Binding ExecutePrintCommand}"
                                     IsEnabled="{Binding CanPrint}" />
 
                             <Button Style="{StaticResource SecondaryButtonStyle}"
                                     Content="キャンセル"
-                                    MinWidth="84"
+                                    MinWidth="90"
+                                    Padding="16,7"
                                     Command="{Binding CancelCommand}" />
                         </StackPanel>
                     </DockPanel>
