@@ -64,6 +64,7 @@
 | **F55** | UI・レンダリング | ピクセル整合レンダリング＆テキスト整形最適化（UseLayoutRounding / TextFormattingMode=Display / ClearType / BaseFont継承） | **完了** | Issue #102 / MainWindow, GridView, DetailEditorView, App.xaml |
 | **F56** | 手書き詳細 | 拡大縮小連動ペンホバープレビューカーソル（通常ペン・蛍光ペン・部分消しゴムのズーム倍率連動動的プレビュー、WYSIWYG、最小3px・最大128pxクランプ、メモリ内DIBカーソル生成・キャッシュ） | **完了** | Issue #107 / PenCursorHelper & EditorInkCanvas |
 | **F57** | UI・ファイル管理 | 複数ファイルを開いて切り替える機能（タイトルバー中央プルダウンUI、個別終了・保存確認、独立Undo/Redo＆表示状態保持、複数起動統合） | **完了** | Issue #51 / DocumentSession & MainViewModel |
+| **F58** | UI・印刷 | 印刷機能（インアプリ・オーバーレイ、左右2分割レイアウト、リアルタイムプレビュー、Fit/N-up/冊子中綴じ面付け、System.Printing統合） | **完了** | Issue #45 / WpfPrintService & PrintViewModel |
 
 ---
 
