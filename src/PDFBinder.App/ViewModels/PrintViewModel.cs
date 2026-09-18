@@ -374,16 +374,41 @@ public partial class PrintViewModel : ObservableObject
     {
         if (!CanOpenPrinterSettings) return;
 
-        nint ownerHwnd = nint.Zero;
-        if (Application.Current?.MainWindow != null)
-        {
-            ownerHwnd = new System.Windows.Interop.WindowInteropHelper(Application.Current.MainWindow).Handle;
-        }
-
+        nint ownerHwnd = GetOwnerWindowHandle();
         var result = _printService.ShowPrinterSettingsDialog(Settings.PrinterName, ownerHwnd, Settings.DriverDevMode);
         if (result != null)
         {
             ApplyPrinterSettingsResult(result);
+        }
+    }
+
+    /// <summary>
+    /// モーダルダイアログの親となるメインウィンドウのハンドルを安全に取得します。
+    /// </summary>
+    private static nint GetOwnerWindowHandle()
+    {
+        try
+        {
+            var app = Application.Current;
+            if (app == null) return nint.Zero;
+
+            if (app.Dispatcher.CheckAccess())
+            {
+                return app.MainWindow != null
+                    ? new System.Windows.Interop.WindowInteropHelper(app.MainWindow).Handle
+                    : nint.Zero;
+            }
+
+            return app.Dispatcher.Invoke(() =>
+            {
+                return app.MainWindow != null
+                    ? new System.Windows.Interop.WindowInteropHelper(app.MainWindow).Handle
+                    : nint.Zero;
+            });
+        }
+        catch
+        {
+            return nint.Zero;
         }
     }
 

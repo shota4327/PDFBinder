@@ -780,29 +780,23 @@
                         <!-- 左側：設定パネル -->
                         <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,16,0">
                             <StackPanel>
-                                <!-- プリンター選択 ＆ 印刷設定ボタン -->
+                                <!-- プリンター選択 ＆ 印刷設定ボタン（プリンター名の長さに連動してすぐ右横に配置） -->
                                 <TextBlock Text="プリンター" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
-                                <Grid Margin="0,0,0,14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox Grid.Column="0"
-                                              ItemsSource="{Binding Printers}"
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14" VerticalAlignment="Center">
+                                    <ComboBox ItemsSource="{Binding Printers}"
                                               SelectedItem="{Binding Settings.PrinterName, Mode=TwoWay}"
                                               Style="{StaticResource ModernDarkComboBoxStyle}"
                                               FontSize="14"
-                                              HorizontalAlignment="Stretch" />
-                                    <Button Grid.Column="1"
-                                            Command="{Binding OpenPrinterSettingsCommand}"
+                                              VerticalAlignment="Center" />
+                                    <Button Command="{Binding OpenPrinterSettingsCommand}"
                                             Style="{StaticResource MiniIconButtonStyle}"
                                             ToolTip="プリンターのプロパティ（印刷設定）"
                                             Width="30" Height="28"
                                             Margin="6,0,0,0"
                                             VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE713;" FontFamily="{StaticResource IconFontFamily}" FontSize="15" />
+                                        <TextBlock Text="&#xE8B8;" FontFamily="{StaticResource IconFontFamily}" FontSize="16" />
                                     </Button>
-                                </Grid>
+                                </StackPanel>
 
                                 <!-- 部数（ステータスバーズームコントロールと同様の一体型デザイン） -->
                                 <TextBlock Text="部数" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
