@@ -161,8 +161,9 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 
 ### 5.5 `InkTransformHelper`
 手書きストロークコレクションの幾何学的座標変換・追従回転を担当するコアヘルパー。
-- `void RotateStrokes(StrokeCollection? strokes, PageRotation deltaRotation, double currentDisplayWidth, double currentDisplayHeight)`: 差分回転角度と現在のページ寸法をもとに全ストロークの各頂点座標（およびペン先サイズ）を追従変換
-- `(double X, double Y) TransformPoint(double x, double y, PageRotation deltaRotation, double currentWidth, double currentHeight)`: 単一座標点の幾何学的回転変換
+- `void RotateStrokes(StrokeCollection? strokes, PageRotation deltaRotation, double currentDisplayWidth, double currentDisplayHeight)`: WPF ネイティブの `StrokeCollection.Transform(Matrix, false)` を用いた一括アフィン変換により、大量ストロークでも再アロケーションなしに数ミリ秒で追従回転。90度・270度回転時はペン先寸法（`DrawingAttributes.Width`/`Height`）を自動反転。
+- `Matrix CreateRotationMatrix(PageRotation deltaRotation, double currentWidth, double currentHeight)`: 差分回転角度と元の用紙寸法に応じた変換行列を作成。
+- `(double X, double Y) TransformPoint(double x, double y, PageRotation deltaRotation, double currentWidth, double currentHeight)`: 単一座標点の幾何学的回転変換。
 
 ---
 

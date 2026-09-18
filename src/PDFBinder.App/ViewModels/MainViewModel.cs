@@ -1150,6 +1150,7 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
+                DetailEditor?.OnPageDimensionsChanged();
                 _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
             }
             StatusMessage = $"{targets.Count} ページを回転しました。";
@@ -1353,6 +1354,7 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
+            DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
         }
         StatusMessage = "操作を取り消しました。";
@@ -1368,6 +1370,7 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
+            DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
         }
         StatusMessage = "操作をやり直しました。";
