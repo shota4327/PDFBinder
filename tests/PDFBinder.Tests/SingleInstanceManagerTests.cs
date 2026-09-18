@@ -10,6 +10,7 @@ namespace PDFBinder.Tests;
 /// <summary>
 /// <see cref="SingleInstanceManager"/> の単体テスト
 /// </summary>
+[Collection("SingleInstance")]
 public class SingleInstanceManagerTests
 {
     [Fact]

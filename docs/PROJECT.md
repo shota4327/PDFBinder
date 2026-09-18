@@ -57,14 +57,14 @@
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 342件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 350件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
 | **F55** | UI・レンダリング | ピクセル整合レンダリング＆テキスト整形最適化（UseLayoutRounding / TextFormattingMode=Display / ClearType / BaseFont継承） | **完了** | Issue #102 / MainWindow, GridView, DetailEditorView, App.xaml |
 | **F56** | 手書き詳細 | 拡大縮小連動ペンホバープレビューカーソル（通常ペン・蛍光ペン・部分消しゴムのズーム倍率連動動的プレビュー、WYSIWYG、最小3px・最大128pxクランプ、メモリ内DIBカーソル生成・キャッシュ） | **完了** | Issue #107 / PenCursorHelper & EditorInkCanvas |
 | **F57** | UI・ファイル管理 | 複数ファイルを開いて切り替える機能（タイトルバー中央プルダウンUI、個別終了・保存確認、独立Undo/Redo＆表示状態保持、複数起動統合） | **完了** | Issue #51 / DocumentSession & MainViewModel |
-| **F58** | UI・印刷 | 印刷機能（インアプリ・オーバーレイ、左右2分割レイアウト、リアルタイムプレビュー、Fit/N-up/冊子中綴じ面付け、System.Printing統合） | **完了** | Issue #45 / WpfPrintService & PrintViewModel |
+| **F58** | UI・印刷 | 印刷機能（インアプリ・オーバーレイ、左右2分割レイアウト、リアルタイムプレビュー、Fit/N-up/冊子中綴じ面付け、プリンター印刷設定ダイアログ連携・DEVMODE同期・保持、System.Printing統合） | **完了** | Issue #45, #130 / WpfPrintService, PrinterDevModeHelper & PrintViewModel |
 | **F59** | レンダリング / 安定化 | PDFium排他・優先度制御（PriorityAsyncLock）、ページ高速切替デバウンス、サムネイル仮プレビューによるフリーズ・クラッシュ防止 | **完了** | Issue #118 / PriorityAsyncLock, PdfiumRenderer & DetailEditor |
 
 ---

@@ -14,9 +14,22 @@ public class FakePrintService : IPrintService
     public IReadOnlyList<string> InstalledPrinters { get; set; } = new List<string> { "Printer A", "Printer B" };
     public string? DefaultPrinter { get; set; } = "Printer A";
     public bool PrintResult { get; set; } = true;
+    public PrinterSettingsDialogResult? DialogResultToReturn { get; set; }
+    public int ShowDialogCallCount { get; private set; }
+    public string? LastPrinterNamePassed { get; private set; }
 
     public IReadOnlyList<string> GetInstalledPrinters() => InstalledPrinters;
     public string? GetDefaultPrinterName() => DefaultPrinter;
+
+    public PrinterSettingsDialogResult? ShowPrinterSettingsDialog(
+        string printerName,
+        nint ownerHwnd,
+        byte[]? currentDevMode = null)
+    {
+        ShowDialogCallCount++;
+        LastPrinterNamePassed = printerName;
+        return DialogResultToReturn;
+    }
 
     public Task<bool> PrintAsync(
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
@@ -135,5 +148,82 @@ public class PrintViewModelTests
         Assert.Equal("2 ページ", vm.AvailableNUpOptions[0].DisplayName);
         Assert.Equal(NUpPagesPerSheet.Four, vm.AvailableNUpOptions[1].Count);
         Assert.Equal(NUpPagesPerSheet.Eight, vm.AvailableNUpOptions[2].Count);
+    }
+
+    [Fact]
+    public void CanOpenPrinterSettings_ReflectsPrinterNameAndPrintingState()
+    {
+        var vm = CreateViewModel();
+
+        // プリンター選択済み初期状態
+        Assert.True(vm.CanOpenPrinterSettings);
+        Assert.True(vm.OpenPrinterSettingsCommand.CanExecute(null));
+
+        // プリンター名が空の場合
+        vm.Settings.PrinterName = string.Empty;
+        Assert.False(vm.CanOpenPrinterSettings);
+        Assert.False(vm.OpenPrinterSettingsCommand.CanExecute(null));
+
+        // プリンター名再設定
+        vm.Settings.PrinterName = "Printer B";
+        Assert.True(vm.CanOpenPrinterSettings);
+
+        // 印刷中の場合
+        vm.IsPrinting = true;
+        Assert.False(vm.CanOpenPrinterSettings);
+        Assert.False(vm.OpenPrinterSettingsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void OpenPrinterSettings_WhenConfirmed_AppliesResultAndUpdatesPreview()
+    {
+        var vm = CreateViewModel();
+        var dummyDevMode = new byte[] { 1, 2, 3, 4 };
+        _fakePrintService.DialogResultToReturn = new PrinterSettingsDialogResult(
+            dummyDevMode,
+            PrintPaperSize.A3,
+            PrintOrientation.Landscape,
+            3,
+            PrintDuplexMode.TwoSidedLongEdge);
+
+        vm.OpenPrinterSettingsCommand.Execute(null);
+
+        Assert.Equal(1, _fakePrintService.ShowDialogCallCount);
+        Assert.Equal("Printer A", _fakePrintService.LastPrinterNamePassed);
+        Assert.Equal(PrintPaperSize.A3, vm.Settings.PaperSize);
+        Assert.Equal(PrintOrientation.Landscape, vm.Settings.Orientation);
+        Assert.Equal(3, vm.Settings.Copies);
+        Assert.Equal(PrintDuplexMode.TwoSidedLongEdge, vm.Settings.DuplexMode);
+        Assert.Equal(dummyDevMode, vm.Settings.DriverDevMode);
+    }
+
+    [Fact]
+    public void OpenPrinterSettings_WhenCancelled_LeavesSettingsIntact()
+    {
+        var vm = CreateViewModel();
+        vm.Settings.PaperSize = PrintPaperSize.A4;
+        vm.Settings.Orientation = PrintOrientation.Portrait;
+        vm.Settings.Copies = 1;
+        _fakePrintService.DialogResultToReturn = null; // キャンセル
+
+        vm.OpenPrinterSettingsCommand.Execute(null);
+
+        Assert.Equal(1, _fakePrintService.ShowDialogCallCount);
+        Assert.Equal(PrintPaperSize.A4, vm.Settings.PaperSize);
+        Assert.Equal(PrintOrientation.Portrait, vm.Settings.Orientation);
+        Assert.Equal(1, vm.Settings.Copies);
+        Assert.Null(vm.Settings.DriverDevMode);
+    }
+
+    [Fact]
+    public void PrinterChange_ClearsDriverDevMode()
+    {
+        var vm = CreateViewModel();
+        vm.Settings.DriverDevMode = new byte[] { 10, 20, 30 };
+
+        // 異なるプリンターに切り替え
+        vm.Settings.PrinterName = "Printer B";
+
+        Assert.Null(vm.Settings.DriverDevMode);
     }
 }
