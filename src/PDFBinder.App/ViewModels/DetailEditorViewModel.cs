@@ -452,6 +452,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         ScrollToPageRequested?.Invoke(page);
     }
 
+    private PageRotation _lastObservedRotation = PageRotation.Rotate0;
+
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
         if (oldValue != null)
@@ -461,6 +463,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (newValue != null)
         {
             newValue.PropertyChanged += OnCurrentPagePropertyChanged;
+            _lastObservedRotation = newValue.Rotation;
+        }
+        else
+        {
+            _lastObservedRotation = PageRotation.Rotate0;
         }
 
         OnPropertyChanged(nameof(HasPreviousPage));
@@ -483,8 +490,34 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     private void OnCurrentPagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(PdfPageModel.Rotation) or nameof(PdfPageModel.DisplayWidth) or nameof(PdfPageModel.DisplayHeight))
+        if (e.PropertyName == nameof(PdfPageModel.Rotation) && CurrentPage != null)
         {
+            int deltaDeg = ((int)CurrentPage.Rotation - (int)_lastObservedRotation + 360) % 360;
+            _lastObservedRotation = CurrentPage.Rotation;
+            if (deltaDeg != 0)
+            {
+                CurrentPageItem?.ApplyInstantRotation(deltaDeg);
+                OnPropertyChanged(nameof(PageBackground));
+            }
+            OnPageDimensionsChanged();
+        }
+        else if (e.PropertyName is nameof(PdfPageModel.DisplayWidth) or nameof(PdfPageModel.DisplayHeight))
+        {
+            OnPageDimensionsChanged();
+        }
+    }
+
+    /// <summary>
+    /// 指定されたページアイテムに対して即時幾何回転プレビューを適用します。
+    /// </summary>
+    public void ApplyInstantRotationToPage(PdfPageModel page, int deltaDegrees)
+    {
+        var item = Pages.FirstOrDefault(p => p.Page == page);
+        item?.ApplyInstantRotation(deltaDegrees);
+        if (item == CurrentPageItem)
+        {
+            _lastObservedRotation = page.Rotation;
+            OnPropertyChanged(nameof(PageBackground));
             OnPageDimensionsChanged();
         }
     }

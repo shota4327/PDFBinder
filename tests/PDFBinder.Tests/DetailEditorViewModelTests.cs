@@ -1203,4 +1203,40 @@ public class DetailEditorViewModelTests
         Assert.NotEqual(initialZoom, vm.Zoom);
         Assert.True(vm.Zoom < initialZoom);
     }
+
+    [Fact]
+    public void RotatePage_InstantlyRotatesPageBackgroundAndThumbnail()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+
+        var renderer = new FakePdfRenderer();
+        var originalBg = renderer.CreateBlankPageBitmap(500, 1000, PageRotation.Rotate0);
+        var originalThumb = renderer.CreateBlankPageBitmap(100, 200, PageRotation.Rotate0);
+        page.Thumbnail = originalThumb;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        Assert.NotNull(vm.CurrentPageItem);
+        vm.CurrentPageItem.PageBackground = originalBg;
+
+        // Act: ページを時計回りに90度回転
+        page.RotateClockwise();
+
+        // Assert 1: サムネイルが即座に回転され寸法が反転していること（幅200, 高さ100）
+        Assert.NotNull(page.Thumbnail);
+        Assert.NotSame(originalThumb, page.Thumbnail);
+        Assert.Equal(200, page.Thumbnail.PixelWidth);
+        Assert.Equal(100, page.Thumbnail.PixelHeight);
+
+        // Assert 2: PageBackgroundが即座に幾何回転され寸法が反転していること（幅1000, 高さ500）
+        var rotatedBg = vm.CurrentPageItem.PageBackground;
+        Assert.NotNull(rotatedBg);
+        Assert.NotSame(originalBg, rotatedBg);
+        Assert.Equal(1000, rotatedBg.PixelWidth);
+        Assert.Equal(500, rotatedBg.PixelHeight);
+    }
 }

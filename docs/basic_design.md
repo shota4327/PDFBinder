@@ -165,6 +165,10 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `Matrix CreateRotationMatrix(PageRotation deltaRotation, double currentWidth, double currentHeight)`: 差分回転角度と元の用紙寸法に応じた変換行列を作成。
 - `(double X, double Y) TransformPoint(double x, double y, PageRotation deltaRotation, double currentWidth, double currentHeight)`: 単一座標点の幾何学的回転変換。
 
+### 5.6 `BitmapTransformHelper`
+ビットマップ画像の幾何学的変換（0ms即時回転など）を担当するコアヘルパー。
+- `BitmapSource? CreateRotatedBitmap(BitmapSource? source, int deltaDegrees)`: `TransformedBitmap` と `RotateTransform` を用いて、既存のビットマップをメモリ上で即座に回転させたフリーズ済み画像を生成。回転操作直後の引き伸ばし・歪みを完全防止する仮プレビュー表示や、グリッドビューでのサムネイル即時回転に活用。
+
 ---
 
 ## 6. 画面設計とUI/UXフロー
