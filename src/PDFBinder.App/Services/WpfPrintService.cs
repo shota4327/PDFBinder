@@ -69,8 +69,8 @@ public class WpfPrintService : IPrintService
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 用紙サイズ（ポイント単位: 72 DPI）を算出 (A4: 595.28 x 841.89, A3: 841.89 x 1190.55)
-        var (pageWidth, pageHeight) = GetPaperDimensionsInPoints(settings.PaperSize, settings.Orientation);
+        // 用紙サイズ（WPF論理ピクセル単位: 96 DPI）を算出 (A4: 793.70 x 1122.52, A3: 1122.52 x 1587.40)
+        var (pageWidth, pageHeight) = GetPaperDimensionsInDips(settings.PaperSize, settings.Orientation);
 
         // FixedDocument をバックグラウンド／UI連携で構築
         var fixedDoc = new FixedDocument();
@@ -93,14 +93,14 @@ public class WpfPrintService : IPrintService
     }
 
     /// <summary>
-    /// 用紙サイズおよび向きからポイント単位（1/72インチ）の幅と高さを取得します。
+    /// 用紙サイズおよび向きから WPF 座標系論理ピクセル単位（96 DPI、1/96インチ）の幅と高さを取得します。
     /// </summary>
-    private static (double width, double height) GetPaperDimensionsInPoints(PrintPaperSize size, PrintOrientation orientation)
+    internal static (double width, double height) GetPaperDimensionsInDips(PrintPaperSize size, PrintOrientation orientation)
     {
-        // A4: 210mm x 297mm (約 595.3 x 841.9 pt)
-        // A3: 297mm x 420mm (約 841.9 x 1190.6 pt)
-        double shortSide = size == PrintPaperSize.A3 ? 841.89 : 595.28;
-        double longSide = size == PrintPaperSize.A3 ? 1190.55 : 841.89;
+        // A4: 210mm x 297mm (210 / 25.4 * 96 ≈ 793.70, 297 / 25.4 * 96 ≈ 1122.52 px)
+        // A3: 297mm x 420mm (297 / 25.4 * 96 ≈ 1122.52, 420 / 25.4 * 96 ≈ 1587.40 px)
+        double shortSide = size == PrintPaperSize.A3 ? 1122.52 : 793.70;
+        double longSide = size == PrintPaperSize.A3 ? 1587.40 : 1122.52;
 
         return orientation == PrintOrientation.Landscape
             ? (longSide, shortSide)
