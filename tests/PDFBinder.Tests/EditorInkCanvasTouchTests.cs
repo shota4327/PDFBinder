@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PDFBinder.App.Controls;
 using Xunit;
 
@@ -143,6 +144,68 @@ public class EditorInkCanvasTouchTests
             // クールダウン経過後（200ms経過）はタッチ受付再開
             canvas.SetStylusStateForTesting(isTouching: false, isInRange: false, DateTime.UtcNow.AddMilliseconds(-200));
             Assert.False(canvas.IsStylusSuppressed());
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "Thread timed out");
+    }
+
+    [Fact]
+    public void EditorInkCanvas_IsTouchPromotedMouseEvent_IdentifiesTouchAccurately()
+    {
+        var thread = new Thread(() =>
+        {
+            var canvas = new EditorInkCanvas();
+            var mouseArgs = new MouseEventArgs(Mouse.PrimaryDevice, 0);
+
+            // タッチが存在しない初期状態では通常のマウス操作と判定
+            Assert.False(canvas.IsTouchPromotedMouseEvent(mouseArgs));
+
+            // 手指タッチが登録されている場合はタッチ昇格イベントと判定
+            canvas.AddTouchPointForTesting(1, new Point(50, 50));
+            Assert.True(canvas.IsTouchPromotedMouseEvent(mouseArgs));
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "Thread timed out");
+    }
+
+    [Fact]
+    public void EditorInkCanvas_MousePan_TracksDeltaAndUpdatesStartPoint()
+    {
+        var thread = new Thread(() =>
+        {
+            var canvas = new EditorInkCanvas { ToolMode = EditorToolMode.Hand };
+            var scrollViewer = new ScrollViewer();
+            canvas.SetParentScrollViewerForTesting(scrollViewer);
+
+            // パン開始
+            var startPoint = new Point(100, 100);
+            canvas.StartMousePan(startPoint);
+            Assert.Equal(startPoint, canvas.PanStartPoint);
+
+            // 1回目のドラッグ移動（X方向に10px、Y方向に20px移動）
+            var movePoint1 = new Point(90, 80);
+            var (dx1, dy1) = canvas.ProcessMousePan(movePoint1);
+            Assert.Equal(movePoint1, canvas.PanStartPoint);
+            Assert.Equal(10.0, dx1);
+            Assert.Equal(20.0, dy1);
+
+            // 2回目のドラッグ移動（さらにX方向に5px移動、Yは変化なし）
+            // 基準点が前回位置に更新されているため、累積加算ではなく差分5pxのみが計算される
+            var movePoint2 = new Point(85, 80);
+            var (dx2, dy2) = canvas.ProcessMousePan(movePoint2);
+            Assert.Equal(movePoint2, canvas.PanStartPoint);
+            Assert.Equal(5.0, dx2);
+            Assert.Equal(0.0, dy2);
+
+            // パン終了
+            canvas.EndMousePan();
+            Assert.Null(canvas.PanStartPoint);
         });
 
         thread.SetApartmentState(ApartmentState.STA);

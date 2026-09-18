@@ -363,6 +363,12 @@ public class EditorInkCanvas : InkCanvas
         {
             if (IsStraightLineActive)
             {
+                if (IsTouchPromotedMouseEvent(e))
+                {
+                    base.OnPreviewMouseDown(e);
+                    return;
+                }
+
                 _lineStartPoint = e.GetPosition(this);
                 _currentLinePoint = _lineStartPoint;
                 _isDrawingLine = true;
@@ -373,11 +379,20 @@ public class EditorInkCanvas : InkCanvas
 
             if (ToolMode == EditorToolMode.Hand)
             {
-                _panStartPoint = e.GetPosition(this);
+                if (IsTouchPromotedMouseEvent(e))
+                {
+                    base.OnPreviewMouseDown(e);
+                    return;
+                }
+
                 _parentScrollViewer ??= FindParentScrollViewer(this);
-                CaptureMouse();
-                e.Handled = true;
-                return;
+                if (_parentScrollViewer != null)
+                {
+                    StartMousePan(e.GetPosition(_parentScrollViewer));
+                    CaptureMouse();
+                    e.Handled = true;
+                    return;
+                }
             }
         }
 
@@ -388,6 +403,12 @@ public class EditorInkCanvas : InkCanvas
     {
         if (_isDrawingLine && _lineStartPoint.HasValue)
         {
+            if (IsTouchPromotedMouseEvent(e))
+            {
+                base.OnPreviewMouseMove(e);
+                return;
+            }
+
             _currentLinePoint = e.GetPosition(this);
             InvalidateVisual();
             e.Handled = true;
@@ -396,12 +417,13 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand && _panStartPoint.HasValue && _parentScrollViewer != null)
         {
-            Point current = e.GetPosition(this);
-            double deltaX = _panStartPoint.Value.X - current.X;
-            double deltaY = _panStartPoint.Value.Y - current.Y;
+            if (IsTouchPromotedMouseEvent(e))
+            {
+                base.OnPreviewMouseMove(e);
+                return;
+            }
 
-            _parentScrollViewer.ScrollToHorizontalOffset(_parentScrollViewer.HorizontalOffset + deltaX);
-            _parentScrollViewer.ScrollToVerticalOffset(_parentScrollViewer.VerticalOffset + deltaY);
+            ProcessMousePan(e.GetPosition(_parentScrollViewer));
             e.Handled = true;
             return;
         }
@@ -413,6 +435,12 @@ public class EditorInkCanvas : InkCanvas
     {
         if (_isDrawingLine && _lineStartPoint.HasValue && _currentLinePoint.HasValue)
         {
+            if (IsTouchPromotedMouseEvent(e))
+            {
+                base.OnPreviewMouseUp(e);
+                return;
+            }
+
             ReleaseMouseCapture();
             _isDrawingLine = false;
 
@@ -427,13 +455,83 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand)
         {
-            ReleaseMouseCapture();
-            _panStartPoint = null;
+            if (IsTouchPromotedMouseEvent(e))
+            {
+                base.OnPreviewMouseUp(e);
+                return;
+            }
+
+            EndMousePan();
             e.Handled = true;
             return;
         }
 
         base.OnPreviewMouseUp(e);
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        if (ToolMode == EditorToolMode.Hand)
+        {
+            EndMousePan();
+        }
+
+        if (_isDrawingLine)
+        {
+            _isDrawingLine = false;
+            _lineStartPoint = null;
+            _currentLinePoint = null;
+            InvalidateVisual();
+        }
+
+        base.OnLostMouseCapture(e);
+    }
+
+    /// <summary>
+    /// マウスイベントが手指タッチ操作または昇格されたタッチイベントに起因するものか判定します。
+    /// </summary>
+    internal bool IsTouchPromotedMouseEvent(MouseEventArgs e)
+    {
+        if (_activeTouchPoints.Count > 0 || _capturedTouchDevices.Count > 0) return true;
+        if (e.StylusDevice != null && e.StylusDevice.TabletDevice?.Type == TabletDeviceType.Touch) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// マウスによるパン（手のひらツール）操作を開始します。
+    /// </summary>
+    internal void StartMousePan(Point startPos)
+    {
+        _panStartPoint = startPos;
+    }
+
+    /// <summary>
+    /// マウスによるパン（手のひらツール）の移動差分を親ScrollViewerに反映し、基準点を更新します。
+    /// </summary>
+    internal (double DeltaX, double DeltaY) ProcessMousePan(Point currentPos)
+    {
+        if (!_panStartPoint.HasValue || _parentScrollViewer == null) return (0, 0);
+
+        double deltaX = _panStartPoint.Value.X - currentPos.X;
+        double deltaY = _panStartPoint.Value.Y - currentPos.Y;
+
+        _parentScrollViewer.ScrollToHorizontalOffset(_parentScrollViewer.HorizontalOffset + deltaX);
+        _parentScrollViewer.ScrollToVerticalOffset(_parentScrollViewer.VerticalOffset + deltaY);
+        _panStartPoint = currentPos;
+
+        return (deltaX, deltaY);
+    }
+
+    /// <summary>
+    /// マウスによるパン（手のひらツール）操作を終了します。
+    /// </summary>
+    internal void EndMousePan()
+    {
+        if (IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+        _panStartPoint = null;
     }
 
     #region スタイラスペン・パームリジェクション処理
@@ -755,6 +853,9 @@ public class EditorInkCanvas : InkCanvas
         _activeTouchPoints[touchId] = newPos;
         return true;
     }
+
+    internal Point? PanStartPoint => _panStartPoint;
+    internal void SetParentScrollViewerForTesting(ScrollViewer sv) => _parentScrollViewer = sv;
 
     #endregion
 
