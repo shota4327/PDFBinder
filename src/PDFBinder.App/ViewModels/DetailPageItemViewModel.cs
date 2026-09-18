@@ -8,8 +8,10 @@ namespace PDFBinder.App.ViewModels;
 /// <summary>
 /// 詳細エディタにおける各個別ページの表示情報およびレンダリング状態を管理するViewModel
 /// </summary>
-public partial class DetailPageItemViewModel : ObservableObject
+public partial class DetailPageItemViewModel : ObservableObject, IDisposable
 {
+    private PageRotation _lastRotation = PageRotation.Rotate0;
+
     /// <summary>
     /// 指定された差分回転角度で現在保持している背景画像およびストロークキャッシュを即座に幾何回転させます。
     /// これにより、PDFium再レンダリング完了までの間の一時的な引き伸ばしや歪みを完全に防止します。
@@ -33,6 +35,36 @@ public partial class DetailPageItemViewModel : ObservableObject
         {
             StrokeCache = BitmapTransformHelper.CreateRotatedBitmap(StrokeCache, deltaDegrees);
         }
+    }
+
+    private void OnPagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfPageModel.Rotation) && Page != null)
+        {
+            int deltaDeg = ((int)Page.Rotation - (int)_lastRotation + 360) % 360;
+            _lastRotation = Page.Rotation;
+            if (deltaDeg != 0)
+            {
+                ApplyInstantRotation(deltaDeg);
+            }
+        }
+    }
+
+    partial void OnPageChanged(PdfPageModel? oldValue, PdfPageModel newValue)
+    {
+        if (oldValue != null)
+        {
+            oldValue.PropertyChanged -= OnPagePropertyChanged;
+        }
+        newValue.PropertyChanged += OnPagePropertyChanged;
+        _lastRotation = newValue.Rotation;
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        Page.PropertyChanged -= OnPagePropertyChanged;
+        GC.SuppressFinalize(this);
     }
     [ObservableProperty]
     private PdfPageModel _page;
@@ -146,5 +178,7 @@ public partial class DetailPageItemViewModel : ObservableObject
     public DetailPageItemViewModel(PdfPageModel page)
     {
         _page = page;
+        _lastRotation = page.Rotation;
+        page.PropertyChanged += OnPagePropertyChanged;
     }
 }

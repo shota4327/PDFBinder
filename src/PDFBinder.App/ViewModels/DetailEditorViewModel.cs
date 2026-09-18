@@ -452,8 +452,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         ScrollToPageRequested?.Invoke(page);
     }
 
-    private PageRotation _lastObservedRotation = PageRotation.Rotate0;
-
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
         if (oldValue != null)
@@ -463,11 +461,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (newValue != null)
         {
             newValue.PropertyChanged += OnCurrentPagePropertyChanged;
-            _lastObservedRotation = newValue.Rotation;
-        }
-        else
-        {
-            _lastObservedRotation = PageRotation.Rotate0;
         }
 
         OnPropertyChanged(nameof(HasPreviousPage));
@@ -490,15 +483,9 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     private void OnCurrentPagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PdfPageModel.Rotation) && CurrentPage != null)
+        if (e.PropertyName == nameof(PdfPageModel.Rotation))
         {
-            int deltaDeg = ((int)CurrentPage.Rotation - (int)_lastObservedRotation + 360) % 360;
-            _lastObservedRotation = CurrentPage.Rotation;
-            if (deltaDeg != 0)
-            {
-                CurrentPageItem?.ApplyInstantRotation(deltaDeg);
-                OnPropertyChanged(nameof(PageBackground));
-            }
+            OnPropertyChanged(nameof(PageBackground));
             OnPageDimensionsChanged();
         }
         else if (e.PropertyName is nameof(PdfPageModel.DisplayWidth) or nameof(PdfPageModel.DisplayHeight))
@@ -516,7 +503,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         item?.ApplyInstantRotation(deltaDegrees);
         if (item == CurrentPageItem)
         {
-            _lastObservedRotation = page.Rotation;
             OnPropertyChanged(nameof(PageBackground));
             OnPageDimensionsChanged();
         }

@@ -1239,4 +1239,42 @@ public class DetailEditorViewModelTests
         Assert.Equal(1000, rotatedBg.PixelWidth);
         Assert.Equal(500, rotatedBg.PixelHeight);
     }
+
+    [Fact]
+    public void RotatePage_ConsecutiveRotations_RotatesExactly90DegreesEachStep()
+    {
+        // Arrange: 縦長ページ（幅500, 高さ1000）
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+
+        var renderer = new FakePdfRenderer();
+        var originalBg = renderer.CreateBlankPageBitmap(500, 1000, PageRotation.Rotate0);
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        Assert.NotNull(vm.CurrentPageItem);
+        vm.CurrentPageItem.PageBackground = originalBg;
+
+        // 1回目の回転 (0 -> 90度): 横長 (1000 x 500)
+        page.RotateClockwise();
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 2回目の回転 (90 -> 180度): 縦長 (500 x 1000)
+        page.RotateClockwise();
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 3回目の回転 (180 -> 270度): 横長 (1000 x 500)
+        page.RotateClockwise();
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 4回目の回転 (270 -> 0度): 縦長 (500 x 1000)
+        page.RotateClockwise();
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground.PixelHeight);
+    }
 }

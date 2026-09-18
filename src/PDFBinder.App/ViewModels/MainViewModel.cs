@@ -1143,15 +1143,6 @@ public partial class MainViewModel : ObservableObject
 
         if (commands.Count > 0)
         {
-            if (IsDetailViewActive && DetailEditor != null)
-            {
-                foreach (var page in targets)
-                {
-                    int delta = ((int)nextRotation(page) - (int)page.Rotation + 360) % 360;
-                    DetailEditor.ApplyInstantRotationToPage(page, delta);
-                }
-            }
-
             CurrentUndoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの回転"));
             if (!IsDetailViewActive)
             {
