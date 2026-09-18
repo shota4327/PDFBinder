@@ -22,7 +22,7 @@
 | **F03** | プロジェクト基盤 | CI・コーディング規約 (`GEMINI.md`) 整備 | **完了** | 初期コミット済 |
 | **F04** | プロジェクト基盤 | 単一EXE発行環境（Self-Contained & Framework-Dependent / `build.ps1`） | **完了** | `dist/PDFBinder.exe` (フレームワーク依存版: 約8.4MB) & `dist/self-contained/PDFBinder.exe` (自己完結版: 約66MB) |
 | **F10** | PDF操作コア | 非破壊ドキュメント読み込み（メモリ展開/ファイルロック回避） | **完了** | PdfService (PdfSharp) |
-| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°、手書きインク追従幾何変換、Undo/Redo同期） | **完了** | Issue #70 / InkTransformHelper / PdfPageModel |
+| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°、手書きインク追従幾何変換、WPFネイティブ一括アフィン変換高速化、回転時FitMode自動再計算追従、Undo/Redo同期） | **完了** | Issue #70, #106 / InkTransformHelper / PdfPageModel |
 | **F12** | PDF操作コア | ページ削除 | **完了** | PdfDocumentModel.RemovePage |
 | **F13** | PDF操作コア | ページ順序入れ替え（Reordering） | **完了** | MovePageCommand / PdfDocumentModel |
 | **F14** | PDF操作コア | 空白ページの追加（隣接サイズ継承 / A4標準） | **完了** | PdfService.CreateBlankPage |
@@ -57,7 +57,7 @@
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 330件全PASS） | **完了** | PDFBinder.Tests |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 342件全PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |

@@ -454,6 +454,15 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
+        if (oldValue != null)
+        {
+            oldValue.PropertyChanged -= OnCurrentPagePropertyChanged;
+        }
+        if (newValue != null)
+        {
+            newValue.PropertyChanged += OnCurrentPagePropertyChanged;
+        }
+
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
@@ -469,6 +478,45 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (PageViewMode == DetailPageViewMode.SinglePage && newValue != null)
         {
             _ = ScheduleDynamicRender(immediate: false, isInitialLoad: false, isPageSwitch: true);
+        }
+    }
+
+    private void OnCurrentPagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfPageModel.Rotation))
+        {
+            OnPropertyChanged(nameof(PageBackground));
+            OnPageDimensionsChanged();
+        }
+        else if (e.PropertyName is nameof(PdfPageModel.DisplayWidth) or nameof(PdfPageModel.DisplayHeight))
+        {
+            OnPageDimensionsChanged();
+        }
+    }
+
+    /// <summary>
+    /// 指定されたページアイテムに対して即時幾何回転プレビューを適用します。
+    /// </summary>
+    public void ApplyInstantRotationToPage(PdfPageModel page, int deltaDegrees)
+    {
+        var item = Pages.FirstOrDefault(p => p.Page == page);
+        item?.ApplyInstantRotation(deltaDegrees);
+        if (item == CurrentPageItem)
+        {
+            OnPropertyChanged(nameof(PageBackground));
+            OnPageDimensionsChanged();
+        }
+    }
+
+    /// <summary>
+    /// カレントページの寸法または回転が変更された際にFitModeを再計算します。
+    /// 単一ページ表示・連続表示のいずれでも、FitModeが有効であれば用紙の新しい向きに合わせて拡大率を再計算・適用します。
+    /// </summary>
+    public void OnPageDimensionsChanged()
+    {
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
         }
     }
 
@@ -1114,6 +1162,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             if (disposing)
             {
+                if (CurrentPage != null)
+                {
+                    CurrentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+                }
                 _renderCts?.Cancel();
                 _renderCts?.Dispose();
                 _renderCts = null;

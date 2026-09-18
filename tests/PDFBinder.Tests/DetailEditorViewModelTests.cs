@@ -1119,4 +1119,162 @@ public class DetailEditorViewModelTests
         // Assert: カレントページには RenderPriority.High が指定されること
         Assert.Equal(RenderPriority.High, renderer.LastPriority);
     }
+
+    [Fact]
+    public void RotatePage_WhenFitModeIsFitToWindow_AutomaticallyUpdatesZoom()
+    {
+        // Arrange: 縦長ページ（幅500, 高さ1000）
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.UpdateViewportSize(800, 1200);
+
+        // FitToWindow を適用
+        vm.SetFitMode(DetailViewFitMode.FitToWindow);
+        double initialZoom = vm.Zoom;
+        Assert.True(initialZoom > 0);
+
+        // Act: ページを時計回りに90度回転（横長: 幅1000, 高さ500 に変化）
+        page.RotateClockwise();
+
+        // Assert: 新しい横長寸法に合わせて自動的にZoomが再計算され、更新されていること
+        Assert.NotEqual(initialZoom, vm.Zoom);
+        // 横幅が500から1000に倍増したため、ウィンドウに収めるためのズーム倍率は初期より小さくなるはず
+        Assert.True(vm.Zoom < initialZoom);
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.FitMode);
+    }
+
+    [Fact]
+    public void RotatePage_WhenFitModeIsNone_MaintainsManualZoom()
+    {
+        // Arrange: 手動ズーム（FitMode = None）
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.UpdateViewportSize(800, 1200);
+
+        // 手動でズームを 2.5 に設定（FitMode = None）
+        vm.SetFitMode(DetailViewFitMode.None);
+        vm.SetZoom(2.5);
+        Assert.Equal(DetailViewFitMode.None, vm.FitMode);
+        Assert.Equal(2.5, vm.Zoom);
+
+        // Act: ページを時計回りに90度回転
+        page.RotateClockwise();
+
+        // Assert: 手動ズーム倍率 2.5 がそのまま維持されること
+        Assert.Equal(2.5, vm.Zoom);
+        Assert.Equal(DetailViewFitMode.None, vm.FitMode);
+    }
+
+    [Fact]
+    public void RotatePage_InContinuousMode_AutomaticallyUpdatesZoom()
+    {
+        // Arrange: 連続表示モード
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.Continuous;
+        vm.UpdateViewportSize(800, 1200);
+
+        // FitToWidth を適用
+        vm.SetFitMode(DetailViewFitMode.FitToWidth);
+        double initialZoom = vm.Zoom;
+
+        // Act: ページを回転
+        page.RotateClockwise();
+
+        // Assert: 連続表示モードでもカレントページの回転に応じて拡大率が自動更新されること
+        Assert.NotEqual(initialZoom, vm.Zoom);
+        Assert.True(vm.Zoom < initialZoom);
+    }
+
+    [Fact]
+    public void RotatePage_InstantlyRotatesPageBackgroundAndThumbnail()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+
+        var renderer = new FakePdfRenderer();
+        var originalBg = renderer.CreateBlankPageBitmap(500, 1000, PageRotation.Rotate0);
+        var originalThumb = renderer.CreateBlankPageBitmap(100, 200, PageRotation.Rotate0);
+        page.Thumbnail = originalThumb;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        Assert.NotNull(vm.CurrentPageItem);
+        vm.CurrentPageItem.PageBackground = originalBg;
+
+        // Act: ページを時計回りに90度回転
+        page.RotateClockwise();
+
+        // Assert 1: サムネイルが即座に回転され寸法が反転していること（幅200, 高さ100）
+        Assert.NotNull(page.Thumbnail);
+        Assert.NotSame(originalThumb, page.Thumbnail);
+        Assert.Equal(200, page.Thumbnail.PixelWidth);
+        Assert.Equal(100, page.Thumbnail.PixelHeight);
+
+        // Assert 2: PageBackgroundが即座に幾何回転され寸法が反転していること（幅1000, 高さ500）
+        var rotatedBg = vm.CurrentPageItem.PageBackground;
+        Assert.NotNull(rotatedBg);
+        Assert.NotSame(originalBg, rotatedBg);
+        Assert.Equal(1000, rotatedBg.PixelWidth);
+        Assert.Equal(500, rotatedBg.PixelHeight);
+    }
+
+    [Fact]
+    public void RotatePage_ConsecutiveRotations_RotatesExactly90DegreesEachStep()
+    {
+        // Arrange: 縦長ページ（幅500, 高さ1000）
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(500, 1000);
+        page.PageNumber = 1;
+
+        var renderer = new FakePdfRenderer();
+        var originalBg = renderer.CreateBlankPageBitmap(500, 1000, PageRotation.Rotate0);
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        Assert.NotNull(vm.CurrentPageItem);
+        vm.CurrentPageItem.PageBackground = originalBg;
+
+        // 1回目の回転 (0 -> 90度): 横長 (1000 x 500)
+        page.RotateClockwise();
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 2回目の回転 (90 -> 180度): 縦長 (500 x 1000)
+        page.RotateClockwise();
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 3回目の回転 (180 -> 270度): 横長 (1000 x 500)
+        page.RotateClockwise();
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground.PixelHeight);
+
+        // 4回目の回転 (270 -> 0度): 縦長 (500 x 1000)
+        page.RotateClockwise();
+        Assert.Equal(500, vm.CurrentPageItem.PageBackground!.PixelWidth);
+        Assert.Equal(1000, vm.CurrentPageItem.PageBackground.PixelHeight);
+    }
 }

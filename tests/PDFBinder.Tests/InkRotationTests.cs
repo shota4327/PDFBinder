@@ -216,4 +216,35 @@ public class InkRotationTests : IDisposable
         Assert.Equal(50, reloadedPage.InkStrokes[0].StylusPoints[0].Y, 1);
         Assert.Equal(Colors.Green, reloadedPage.InkStrokes[0].DrawingAttributes.Color);
     }
+
+    [Fact]
+    public void RotateStrokes_WithLargeNumberOfStrokes_ExecutesQuicklyWithoutAllocatingNewStrokes()
+    {
+        // Arrange: 1,000 本のストロークを生成
+        const int strokeCount = 1000;
+        var strokes = new StrokeCollection();
+        for (int i = 0; i < strokeCount; i++)
+        {
+            var points = new StylusPointCollection
+            {
+                new StylusPoint(i % 500, (i * 2) % 700),
+                new StylusPoint((i % 500) + 10, ((i * 2) % 700) + 10)
+            };
+            strokes.Add(new Stroke(points));
+        }
+
+        var firstStrokeReference = strokes[0];
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Act: 1,000 本のストロークを90度回転
+        InkTransformHelper.RotateStrokes(strokes, PageRotation.Rotate90, 500, 700);
+        sw.Stop();
+
+        // Assert 1: 新しいストロークを再アロケーションせず、既存インスタンスがインプレース変換されていること
+        Assert.Same(firstStrokeReference, strokes[0]);
+        Assert.Equal(strokeCount, strokes.Count);
+
+        // Assert 2: 1,000 本の回転処理が 500ms 未満（通常は数ms〜数十ms）で超高速に完了すること
+        Assert.True(sw.ElapsedMilliseconds < 500, $"回転処理に {sw.ElapsedMilliseconds} ms かかりました。");
+    }
 }

@@ -102,6 +102,10 @@ public partial class PdfPageModel : ObservableObject
         int deltaDeg = ((int)newRotation - (int)Rotation + 360) % 360;
         var delta = PageRotationExtensions.FromDegrees(deltaDeg);
         InkTransformHelper.RotateStrokes(InkStrokes, delta, DisplayWidth, DisplayHeight);
+        if (Thumbnail != null && deltaDeg != 0)
+        {
+            Thumbnail = BitmapTransformHelper.CreateRotatedBitmap(Thumbnail, deltaDeg);
+        }
         Rotation = newRotation;
     }
 
