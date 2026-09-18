@@ -34,6 +34,9 @@ public partial class PrintSettings : ObservableObject
     [ObservableProperty]
     private NUpPagesPerSheet _nUpCount = NUpPagesPerSheet.Two;
 
+    [ObservableProperty]
+    private byte[]? _driverDevMode;
+
     /// <summary>
     /// 設定内容をデフォルト値にリセットします。
     /// </summary>
@@ -48,6 +51,7 @@ public partial class PrintSettings : ObservableObject
         CustomRangeText = string.Empty;
         LayoutMode = PrintLayoutMode.FitToPage;
         NUpCount = NUpPagesPerSheet.Two;
+        DriverDevMode = null;
     }
 
     /// <summary>
@@ -65,5 +69,6 @@ public partial class PrintSettings : ObservableObject
         CustomRangeText = source.CustomRangeText;
         LayoutMode = source.LayoutMode;
         NUpCount = source.NUpCount;
+        DriverDevMode = source.DriverDevMode != null ? (byte[])source.DriverDevMode.Clone() : null;
     }
 }

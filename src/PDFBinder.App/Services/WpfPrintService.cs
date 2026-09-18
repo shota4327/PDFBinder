@@ -49,6 +49,15 @@ public class WpfPrintService : IPrintService
     }
 
     /// <inheritdoc/>
+    public PrinterSettingsDialogResult? ShowPrinterSettingsDialog(
+        string printerName,
+        nint ownerHwnd,
+        byte[]? currentDevMode = null)
+    {
+        return PrinterDevModeHelper.ShowDocumentPropertiesDialog(printerName, ownerHwnd, currentDevMode);
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> PrintAsync(
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
         PrintSettings settings,
@@ -194,7 +203,16 @@ public class WpfPrintService : IPrintService
     /// </summary>
     private static void ConfigurePrintTicket(PrintDialog printDialog, PrintSettings settings)
     {
-        var ticket = printDialog.PrintTicket ?? printDialog.PrintQueue.DefaultPrintTicket.Clone();
+        PrintTicket? devModeTicket = null;
+        if (settings.DriverDevMode != null && settings.DriverDevMode.Length > 0 && printDialog.PrintQueue != null)
+        {
+            devModeTicket = PrinterDevModeHelper.CreatePrintTicketFromDevMode(
+                settings.PrinterName,
+                settings.DriverDevMode,
+                printDialog.PrintQueue);
+        }
+
+        var ticket = devModeTicket ?? printDialog.PrintTicket ?? printDialog.PrintQueue?.DefaultPrintTicket.Clone() ?? new PrintTicket();
 
         ticket.PageOrientation = settings.Orientation == PrintOrientation.Landscape
             ? PageOrientation.Landscape

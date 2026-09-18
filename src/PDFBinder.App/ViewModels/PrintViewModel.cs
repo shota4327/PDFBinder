@@ -49,6 +49,7 @@ public partial class PrintViewModel : ObservableObject
     private string? _rangeErrorMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpenPrinterSettings))]
     private bool _isPrinting;
 
     [ObservableProperty]
@@ -58,6 +59,7 @@ public partial class PrintViewModel : ObservableObject
     private double _printProgressValue;
 
     private List<PrintSheetLayout> _currentSheets = new();
+    private string _lastPrinterName = string.Empty;
 
     /// <summary>集約数（N-up）の選択項目</summary>
     public record NUpOptionItem(NUpPagesPerSheet Count, string DisplayName);
@@ -75,6 +77,9 @@ public partial class PrintViewModel : ObservableObject
 
     /// <summary>エラーが無く印刷実行が可能かどうか</summary>
     public bool CanPrint => !IsPrinting && string.IsNullOrEmpty(RangeErrorMessage) && TotalSheets > 0;
+
+    /// <summary>プリンターの印刷設定を開くことができるかどうか</summary>
+    public bool CanOpenPrinterSettings => !IsPrinting && !string.IsNullOrWhiteSpace(Settings.PrinterName);
 
     /// <summary>プレビュー表示用の用紙サイズ（縦横比）</summary>
     public double PreviewAspectWidth => Settings.Orientation == PrintOrientation.Landscape ? 1.414 : 1.0;
@@ -119,6 +124,8 @@ public partial class PrintViewModel : ObservableObject
                 ? defaultPrinter
                 : Printers.FirstOrDefault() ?? string.Empty;
         }
+
+        _lastPrinterName = Settings.PrinterName;
     }
 
     /// <summary>
@@ -126,6 +133,17 @@ public partial class PrintViewModel : ObservableObject
     /// </summary>
     private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(PrintSettings.PrinterName))
+        {
+            if (_lastPrinterName != Settings.PrinterName)
+            {
+                Settings.DriverDevMode = null;
+                _lastPrinterName = Settings.PrinterName;
+            }
+            OpenPrinterSettingsCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanOpenPrinterSettings));
+        }
+
         if (e.PropertyName == nameof(PrintSettings.LayoutMode) && Settings.LayoutMode == PrintLayoutMode.Booklet)
         {
             Settings.Orientation = PrintOrientation.Landscape;
@@ -349,6 +367,75 @@ public partial class PrintViewModel : ObservableObject
         {
             Settings.Copies--;
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanOpenPrinterSettings))]
+    private void OpenPrinterSettings()
+    {
+        if (!CanOpenPrinterSettings) return;
+
+        nint ownerHwnd = GetOwnerWindowHandle();
+        var result = _printService.ShowPrinterSettingsDialog(Settings.PrinterName, ownerHwnd, Settings.DriverDevMode);
+        if (result != null)
+        {
+            ApplyPrinterSettingsResult(result);
+        }
+    }
+
+    /// <summary>
+    /// モーダルダイアログの親となるメインウィンドウのハンドルを安全に取得します。
+    /// </summary>
+    private static nint GetOwnerWindowHandle()
+    {
+        try
+        {
+            var app = Application.Current;
+            if (app == null) return nint.Zero;
+
+            if (app.Dispatcher.CheckAccess())
+            {
+                return app.MainWindow != null
+                    ? new System.Windows.Interop.WindowInteropHelper(app.MainWindow).Handle
+                    : nint.Zero;
+            }
+
+            return app.Dispatcher.Invoke(() =>
+            {
+                return app.MainWindow != null
+                    ? new System.Windows.Interop.WindowInteropHelper(app.MainWindow).Handle
+                    : nint.Zero;
+            });
+        }
+        catch
+        {
+            return nint.Zero;
+        }
+    }
+
+    /// <summary>
+    /// プリンター印刷設定ダイアログの結果をモデルに反映します。
+    /// </summary>
+    private void ApplyPrinterSettingsResult(PrinterSettingsDialogResult result)
+    {
+        Settings.DriverDevMode = result.DevModeData;
+        if (result.PaperSize.HasValue)
+        {
+            Settings.PaperSize = result.PaperSize.Value;
+        }
+        if (result.Orientation.HasValue)
+        {
+            Settings.Orientation = result.Orientation.Value;
+        }
+        if (result.Copies.HasValue)
+        {
+            Settings.Copies = Math.Clamp(result.Copies.Value, 1, 99);
+        }
+        if (result.DuplexMode.HasValue)
+        {
+            Settings.DuplexMode = result.DuplexMode.Value;
+        }
+
+        ValidateAndRefresh();
     }
 
     [RelayCommand]
