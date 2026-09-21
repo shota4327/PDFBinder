@@ -184,12 +184,12 @@ public class PdfServiceSplitHalfTests : IDisposable
 
         Assert.Equal(2, result.Count);
         // 画面上横長（DisplayWidth=800, DisplayHeight=600）なので左右分割
-        Assert.Equal(400, result[0].Width);
-        Assert.Equal(600, result[0].Height);
-        Assert.Equal(PageRotation.Rotate0, result[0].Rotation);
+        Assert.Equal(400, result[0].DisplayWidth);
+        Assert.Equal(600, result[0].DisplayHeight);
+        Assert.Equal(PageRotation.Rotate90, result[0].Rotation);
 
-        Assert.Equal(400, result[1].Width);
-        Assert.Equal(600, result[1].Height);
-        Assert.Equal(PageRotation.Rotate0, result[1].Rotation);
+        Assert.Equal(400, result[1].DisplayWidth);
+        Assert.Equal(600, result[1].DisplayHeight);
+        Assert.Equal(PageRotation.Rotate90, result[1].Rotation);
     }
 }

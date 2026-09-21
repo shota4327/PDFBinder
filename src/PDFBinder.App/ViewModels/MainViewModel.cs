@@ -830,7 +830,17 @@ public partial class MainViewModel : ObservableObject
             var cmd = new ReplaceAllPagesCommand(Document, oldPages, newPages);
             _undoRedoService.Execute(cmd);
 
-            await EnsureThumbnailsGeneratedAsync();
+            DetailEditor?.InitializeDocument(Document);
+
+            if (IsDetailViewActive)
+            {
+                _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+            }
+            else
+            {
+                await EnsureThumbnailsGeneratedAsync();
+            }
+
             StatusMessage = $"全 {oldPages.Count} ページを {newPages.Count} ページに分割しました。";
         }
         catch (Exception ex)
@@ -861,6 +871,10 @@ public partial class MainViewModel : ObservableObject
     public void OpenPageDetail(PdfPageModel page)
     {
         IsDetailViewActive = true;
+        if (DetailEditor != null && DetailEditor.Pages.Count != Document.Pages.Count)
+        {
+            DetailEditor.InitializeDocument(Document);
+        }
         DetailEditor?.ScrollToPage(page);
         SelectedRibbonTabIndex = 1;
         StatusMessage = $"ページ {page.PageNumber} を編集しています。";
@@ -911,6 +925,7 @@ public partial class MainViewModel : ObservableObject
     public void Undo()
     {
         _undoRedoService.Undo();
+        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();
@@ -926,6 +941,7 @@ public partial class MainViewModel : ObservableObject
     public void Redo()
     {
         _undoRedoService.Redo();
+        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();

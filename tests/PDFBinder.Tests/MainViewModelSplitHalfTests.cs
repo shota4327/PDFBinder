@@ -84,4 +84,39 @@ public class MainViewModelSplitHalfTests
         Assert.Equal(0, vm.Document.PageCount);
         Assert.False(vm.CanUndo);
     }
+
+    [Fact]
+    public async Task SplitPagesHalfCommand_InDetailView_SynchronizesDetailEditor()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        var page = new PdfPageModel
+        {
+            Width = 842,
+            Height = 595,
+            Rotation = PageRotation.Rotate0
+        };
+        vm.Document.AddPage(page);
+        vm.OpenPageDetail(page);
+        Assert.True(vm.IsDetailViewActive);
+        Assert.Single(vm.DetailEditor!.Pages);
+
+        // Act - 分割実行
+        await vm.SplitPagesHalfCommand.ExecuteAsync(null);
+
+        // Assert - 詳細エディタのページ一覧が2ページに更新されていること
+        Assert.Equal(2, vm.DetailEditor.Pages.Count);
+        Assert.Equal(421, vm.DetailEditor.Pages[0].Page.Width);
+        Assert.Equal(421, vm.DetailEditor.Pages[1].Page.Width);
+
+        // Act - Undo
+        vm.UndoCommand.Execute(null);
+        Assert.Single(vm.DetailEditor.Pages);
+        Assert.Equal(842, vm.DetailEditor.Pages[0].Page.Width);
+
+        // Act - Redo
+        vm.RedoCommand.Execute(null);
+        Assert.Equal(2, vm.DetailEditor.Pages.Count);
+        Assert.Equal(421, vm.DetailEditor.Pages[0].Page.Width);
+    }
 }
