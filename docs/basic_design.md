@@ -120,6 +120,8 @@ PDFファイルの入出力、構造操作を担当。
 - `PdfPageModel CreateBlankPage(double width, double height)`: 指定サイズの白紙ページ生成
 - `Task AppendPdfAsync(PdfDocumentModel doc, string filePath, int insertIndex)`: 別PDFのページ差し込み結合
 - `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
+- `Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName)`: 全ページを個別PDFに一括分割
+- `Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken)`: ページの向き（表示寸法）に応じて長辺を半分に2分割（横長なら左右分割、縦長なら上下分割）
 
 ### 5.2 `IPdfRenderer`
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。
@@ -143,6 +145,10 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 手書きストロークコレクションの幾何学的座標変換・追従回転を担当するコアヘルパー。
 - `void RotateStrokes(StrokeCollection? strokes, PageRotation deltaRotation, double currentDisplayWidth, double currentDisplayHeight)`: 差分回転角度と現在のページ寸法をもとに全ストロークの各頂点座標（およびペン先サイズ）を追従変換
 - `(double X, double Y) TransformPoint(double x, double y, PageRotation deltaRotation, double currentWidth, double currentHeight)`: 単一座標点の幾何学的回転変換
+
+### 5.6 `StrokeSplitHelper`
+手書きストロークコレクションを垂直・水平境界線で幾何学的に切断・分割し、それぞれの新ページローカル座標系へ分配するヘルパー。
+- `(StrokeCollection FirstPart, StrokeCollection SecondPart) SplitStrokes(StrokeCollection? strokes, bool splitHorizontally, double splitOffset)`: 境界線（中央線）を跨ぐストロークを線形補間交点で2つに切断し、後半側ストロークの座標オフセットを自動シフトして返却
 
 ---
 
@@ -209,7 +215,7 @@ stateDiagram-v2
 - **リボンタブ構成**:
   - **「PDF編集」タブ**: ファイル操作およびドキュメント構成の編集（常時利用可能）
     - ファイル操作: 開く (`Ctrl+O`), 追加, 保存 (`Ctrl+S`), 別名保存 (`Ctrl+Shift+S`)
-    - ページ構成・抽出: 白紙追加 (`Ctrl+B`), 選択抽出, 全分割
+    - ページ構成・抽出: 白紙追加 (`Ctrl+B`), 選択抽出, 全分割, ページ分割
     - ページ編集: 左回転 (`Ctrl+L`), 右回転 (`Ctrl+R`), 削除 (`Delete` / ホバー時赤ハイライト)
       - ※詳細ビュー表示時、特定ページが明示選択されていない場合は現在操作・表示中のカレントページを対象として回転・削除・白紙挿入が実行される。
     - 履歴操作: 元に戻す (`Ctrl+Z`), やり直す (`Ctrl+Y`)

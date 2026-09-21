@@ -270,5 +270,6 @@ public class DefaultDetailViewTests
         public Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath) => Task.CompletedTask;
         public Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath) => Task.CompletedTask;
         public Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName) => Task.FromResult(0);
+        public Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken = default) => Task.FromResult(new List<PdfPageModel>());
     }
 }

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Ink;
 using System.Windows.Input;
+using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
@@ -272,5 +273,193 @@ public class PdfService : IPdfService
         {
             File.Move(sourceTempFile, targetFile);
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<PdfPageModel>> SplitPagesHalfAsync(
+        IEnumerable<PdfPageModel> pages,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+        var pageList = pages.ToList();
+        if (pageList.Count == 0)
+        {
+            return new List<PdfPageModel>();
+        }
+
+        return await Task.Run(() => SplitPagesInternal(pageList, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>
+    /// 各ページを半分に分割し、新しいページモデル群を生成します。
+    /// </summary>
+    private static List<PdfPageModel> SplitPagesInternal(
+        List<PdfPageModel> pages,
+        CancellationToken cancellationToken)
+    {
+        var resultPages = new List<PdfPageModel>(pages.Count * 2);
+        string tempDir = Path.Combine(Path.GetTempPath(), "PDFBinder", "splits");
+        Directory.CreateDirectory(tempDir);
+        string tempSplitPdfPath = Path.Combine(tempDir, $"{Guid.NewGuid()}.pdf");
+
+        PdfDocument? splitDoc = null;
+        try
+        {
+            foreach (var page in pages)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ProcessSinglePageSplit(page, ref splitDoc, tempSplitPdfPath, resultPages);
+            }
+
+            if (splitDoc != null)
+            {
+                splitDoc.Save(tempSplitPdfPath);
+            }
+        }
+        finally
+        {
+            splitDoc?.Dispose();
+        }
+
+        for (int i = 0; i < resultPages.Count; i++)
+        {
+            resultPages[i].PageNumber = i + 1;
+        }
+
+        return resultPages;
+    }
+
+    /// <summary>
+    /// 単一ページの分割処理（白紙または実PDF）を行い結果リストに追加します。
+    /// </summary>
+    private static void ProcessSinglePageSplit(
+        PdfPageModel page,
+        ref PdfDocument? splitDoc,
+        string tempSplitPdfPath,
+        List<PdfPageModel> resultPages)
+    {
+        bool isLandscape = page.DisplayWidth >= page.DisplayHeight;
+        double splitWidth = isLandscape ? page.DisplayWidth / 2 : page.DisplayWidth;
+        double splitHeight = isLandscape ? page.DisplayHeight : page.DisplayHeight / 2;
+        double splitOffset = isLandscape ? page.DisplayWidth / 2 : page.DisplayHeight / 2;
+
+        var (strokes1, strokes2) = StrokeSplitHelper.SplitStrokes(page.InkStrokes, isLandscape, splitOffset);
+
+        if (page.IsBlankPage)
+        {
+            resultPages.Add(CreateSplitBlankPage(splitWidth, splitHeight, strokes1));
+            resultPages.Add(CreateSplitBlankPage(splitWidth, splitHeight, strokes2));
+        }
+        else
+        {
+            splitDoc ??= new PdfDocument();
+            int pageIndex1 = splitDoc.PageCount;
+            AppendSplitPdfPages(splitDoc, page, isLandscape, splitWidth, splitHeight);
+            int pageIndex2 = pageIndex1 + 1;
+
+            resultPages.Add(CreateSplitPdfPage(splitWidth, splitHeight, tempSplitPdfPath, pageIndex1, strokes1));
+            resultPages.Add(CreateSplitPdfPage(splitWidth, splitHeight, tempSplitPdfPath, pageIndex2, strokes2));
+        }
+    }
+
+    /// <summary>
+    /// 分割後の白紙ページモデルを作成します。
+    /// </summary>
+    private static PdfPageModel CreateSplitBlankPage(double width, double height, StrokeCollection strokes)
+    {
+        return new PdfPageModel
+        {
+            SourceFilePath = null,
+            OriginalPageIndex = -1,
+            Width = width,
+            Height = height,
+            Rotation = PageRotation.Rotate0,
+            InkStrokes = strokes,
+            IsModified = true,
+            IsThumbnailDirty = true
+        };
+    }
+
+    /// <summary>
+    /// 分割後の実PDFページモデルを作成します。
+    /// </summary>
+    private static PdfPageModel CreateSplitPdfPage(
+        double width,
+        double height,
+        string filePath,
+        int pageIndex,
+        StrokeCollection strokes)
+    {
+        return new PdfPageModel
+        {
+            SourceFilePath = filePath,
+            OriginalPageIndex = pageIndex,
+            Width = width,
+            Height = height,
+            Rotation = PageRotation.Rotate0,
+            InkStrokes = strokes,
+            IsModified = true,
+            IsThumbnailDirty = true
+        };
+    }
+
+    /// <summary>
+    /// 実PDFページを分割し、描画先PDFドキュメントへ2ページ追加します。
+    /// </summary>
+    private static void AppendSplitPdfPages(
+        PdfDocument splitDoc,
+        PdfPageModel page,
+        bool isLandscape,
+        double splitWidth,
+        double splitHeight)
+    {
+        using var form = XPdfForm.FromFile(page.SourceFilePath!);
+        form.PageNumber = page.OriginalPageIndex + 1;
+
+        for (int part = 0; part < 2; part++)
+        {
+            double offsetX = isLandscape ? part * splitWidth : 0;
+            double offsetY = isLandscape ? 0 : part * splitHeight;
+
+            var newPdfPage = splitDoc.AddPage();
+            newPdfPage.Width = XUnit.FromPoint(splitWidth);
+            newPdfPage.Height = XUnit.FromPoint(splitHeight);
+
+            using var gfx = XGraphics.FromPdfPage(newPdfPage);
+            RenderPageWithTransform(gfx, form, page, offsetX, offsetY);
+        }
+    }
+
+    /// <summary>
+    /// ページの回転を反映して分割領域を描画します。
+    /// </summary>
+    private static void RenderPageWithTransform(
+        XGraphics gfx,
+        XPdfForm form,
+        PdfPageModel page,
+        double offsetX,
+        double offsetY)
+    {
+        gfx.TranslateTransform(-offsetX, -offsetY);
+
+        switch (page.Rotation)
+        {
+            case PageRotation.Rotate0:
+                break;
+            case PageRotation.Rotate90:
+                gfx.TranslateTransform(page.Height, 0);
+                gfx.RotateAtTransform(90, new XPoint(0, 0));
+                break;
+            case PageRotation.Rotate180:
+                gfx.TranslateTransform(page.Width, page.Height);
+                gfx.RotateAtTransform(180, new XPoint(0, 0));
+                break;
+            case PageRotation.Rotate270:
+                gfx.TranslateTransform(0, page.Width);
+                gfx.RotateAtTransform(270, new XPoint(0, 0));
+                break;
+        }
+
+        gfx.DrawImage(form, 0, 0, page.Width, page.Height);
     }
 }

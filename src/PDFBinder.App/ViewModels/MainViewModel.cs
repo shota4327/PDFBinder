@@ -812,6 +812,38 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// ドキュメントの全ページをそれぞれ半分のサイズ（横長なら左右、縦長なら上下）に2分割します。
+    /// </summary>
+    [RelayCommand]
+    public async Task SplitPagesHalfAsync()
+    {
+        if (Document.Pages.Count == 0) return;
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "ページを分割しています...";
+
+            var oldPages = Document.Pages.ToList();
+            var newPages = await _pdfService.SplitPagesHalfAsync(oldPages);
+
+            var cmd = new ReplaceAllPagesCommand(Document, oldPages, newPages);
+            _undoRedoService.Execute(cmd);
+
+            await EnsureThumbnailsGeneratedAsync();
+            StatusMessage = $"全 {oldPages.Count} ページを {newPages.Count} ページに分割しました。";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"ページ分割エラー: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>
     /// ページの並び替えを実行し、アンドゥ履歴に記録します。
     /// </summary>
     public void MovePage(int oldIndex, int newIndex)
