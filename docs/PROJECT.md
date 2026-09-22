@@ -31,7 +31,7 @@
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
 | **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、手書き既存ファイル復元後の変更検知、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54, #111 / インアプリオーバーレイ & OnClosing |
 | **F19** | PDF操作コア / 起動 | 起動時コマンドライン引数処理および単一インスタンス管理（「プログラムから開く」・関連付け起動時の同一ウィンドウ新タブ統合・IPC通信・最前面復元・--new-windowオプション・複数ウィンドウ統合管理） | **完了** | Issue #83, #123 / SingleInstanceManager, CommandLineArgsHelper & App.OnStartup |
-| **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
+| **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大3200%ズーム対応・720x1008px事前レンダリング・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
 | **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
 | **F30** | UI・グリッド俯瞰 | ページタイル状グリッド一覧表示（仮想化・カードUI） | **完了** | GridView.xaml |
 | **F31** | UI・グリッド俯瞰 | ドラッグ＆ドロップによるページ並び替え | **完了** | DragDrop.DoDragDrop / MovePage |

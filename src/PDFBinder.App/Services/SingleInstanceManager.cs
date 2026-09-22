@@ -37,6 +37,8 @@ public sealed class SingleInstanceManager : IDisposable
     private bool _hasMutexOwnership;
     private CancellationTokenSource? _serverCts;
     private Task? _serverLoopTask;
+    private NamedPipeServerStream? _currentServerStream;
+    private readonly object _serverStreamLock = new();
     private bool _isDisposed;
 
     /// <summary>
@@ -146,24 +148,24 @@ public sealed class SingleInstanceManager : IDisposable
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous);
 
+                lock (_serverStreamLock)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        pipeServer.Dispose();
+                        break;
+                    }
+                    _currentServerStream = pipeServer;
+                }
+
+                using var reg = cancellationToken.Register(() =>
+                {
+                    try { pipeServer.Dispose(); } catch { }
+                });
+
                 await pipeServer.WaitForConnectionAsync(cancellationToken);
 
-                using (pipeServer)
-                using (var reader = new StreamReader(pipeServer, leaveOpen: true))
-                using (var writer = new StreamWriter(pipeServer, leaveOpen: true) { AutoFlush = true })
-                {
-                    var line = await reader.ReadLineAsync(cancellationToken);
-                    if (!string.IsNullOrWhiteSpace(line))
-                    {
-                        var payload = JsonSerializer.Deserialize<SingleInstancePayload>(line);
-                        await writer.WriteLineAsync(AckResponse.AsMemory(), cancellationToken);
-
-                        if (payload != null)
-                        {
-                            await onPayloadReceived(payload);
-                        }
-                    }
-                }
+                await ProcessClientSessionAsync(pipeServer, onPayloadReceived, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -172,7 +174,41 @@ public sealed class SingleInstanceManager : IDisposable
             catch (Exception)
             {
                 // 一時的な接続エラー等は無視して次回の受信待機を継続
+            }
+            finally
+            {
+                lock (_serverStreamLock)
+                {
+                    if (_currentServerStream == pipeServer)
+                    {
+                        _currentServerStream = null;
+                    }
+                }
                 pipeServer?.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// クライアント接続からのメッセージを読み取り、処理・応答します。
+    /// </summary>
+    private static async Task ProcessClientSessionAsync(
+        NamedPipeServerStream pipeServer,
+        Func<SingleInstancePayload, Task> onPayloadReceived,
+        CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(pipeServer, leaveOpen: true);
+        using var writer = new StreamWriter(pipeServer, leaveOpen: true) { AutoFlush = true };
+
+        var line = await reader.ReadLineAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(line))
+        {
+            var payload = JsonSerializer.Deserialize<SingleInstancePayload>(line);
+            await writer.WriteLineAsync(AckResponse.AsMemory(), cancellationToken);
+
+            if (payload != null)
+            {
+                await onPayloadReceived(payload);
             }
         }
     }
@@ -198,6 +234,11 @@ public sealed class SingleInstanceManager : IDisposable
         try
         {
             _serverCts?.Cancel();
+            lock (_serverStreamLock)
+            {
+                _currentServerStream?.Dispose();
+                _currentServerStream = null;
+            }
             _serverCts?.Dispose();
         }
         catch { }

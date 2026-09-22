@@ -71,11 +71,12 @@ public class DefaultDetailViewTests
         Assert.True(vm.CanZoomIn);
         Assert.True(vm.CanZoomOut);
 
-        // 拡大 (220 -> 240)
+        // 拡大 (220 -> 275: 100% -> 125%)
         vm.ZoomInCommand.Execute(null);
-        Assert.Equal(240.0, vm.ThumbnailSize);
+        Assert.Equal(275.0, vm.ThumbnailSize);
+        Assert.Equal("125%", vm.CurrentZoomText);
 
-        // 縮小 (240 -> 220)
+        // 縮小 (275 -> 220: 125% -> 100%)
         vm.ZoomOutCommand.Execute(null);
         Assert.Equal(220.0, vm.ThumbnailSize);
         Assert.Equal("100%", vm.CurrentZoomText);

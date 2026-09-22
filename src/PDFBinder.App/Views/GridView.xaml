@@ -35,6 +35,7 @@
                       PreviewMouseLeftButtonDown="OnGridPreviewMouseLeftButtonDown"
                       PreviewMouseMove="OnGridPreviewMouseMove"
                       PreviewMouseLeftButtonUp="OnGridPreviewMouseLeftButtonUp"
+                      PreviewMouseWheel="OnGridPreviewMouseWheel"
                       DragOver="OnGridDragOver"
                       DragLeave="OnGridDragLeave"
                       Drop="OnGridDrop">
