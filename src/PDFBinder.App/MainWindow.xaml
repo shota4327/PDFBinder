@@ -269,6 +269,12 @@
                                     <TextBlock Text="全分割" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
+                            <Button Command="{Binding SplitPagesHalfCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="全ページを半分に分割 (A3→A4等)">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE14E;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="ページ分割" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 

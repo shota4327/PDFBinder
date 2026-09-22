@@ -46,6 +46,7 @@ public class MainViewModelMultiFileTests
 
         public Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputFilePath) => Task.CompletedTask;
         public Task<int> SplitAllPagesAsync(PdfDocumentModel document, string outputDirectory, string baseFileName) => Task.FromResult(document.PageCount);
+        public Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken = default) => Task.FromResult(new List<PdfPageModel>());
 
         public PdfPageModel CreateBlankPage(double width, double height)
         {

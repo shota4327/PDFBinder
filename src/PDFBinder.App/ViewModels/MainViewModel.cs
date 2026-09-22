@@ -1254,6 +1254,48 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// ドキュメントの全ページをそれぞれ半分のサイズ（横長なら左右、縦長なら上下）に2分割します。
+    /// </summary>
+    [RelayCommand]
+    public async Task SplitPagesHalfAsync()
+    {
+        if (Document.Pages.Count == 0) return;
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "ページを分割しています...";
+
+            var oldPages = Document.Pages.ToList();
+            var newPages = await _pdfService.SplitPagesHalfAsync(oldPages);
+
+            var cmd = new ReplaceAllPagesCommand(Document, oldPages, newPages);
+            _undoRedoService.Execute(cmd);
+
+            DetailEditor?.InitializeDocument(Document);
+
+            if (IsDetailViewActive)
+            {
+                _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+            }
+            else
+            {
+                await EnsureThumbnailsGeneratedAsync();
+            }
+
+            StatusMessage = $"全 {oldPages.Count} ページを {newPages.Count} ページに分割しました。";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"ページ分割エラー: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>
     /// ページの並び替えを実行し、アンドゥ履歴に記録します。
     /// </summary>
     public void MovePage(int oldIndex, int newIndex)
@@ -1298,6 +1340,10 @@ public partial class MainViewModel : ObservableObject
     public void OpenPageDetail(PdfPageModel page)
     {
         IsDetailViewActive = true;
+        if (DetailEditor != null && DetailEditor.Pages.Count != Document.Pages.Count)
+        {
+            DetailEditor.InitializeDocument(Document);
+        }
         DetailEditor?.ScrollToPage(page);
         SelectedRibbonTabIndex = 1;
         StatusMessage = $"ページ {page.PageNumber} を編集しています。";
@@ -1348,6 +1394,7 @@ public partial class MainViewModel : ObservableObject
     public void Undo()
     {
         CurrentUndoRedoService.Undo();
+        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();
@@ -1364,6 +1411,7 @@ public partial class MainViewModel : ObservableObject
     public void Redo()
     {
         CurrentUndoRedoService.Redo();
+        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
             _ = EnsureThumbnailsGeneratedAsync();

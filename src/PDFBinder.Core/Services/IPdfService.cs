@@ -36,4 +36,9 @@ public interface IPdfService
     /// ドキュメントの全ページを1ページずつの個別PDFファイルに一括分割して出力します。
     /// </summary>
     Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName);
+
+    /// <summary>
+    /// 指定されたページ群をそれぞれ半分のサイズに2分割（横長なら左右、縦長なら上下）した新しいページリストを生成します。
+    /// </summary>
+    Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken = default);
 }

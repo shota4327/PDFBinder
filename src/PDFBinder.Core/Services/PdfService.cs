@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Ink;
 using System.Windows.Input;
+using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
@@ -274,5 +275,189 @@ public class PdfService : IPdfService
         {
             File.Move(sourceTempFile, targetFile);
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<PdfPageModel>> SplitPagesHalfAsync(
+        IEnumerable<PdfPageModel> pages,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+        var pageList = pages.ToList();
+        if (pageList.Count == 0)
+        {
+            return new List<PdfPageModel>();
+        }
+
+        return await Task.Run(() => SplitPagesInternal(pageList, cancellationToken), cancellationToken);
+    }
+
+    /// <summary>
+    /// 各ページを半分に分割し、新しいページモデル群を生成します。
+    /// </summary>
+    private static List<PdfPageModel> SplitPagesInternal(
+        List<PdfPageModel> pages,
+        CancellationToken cancellationToken)
+    {
+        var resultPages = new List<PdfPageModel>(pages.Count * 2);
+        string tempDir = Path.Combine(Path.GetTempPath(), "PDFBinder", "splits");
+        Directory.CreateDirectory(tempDir);
+        string tempSplitPdfPath = Path.Combine(tempDir, $"{Guid.NewGuid()}.pdf");
+
+        var sourceCache = new Dictionary<string, PdfDocument>();
+        PdfDocument? splitDoc = null;
+        try
+        {
+            foreach (var page in pages)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ProcessSinglePageSplit(page, ref splitDoc, tempSplitPdfPath, sourceCache, resultPages);
+            }
+
+            if (splitDoc != null)
+            {
+                splitDoc.Save(tempSplitPdfPath);
+            }
+        }
+        finally
+        {
+            splitDoc?.Dispose();
+            foreach (var doc in sourceCache.Values)
+            {
+                doc.Dispose();
+            }
+        }
+
+        for (int i = 0; i < resultPages.Count; i++)
+        {
+            resultPages[i].PageNumber = i + 1;
+        }
+
+        return resultPages;
+    }
+
+    /// <summary>
+    /// 単一ページの分割処理（白紙または実PDF）を行い結果リストに追加します。
+    /// </summary>
+    private static void ProcessSinglePageSplit(
+        PdfPageModel page,
+        ref PdfDocument? splitDoc,
+        string tempSplitPdfPath,
+        Dictionary<string, PdfDocument> sourceCache,
+        List<PdfPageModel> resultPages)
+    {
+        bool isLandscape = page.DisplayWidth >= page.DisplayHeight;
+        double splitOffset = isLandscape ? page.DisplayWidth / 2 : page.DisplayHeight / 2;
+        var (strokes1, strokes2) = StrokeSplitHelper.SplitStrokes(page.InkStrokes, isLandscape, splitOffset);
+
+        if (page.IsBlankPage)
+        {
+            double blankW = isLandscape ? page.DisplayWidth / 2 : page.DisplayWidth;
+            double blankH = isLandscape ? page.DisplayHeight : page.DisplayHeight / 2;
+            resultPages.Add(CreateSplitBlankPage(blankW, blankH, strokes1));
+            resultPages.Add(CreateSplitBlankPage(blankW, blankH, strokes2));
+            return;
+        }
+
+        splitDoc ??= new PdfDocument();
+        string sourcePath = page.SourceFilePath!;
+        if (!sourceCache.TryGetValue(sourcePath, out var sourceDoc))
+        {
+            byte[] bytes = File.ReadAllBytes(sourcePath);
+            sourceDoc = PdfReader.Open(new MemoryStream(bytes), PdfDocumentOpenMode.Import);
+            sourceCache[sourcePath] = sourceDoc;
+        }
+
+        var srcPage = sourceDoc.Pages[page.OriginalPageIndex];
+        var (box1, box2) = CalculateCropBoxes(srcPage.Width.Point, srcPage.Height.Point, page.Rotation, isLandscape);
+
+        int pageIndex1 = splitDoc.PageCount;
+        var p1 = splitDoc.AddPage(srcPage);
+        p1.CropBox = box1;
+        p1.MediaBox = box1;
+
+        int pageIndex2 = pageIndex1 + 1;
+        var p2 = splitDoc.AddPage(srcPage);
+        p2.CropBox = box2;
+        p2.MediaBox = box2;
+
+        resultPages.Add(CreateSplitPdfPage(box1.Width, box1.Height, page.Rotation, page.OriginalRotation, tempSplitPdfPath, pageIndex1, strokes1));
+        resultPages.Add(CreateSplitPdfPage(box2.Width, box2.Height, page.Rotation, page.OriginalRotation, tempSplitPdfPath, pageIndex2, strokes2));
+    }
+
+    /// <summary>
+    /// 分割後の白紙ページモデルを作成します。
+    /// </summary>
+    private static PdfPageModel CreateSplitBlankPage(double width, double height, StrokeCollection strokes)
+    {
+        return new PdfPageModel
+        {
+            SourceFilePath = null,
+            OriginalPageIndex = -1,
+            Width = width,
+            Height = height,
+            Rotation = PageRotation.Rotate0,
+            OriginalRotation = PageRotation.Rotate0,
+            InkStrokes = strokes,
+            IsModified = true,
+            IsThumbnailDirty = true
+        };
+    }
+
+    /// <summary>
+    /// 分割後の実PDFページモデルを作成します。
+    /// </summary>
+    private static PdfPageModel CreateSplitPdfPage(
+        double width,
+        double height,
+        PageRotation rotation,
+        PageRotation originalRotation,
+        string filePath,
+        int pageIndex,
+        StrokeCollection strokes)
+    {
+        return new PdfPageModel
+        {
+            SourceFilePath = filePath,
+            OriginalPageIndex = pageIndex,
+            Width = width,
+            Height = height,
+            Rotation = rotation,
+            OriginalRotation = originalRotation,
+            InkStrokes = strokes,
+            IsModified = true,
+            IsThumbnailDirty = true
+        };
+    }
+
+    /// <summary>
+    /// 画面の表示向きとページの回転角度に基づいて、切り出す CropBox 領域を算出します。
+    /// </summary>
+    private static (PdfRectangle Box1, PdfRectangle Box2) CalculateCropBoxes(
+        double w,
+        double h,
+        PageRotation rotation,
+        bool isLandscape)
+    {
+        if (isLandscape)
+        {
+            return rotation switch
+            {
+                PageRotation.Rotate0 => (new PdfRectangle(new XPoint(0, 0), new XPoint(w / 2, h)), new PdfRectangle(new XPoint(w / 2, 0), new XPoint(w, h))),
+                PageRotation.Rotate90 => (new PdfRectangle(new XPoint(0, 0), new XPoint(w, h / 2)), new PdfRectangle(new XPoint(0, h / 2), new XPoint(w, h))),
+                PageRotation.Rotate180 => (new PdfRectangle(new XPoint(w / 2, 0), new XPoint(w, h)), new PdfRectangle(new XPoint(0, 0), new XPoint(w / 2, h))),
+                PageRotation.Rotate270 => (new PdfRectangle(new XPoint(0, h / 2), new XPoint(w, h)), new PdfRectangle(new XPoint(0, 0), new XPoint(w, h / 2))),
+                _ => (new PdfRectangle(new XPoint(0, 0), new XPoint(w / 2, h)), new PdfRectangle(new XPoint(w / 2, 0), new XPoint(w, h)))
+            };
+        }
+
+        return rotation switch
+        {
+            PageRotation.Rotate0 => (new PdfRectangle(new XPoint(0, h / 2), new XPoint(w, h)), new PdfRectangle(new XPoint(0, 0), new XPoint(w, h / 2))),
+            PageRotation.Rotate90 => (new PdfRectangle(new XPoint(w / 2, 0), new XPoint(w, h)), new PdfRectangle(new XPoint(0, 0), new XPoint(w / 2, h))),
+            PageRotation.Rotate180 => (new PdfRectangle(new XPoint(0, 0), new XPoint(w, h / 2)), new PdfRectangle(new XPoint(0, h / 2), new XPoint(w, h))),
+            PageRotation.Rotate270 => (new PdfRectangle(new XPoint(0, 0), new XPoint(w / 2, h)), new PdfRectangle(new XPoint(w / 2, 0), new XPoint(w, h))),
+            _ => (new PdfRectangle(new XPoint(0, h / 2), new XPoint(w, h)), new PdfRectangle(new XPoint(0, 0), new XPoint(w, h / 2)))
+        };
     }
 }

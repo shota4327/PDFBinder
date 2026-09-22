@@ -140,6 +140,8 @@ PDFファイルの入出力、構造操作を担当。
 - `PdfPageModel CreateBlankPage(double width, double height)`: 指定サイズの白紙ページ生成
 - `Task AppendPdfAsync(PdfDocumentModel doc, string filePath, int insertIndex)`: 別PDFのページ差し込み結合
 - `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
+- `Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName)`: 全ページを個別PDFに一括分割
+- `Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken)`: ページの向き（表示寸法）に応じて長辺を半分に2分割（横長なら左右分割、縦長なら上下分割）
 
 ### 5.2 `IPdfRenderer`
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。PDFiumネイティブAPI（Docnet.Core）の非スレッドセーフ性を回避するため、`PriorityAsyncLock` による排他・優先度制御（High: カレントページ詳細表示、Low: バックグラウンドサムネイル・先読み）を備え、多重実行によるクラッシュやフリーズを完全に防止。
@@ -168,6 +170,10 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 ### 5.6 `BitmapTransformHelper`
 ビットマップ画像の幾何学的変換（0ms即時回転など）を担当するコアヘルパー。
 - `BitmapSource? CreateRotatedBitmap(BitmapSource? source, int deltaDegrees)`: `TransformedBitmap` と `RotateTransform` を用いて、既存のビットマップをメモリ上で即座に回転させたフリーズ済み画像を生成。回転操作直後の引き伸ばし・歪みを完全防止する仮プレビュー表示や、グリッドビューでのサムネイル即時回転に活用。
+
+### 5.7 `StrokeSplitHelper`
+手書きストロークコレクションを垂直・水平境界線で幾何学的に切断・分割し、それぞれの新ページローカル座標系へ分配するヘルパー。
+- `(StrokeCollection FirstPart, StrokeCollection SecondPart) SplitStrokes(StrokeCollection? strokes, bool splitHorizontally, double splitOffset)`: 境界線（中央線）を跨ぐストロークを線形補間交点で2つに切断し、後半側ストロークの座標オフセットを自動シフトして返却
 
 ---
 
@@ -234,7 +240,7 @@ stateDiagram-v2
 - **リボンタブ構成**:
   - **「PDF編集」タブ**: ファイル操作およびドキュメント構成の編集（常時利用可能）
     - ファイル操作: 開く (`Ctrl+O`), 追加, 保存 (`Ctrl+S`), 別名保存 (`Ctrl+Shift+S`), 印刷 (`Ctrl+P`)
-    - ページ構成・抽出: 白紙追加 (`Ctrl+B`), 選択抽出, 全分割
+    - ページ構成・抽出: 白紙追加 (`Ctrl+B`), 選択抽出, 全分割, ページ分割
     - ページ編集: 左回転 (`Ctrl+L`), 右回転 (`Ctrl+R`), 削除 (`Delete` / ホバー時赤ハイライト)
       - ※詳細ビュー表示時、特定ページが明示選択されていない場合は現在操作・表示中のカレントページを対象として回転・削除・白紙挿入が実行される。
     - 履歴操作: 元に戻す (`Ctrl+Z`), やり直す (`Ctrl+Y`)

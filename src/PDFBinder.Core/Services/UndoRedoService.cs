@@ -264,3 +264,45 @@ public class InsertPagesCommand : IUndoableCommand
     }
 }
 
+/// <summary>
+/// ページ分割などによりドキュメントの全ページを置換する操作を元に戻す/やり直すコマンド
+/// </summary>
+public class ReplaceAllPagesCommand : IUndoableCommand
+{
+    private readonly PdfDocumentModel _doc;
+    private readonly List<PdfPageModel> _oldPages;
+    private readonly List<PdfPageModel> _newPages;
+
+    public string Description => "全ページの分割";
+
+    public ReplaceAllPagesCommand(
+        PdfDocumentModel doc,
+        IEnumerable<PdfPageModel> oldPages,
+        IEnumerable<PdfPageModel> newPages)
+    {
+        _doc = doc ?? throw new ArgumentNullException(nameof(doc));
+        _oldPages = oldPages?.ToList() ?? throw new ArgumentNullException(nameof(oldPages));
+        _newPages = newPages?.ToList() ?? throw new ArgumentNullException(nameof(newPages));
+    }
+
+    public void Execute()
+    {
+        _doc.Pages.Clear();
+        foreach (var page in _newPages)
+        {
+            _doc.Pages.Add(page);
+        }
+        _doc.UpdatePageNumbers();
+    }
+
+    public void Undo()
+    {
+        _doc.Pages.Clear();
+        foreach (var page in _oldPages)
+        {
+            _doc.Pages.Add(page);
+        }
+        _doc.UpdatePageNumbers();
+    }
+}
+
