@@ -473,4 +473,17 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
     }
+
+    /// <summary>
+    /// タイトルバーのアプリアイコンクリック時にプルダウン（コンテキストメニュー）を表示します。
+    /// </summary>
+    private void OnAppIconButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.ContextMenu != null)
+        {
+            button.ContextMenu.PlacementTarget = button;
+            button.ContextMenu.Placement = PlacementMode.Bottom;
+            button.ContextMenu.IsOpen = true;
+        }
+    }
 }

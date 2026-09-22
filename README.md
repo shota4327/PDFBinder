@@ -142,5 +142,12 @@ dotnet run --project src/PDFBinder.App
 
 ---
 
+## 📌 バージョン管理と変更履歴
+- **バージョニング**: [セマンティック バージョニング 2.0.0 (SemVer)](https://semver.org/lang/ja/) を採用しています。
+- **変更履歴**: 各バージョンの詳細な更新内容は [CHANGELOG.md](CHANGELOG.md) をご覧ください。
+- **アプリ内バージョン情報**: タイトルバー左上のアプリアイコンをクリックし、「version」を選択することで、About画面からバージョンおよび動作環境を確認できます。
+
+---
+
 ## 📄 ライセンス
 本プロジェクトは [MIT License](LICENSE) のもとで公開されています。
