@@ -547,5 +547,30 @@ public partial class GridView : UserControl
         }
     }
 
+    /// <summary>
+    /// マウスホイール操作を先行検知し、Ctrlキー押下時はサムネイルのズームイン・ズームアウトを実行します。
+    /// </summary>
+    private void OnGridPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && ViewModel != null)
+        {
+            if (e.Delta > 0)
+            {
+                if (ViewModel.CanZoomInThumbnail)
+                {
+                    ViewModel.ZoomInThumbnailCommand.Execute(null);
+                }
+            }
+            else if (e.Delta < 0)
+            {
+                if (ViewModel.CanZoomOutThumbnail)
+                {
+                    ViewModel.ZoomOutThumbnailCommand.Execute(null);
+                }
+            }
+            e.Handled = true;
+        }
+    }
+
     #endregion
 }

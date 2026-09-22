@@ -162,12 +162,12 @@ public class ViewModelsTests
         Assert.True(vm.ZoomInThumbnailCommand.CanExecute(null));
         Assert.True(vm.ZoomOutThumbnailCommand.CanExecute(null));
 
-        // Act: Zoom in once
+        // Act: Zoom in once (220 -> 275: 100% -> 125%)
         vm.ZoomInThumbnailCommand.Execute(null);
-        Assert.Equal(240.0, vm.ThumbnailSize);
+        Assert.Equal(275.0, vm.ThumbnailSize);
 
-        // Act: Zoom in to maximum (360.0)
-        while (vm.ThumbnailSize < MainViewModel.MaxThumbnailSize)
+        // Act: Zoom in to maximum (7040.0)
+        while (vm.CanZoomInThumbnail)
         {
             vm.ZoomInThumbnailCommand.Execute(null);
         }
@@ -179,8 +179,8 @@ public class ViewModelsTests
         vm.ZoomInThumbnailCommand.Execute(null);
         Assert.Equal(MainViewModel.MaxThumbnailSize, vm.ThumbnailSize);
 
-        // Act: Zoom out to minimum (140.0)
-        while (vm.ThumbnailSize > MainViewModel.MinThumbnailSize)
+        // Act: Zoom out to minimum (110.0)
+        while (vm.CanZoomOutThumbnail)
         {
             vm.ZoomOutThumbnailCommand.Execute(null);
         }
@@ -192,9 +192,9 @@ public class ViewModelsTests
         vm.ZoomOutThumbnailCommand.Execute(null);
         Assert.Equal(MainViewModel.MinThumbnailSize, vm.ThumbnailSize);
 
-        // Act: Zoom in from minimum re-enables zoom out
+        // Act: Zoom in from minimum re-enables zoom out (110 -> 165: 50% -> 75%)
         vm.ZoomInThumbnailCommand.Execute(null);
-        Assert.Equal(160.0, vm.ThumbnailSize);
+        Assert.Equal(165.0, vm.ThumbnailSize);
         Assert.True(vm.CanZoomOutThumbnail);
         Assert.True(vm.ZoomOutThumbnailCommand.CanExecute(null));
     }
@@ -343,9 +343,9 @@ public class ViewModelsTests
     [Fact]
     public void MainViewModel_ThumbnailRenderConstants_AreConfiguredProperly()
     {
-        // Assert: 最大サイズ（360px）基準でレンダリング定数が設定されていること
-        Assert.Equal(360, MainViewModel.ThumbnailRenderWidth);
-        Assert.Equal(504, MainViewModel.ThumbnailRenderHeight);
+        // Assert: 高解像度（720px）基準でレンダリング定数が設定されていること
+        Assert.Equal(720, MainViewModel.ThumbnailRenderWidth);
+        Assert.Equal(1008, MainViewModel.ThumbnailRenderHeight);
     }
 
     [Fact]

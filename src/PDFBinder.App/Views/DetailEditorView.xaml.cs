@@ -181,7 +181,24 @@ public partial class DetailEditorView : UserControl
 
     private void OnScrollViewerPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (ViewModel == null || ViewModel.PageViewMode != DetailPageViewMode.SinglePage) return;
+        if (ViewModel == null) return;
+
+        // Ctrlキー押下時は表示モードを問わずズームイン・ズームアウトを実行
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            if (e.Delta > 0)
+            {
+                ViewModel.ZoomInCommand.Execute(null);
+            }
+            else if (e.Delta < 0)
+            {
+                ViewModel.ZoomOutCommand.Execute(null);
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (ViewModel.PageViewMode != DetailPageViewMode.SinglePage) return;
 
         double scrollableHeight = DetailScrollViewer.ScrollableHeight;
         bool isFitInView = scrollableHeight <= 1.0;

@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
 using PDFBinder.App.Services;
 using PDFBinder.Core.Models;
@@ -117,34 +118,34 @@ public partial class MainViewModel : ObservableObject
     private PrintViewModel? _printViewModel;
 
     /// <summary>
-    /// サムネイル最小表示サイズ（px）
-    /// </summary>
-    public const double MinThumbnailSize = 140.0;
-
-    /// <summary>
-    /// サムネイル最大表示サイズ（px）
-    /// </summary>
-    public const double MaxThumbnailSize = 360.0;
-
-    /// <summary>
-    /// サムネイル拡大縮小ステップ幅（px）
-    /// </summary>
-    public const double ThumbnailSizeStep = 20.0;
-
-    /// <summary>
     /// サムネイル基準サイズ（初期値 = 220px）
     /// </summary>
     public const double DefaultThumbnailSize = 220.0;
 
     /// <summary>
-    /// サムネイル生成基準幅（px）。最大表示サイズ（360px）や高DPI環境でも鮮明に表示します。
+    /// サムネイル最小表示サイズ（px、基準サイズの50%）
     /// </summary>
-    public const int ThumbnailRenderWidth = 360;
+    public const double MinThumbnailSize = DefaultThumbnailSize * ZoomHelper.MinZoom;
+
+    /// <summary>
+    /// サムネイル最大表示サイズ（px、基準サイズの3200%）
+    /// </summary>
+    public const double MaxThumbnailSize = DefaultThumbnailSize * ZoomHelper.MaxZoom;
+
+    /// <summary>
+    /// サムネイル拡大縮小ステップ幅（px、旧実装互換用）
+    /// </summary>
+    public const double ThumbnailSizeStep = 20.0;
+
+    /// <summary>
+    /// サムネイル生成基準幅（px）。高倍率ズームや高DPI環境でも鮮明に表示します。
+    /// </summary>
+    public const int ThumbnailRenderWidth = 720;
 
     /// <summary>
     /// サムネイル生成基準高さ（px）。縦横比約1:1.4に基づきます。
     /// </summary>
-    public const int ThumbnailRenderHeight = 504;
+    public const int ThumbnailRenderHeight = 1008;
 
     [ObservableProperty]
     private double _thumbnailSize = DefaultThumbnailSize;
@@ -152,12 +153,12 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// サムネイルをさらに拡大可能かどうかを取得します。
     /// </summary>
-    public bool CanZoomInThumbnail => ThumbnailSize < MaxThumbnailSize;
+    public bool CanZoomInThumbnail => ThumbnailSize < MaxThumbnailSize - 0.01;
 
     /// <summary>
     /// サムネイルをさらに縮小可能かどうかを取得します。
     /// </summary>
-    public bool CanZoomOutThumbnail => ThumbnailSize > MinThumbnailSize;
+    public bool CanZoomOutThumbnail => ThumbnailSize > MinThumbnailSize + 0.01;
 
     partial void OnThumbnailSizeChanged(double value)
     {
@@ -285,7 +286,9 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanZoomInThumbnail))]
     public void ZoomInThumbnail()
     {
-        ThumbnailSize = Math.Min(MaxThumbnailSize, ThumbnailSize + ThumbnailSizeStep);
+        double currentZoom = ThumbnailSize / DefaultThumbnailSize;
+        double nextZoom = ZoomHelper.GetNextZoomIn(currentZoom);
+        ThumbnailSize = Math.Round(nextZoom * DefaultThumbnailSize, 2);
     }
 
     /// <summary>
@@ -294,7 +297,9 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanZoomOutThumbnail))]
     public void ZoomOutThumbnail()
     {
-        ThumbnailSize = Math.Max(MinThumbnailSize, ThumbnailSize - ThumbnailSizeStep);
+        double currentZoom = ThumbnailSize / DefaultThumbnailSize;
+        double nextZoom = ZoomHelper.GetNextZoomOut(currentZoom);
+        ThumbnailSize = Math.Round(nextZoom * DefaultThumbnailSize, 2);
     }
 
     /// <summary>
