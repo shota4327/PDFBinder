@@ -23,6 +23,13 @@ public partial class MainViewModel : ObservableObject
     private readonly IUndoRedoService _undoRedoService;
     private readonly IPrintService _printService;
     private readonly PrintSettings _persistentPrintSettings = new();
+    private CancellationTokenSource? _thumbnailCts;
+    private Task? _thumbnailTask;
+
+    /// <summary>
+    /// 現在進行中のサムネイル生成タスクを取得します（単体テスト・待機検証用）。
+    /// </summary>
+    internal Task? CurrentThumbnailTask => _thumbnailTask;
 
     /// <summary>開いているすべてのドキュメントセッション</summary>
     public ObservableCollection<DocumentSession> Documents { get; } = new();
@@ -1269,6 +1276,11 @@ public partial class MainViewModel : ObservableObject
         try
         {
             IsLoading = true;
+            StatusMessage = "進行中のサムネイル生成を中断しています...";
+
+            // 進行中のサムネイル生成タスクをその時点までで安全に終了し、完了を待機
+            await CancelAndAwaitThumbnailsAsync();
+
             StatusMessage = "ページを分割しています...";
 
             var oldPages = Document.Pages.ToList();
@@ -1365,13 +1377,77 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// グリッド表示に必要なサムネイルのうち、未生成または変更されたページを非同期で生成します。
+    /// 進行中のサムネイル生成タスクをその時点までで安全に中断し、完了を待機します。
     /// </summary>
-    public async Task EnsureThumbnailsGeneratedAsync()
+    public async Task CancelAndAwaitThumbnailsAsync()
+    {
+        var cts = _thumbnailCts;
+        if (cts != null)
+        {
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 既に破棄されている場合は安全に無視
+            }
+        }
+
+        var task = _thumbnailTask;
+        if (task != null)
+        {
+            try
+            {
+                await task;
+            }
+            catch (OperationCanceledException)
+            {
+                // 中断例外は正常系として受け入れ
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"サムネイル中断待機例外: {ex.Message}");
+            }
+        }
+
+        _thumbnailTask = null;
+        _thumbnailCts = null;
+    }
+
+    /// <summary>
+    /// グリッド表示に必要なサムネイルのうち、未生成または変更されたページを非同期で生成します。
+    /// 既存の生成タスクが動作中の場合は中断・待機してから新タスクを開始します。
+    /// </summary>
+    public Task EnsureThumbnailsGeneratedAsync()
     {
         var targets = Document.Pages.Where(p => p.Thumbnail == null || p.IsThumbnailDirty).ToList();
-        if (targets.Count == 0) return;
+        if (targets.Count == 0) return Task.CompletedTask;
 
+        var oldCts = _thumbnailCts;
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 既に破棄されている場合は無視
+        }
+
+        var newCts = new CancellationTokenSource();
+        _thumbnailCts = newCts;
+
+        var task = RunEnsureThumbnailsAsync(targets, newCts);
+        _thumbnailTask = task;
+        return task;
+    }
+
+    /// <summary>
+    /// サムネイル生成ループを実行し、各ページをレンダリングします。中断要求があった場合はその時点で終了します。
+    /// </summary>
+    private async Task RunEnsureThumbnailsAsync(List<PdfPageModel> targets, CancellationTokenSource cts)
+    {
+        var token = cts.Token;
         try
         {
             IsLoading = true;
@@ -1379,11 +1455,23 @@ public partial class MainViewModel : ObservableObject
 
             foreach (var page in targets)
             {
-                await UpdatePageThumbnailAsync(page);
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await UpdatePageThumbnailAsync(page, token);
                 page.IsThumbnailDirty = false;
             }
 
-            StatusMessage = $"グリッド表示（全 {Document.PageCount} ページ）";
+            if (!token.IsCancellationRequested)
+            {
+                StatusMessage = $"グリッド表示（全 {Document.PageCount} ページ）";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 中断時はその時点で静かに終了
         }
         catch (Exception ex)
         {
@@ -1391,7 +1479,10 @@ public partial class MainViewModel : ObservableObject
         }
         finally
         {
-            IsLoading = false;
+            if (ReferenceEquals(_thumbnailCts, cts))
+            {
+                IsLoading = false;
+            }
         }
     }
 
@@ -1458,8 +1549,10 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 単一ページのサムネイル画像をレンダリングし、手書きストロークが存在する場合は合成して設定します。
     /// </summary>
-    private async Task UpdatePageThumbnailAsync(PdfPageModel page)
+    private async Task UpdatePageThumbnailAsync(PdfPageModel page, CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested) return;
+
         BitmapSource? baseBitmap;
         if (string.IsNullOrEmpty(page.SourceFilePath))
         {
@@ -1476,11 +1569,11 @@ public partial class MainViewModel : ObservableObject
                 ThumbnailRenderWidth,
                 ThumbnailRenderHeight,
                 page.RenderRotation,
-                CancellationToken.None,
+                cancellationToken,
                 RenderPriority.Low);
         }
 
-        if (baseBitmap != null)
+        if (cancellationToken.IsCancellationRequested || baseBitmap == null) return;
         {
             if (page.InkStrokes.Count > 0)
             {
