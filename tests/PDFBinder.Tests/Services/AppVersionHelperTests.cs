@@ -72,5 +72,34 @@ public class AppVersionHelperTests
         // Assert
         Assert.True(wasCalled);
     }
+
+    [Fact]
+    public void MainViewModel_ShowAboutCommand_SetsIsAboutDialogVisibleTrue()
+    {
+        // Arrange
+        var vm = new PDFBinder.App.ViewModels.MainViewModel();
+        Assert.False(vm.IsAboutDialogVisible);
+
+        // Act
+        vm.ShowAboutCommand.Execute(null);
+
+        // Assert
+        Assert.True(vm.IsAboutDialogVisible);
+    }
+
+    [Fact]
+    public void MainViewModel_CloseAboutCommand_SetsIsAboutDialogVisibleFalse()
+    {
+        // Arrange
+        var vm = new PDFBinder.App.ViewModels.MainViewModel();
+        vm.ShowAboutCommand.Execute(null);
+        Assert.True(vm.IsAboutDialogVisible);
+
+        // Act
+        vm.CloseAboutCommand.Execute(null);
+
+        // Assert
+        Assert.False(vm.IsAboutDialogVisible);
+    }
 }
 

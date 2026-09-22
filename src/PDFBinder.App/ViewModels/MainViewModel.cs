@@ -119,6 +119,12 @@ public partial class MainViewModel : ObservableObject
     private bool _isPrintDialogVisible;
 
     /// <summary>
+    /// バージョン情報ダイアログ（インアプリオーバーレイ）を表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAboutDialogVisible;
+
+    /// <summary>
     /// 現在表示中の印刷ダイアログViewModel
     /// </summary>
     [ObservableProperty]
@@ -1692,7 +1698,7 @@ public partial class MainViewModel : ObservableObject
     public Action? ShowAboutDialogAction { get; set; }
 
     /// <summary>
-    /// アプリケーションのバージョン情報ダイアログを表示します。
+    /// アプリケーションのバージョン情報ダイアログ（インアプリ・オーバーレイ）を表示します。
     /// </summary>
     [RelayCommand]
     public void ShowAbout()
@@ -1703,11 +1709,16 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var dialog = new Views.AboutDialog
-        {
-            Owner = Application.Current?.MainWindow
-        };
-        dialog.ShowDialog();
+        IsAboutDialogVisible = true;
+    }
+
+    /// <summary>
+    /// アプリケーションのバージョン情報ダイアログ（インアプリ・オーバーレイ）を閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void CloseAbout()
+    {
+        IsAboutDialogVisible = false;
     }
 }
 
