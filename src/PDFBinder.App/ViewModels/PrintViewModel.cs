@@ -392,6 +392,7 @@ public partial class PrintViewModel : ObservableObject
             var app = Application.Current;
             if (app == null) return nint.Zero;
 
+            // UIスレッド上であればメインウィンドウのハンドルを取得
             if (app.Dispatcher.CheckAccess())
             {
                 return app.MainWindow != null
@@ -399,12 +400,14 @@ public partial class PrintViewModel : ObservableObject
                     : nint.Zero;
             }
 
+            // 単体テスト環境等、非UIスレッドかつディスパッチャーループ非稼働時の無限デッドロックを防止するため、
+            // タイムアウト（50ms）付きで呼び出し、失敗時は安全に親なし（Zero）として扱います。
             return app.Dispatcher.Invoke(() =>
             {
                 return app.MainWindow != null
                     ? new System.Windows.Interop.WindowInteropHelper(app.MainWindow).Handle
                     : nint.Zero;
-            });
+            }, System.Windows.Threading.DispatcherPriority.Normal, CancellationToken.None, TimeSpan.FromMilliseconds(50));
         }
         catch
         {
