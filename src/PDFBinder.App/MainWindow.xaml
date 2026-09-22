@@ -76,9 +76,25 @@
             <Grid>
                 <!-- 左側：アプリアイコン ＋ タブ -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Stretch">
-                    <!-- アプリアイコン（装飾・ドラッグ領域として機能） -->
-                    <Image Source="Assets/icon.png" Width="18" Height="18" Margin="12,0,10,0"
-                           VerticalAlignment="Center" IsHitTestVisible="False" />
+                    <!-- アプリアイコン（クリック時にバージョン情報プルダウン表示） -->
+                    <Button Style="{StaticResource AppIconButtonStyle}"
+                            WindowChrome.IsHitTestVisibleInChrome="True"
+                            ToolTip="PDF Binder (version)"
+                            Click="OnAppIconButtonClick"
+                            Margin="8,0,6,0"
+                            VerticalAlignment="Center">
+                        <Image Source="Assets/icon.png" Width="18" Height="18" />
+                        <Button.ContextMenu>
+                            <ContextMenu Style="{StaticResource DarkContextMenuStyle}">
+                                <MenuItem Header="version" Style="{StaticResource DarkMenuItemStyle}"
+                                          Command="{Binding ShowAboutCommand}">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="&#xE88E;" FontFamily="{StaticResource IconFontFamily}" FontSize="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
 
                     <!-- タブ（クリック可能にするため IsHitTestVisibleInChrome="True"） -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"

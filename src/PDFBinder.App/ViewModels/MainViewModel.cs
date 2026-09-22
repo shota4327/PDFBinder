@@ -1685,4 +1685,29 @@ public partial class MainViewModel : ObservableObject
 
         return baseBitmap;
     }
+
+    /// <summary>
+    /// バージョン情報（About画面）を表示するための外部デリゲート（単体テスト・差し替え用）。
+    /// </summary>
+    public Action? ShowAboutDialogAction { get; set; }
+
+    /// <summary>
+    /// アプリケーションのバージョン情報ダイアログを表示します。
+    /// </summary>
+    [RelayCommand]
+    public void ShowAbout()
+    {
+        if (ShowAboutDialogAction != null)
+        {
+            ShowAboutDialogAction();
+            return;
+        }
+
+        var dialog = new Views.AboutDialog
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        dialog.ShowDialog();
+    }
 }
+
