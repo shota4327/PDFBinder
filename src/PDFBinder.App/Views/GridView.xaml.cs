@@ -26,6 +26,11 @@ public partial class GridView : UserControl
     private readonly List<FrameworkElement> _draggedContainers = new();
     private int? _currentDropTargetIndex;
 
+    private bool _isDragging;
+    private bool _isExternalDragOver;
+    private readonly AutoScroller _autoScroller;
+    private readonly DragMouseWheelHook _mouseWheelHook;
+
     private bool _isRubberBandActive;
     private Point _rubberBandStart;
     private HashSet<PdfPageModel> _initialSelection = new();
@@ -33,6 +38,18 @@ public partial class GridView : UserControl
     public GridView()
     {
         InitializeComponent();
+
+        _autoScroller = new AutoScroller(GridScrollViewer);
+        _autoScroller.Scrolled += OnDragScrolled;
+
+        _mouseWheelHook = new DragMouseWheelHook();
+        _mouseWheelHook.MouseWheelRotated += HandleDragMouseWheel;
+
+        Unloaded += (s, e) =>
+        {
+            _autoScroller.Stop();
+            _mouseWheelHook.Dispose();
+        };
     }
 
     private MainViewModel? ViewModel => DataContext as MainViewModel;
@@ -193,12 +210,17 @@ public partial class GridView : UserControl
         }
 
         var data = new DataObject("PdfPages", pagesToMove);
+        _isDragging = true;
+        _mouseWheelHook.StartHook();
         try
         {
             DragDrop.DoDragDrop(sourceElement, data, DragDropEffects.Move);
         }
         finally
         {
+            _isDragging = false;
+            _mouseWheelHook.StopHook();
+            _autoScroller.Stop();
             EndDrag();
         }
     }
@@ -223,6 +245,37 @@ public partial class GridView : UserControl
         HideInsertionIndicator();
         _dragStartPoint = null;
         _draggedPage = null;
+    }
+
+    /// <summary>
+    /// ドラッグ中またはラバーバンド選択中のスクロール発生時に表示・選択を追従更新します。
+    /// </summary>
+    private void OnDragScrolled()
+    {
+        if (_isRubberBandActive)
+        {
+            UpdateRubberBandSelection(Mouse.GetPosition(ItemsHostGrid));
+        }
+        else if (_isDragging || _isExternalDragOver)
+        {
+            var hostPos = Mouse.GetPosition(ItemsHostGrid);
+            UpdateInsertionIndicator(hostPos);
+        }
+    }
+
+    /// <summary>
+    /// ドラッグ中のマウスホイール回転に応じてグリッドをスクロールします。
+    /// </summary>
+    private void HandleDragMouseWheel(int delta)
+    {
+        // 1ノッチ（120単位）あたり約48ピクセルスクロール
+        double scrollAmount = -Math.Sign(delta) * 48.0;
+        double newOffset = Math.Clamp(GridScrollViewer.VerticalOffset + scrollAmount, 0, GridScrollViewer.ScrollableHeight);
+        if (Math.Abs(newOffset - GridScrollViewer.VerticalOffset) > 0.001)
+        {
+            GridScrollViewer.ScrollToVerticalOffset(newOffset);
+            OnDragScrolled();
+        }
     }
 
     /// <summary>
@@ -289,6 +342,10 @@ public partial class GridView : UserControl
         var hostPos = e.GetPosition(ItemsHostGrid);
         _dragAdorner?.UpdatePosition(e.GetPosition(this));
 
+        // ドラッグ中の端部オートスクロール判定
+        var scrollViewerPos = e.GetPosition(GridScrollViewer);
+        _autoScroller.UpdatePointerPosition(scrollViewerPos);
+
         if (e.Data.GetDataPresent("PdfPages"))
         {
             e.Effects = DragDropEffects.Move;
@@ -300,6 +357,12 @@ public partial class GridView : UserControl
             var files = e.Data.GetData(DataFormats.FileDrop) as string[];
             if (files != null && files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
             {
+                if (!_isDragging && !_isExternalDragOver)
+                {
+                    _isExternalDragOver = true;
+                    _mouseWheelHook.AttachThreadFilter();
+                }
+
                 e.Effects = DragDropEffects.Copy;
                 UpdateInsertionIndicator(hostPos);
                 e.Handled = true;
@@ -315,6 +378,12 @@ public partial class GridView : UserControl
         var pos = e.GetPosition(this);
         if (pos.X < 0 || pos.Y < 0 || pos.X >= ActualWidth || pos.Y >= ActualHeight)
         {
+            _autoScroller.Stop();
+            if (_isExternalDragOver)
+            {
+                _isExternalDragOver = false;
+                _mouseWheelHook.StopHook();
+            }
             HideInsertionIndicator();
         }
     }
@@ -324,6 +393,13 @@ public partial class GridView : UserControl
     /// </summary>
     private async void OnGridDrop(object sender, DragEventArgs e)
     {
+        _autoScroller.Stop();
+        if (_isExternalDragOver)
+        {
+            _isExternalDragOver = false;
+            _mouseWheelHook.StopHook();
+        }
+
         int targetIndex = _currentDropTargetIndex ?? (ViewModel?.Document.Pages.Count ?? 0);
         HideInsertionIndicator();
 
@@ -503,6 +579,21 @@ public partial class GridView : UserControl
         if (!_isRubberBandActive || ViewModel == null) return;
 
         var current = e.GetPosition(ItemsHostGrid);
+        UpdateRubberBandSelection(current);
+
+        var scrollViewerPos = e.GetPosition(GridScrollViewer);
+        _autoScroller.UpdatePointerPosition(scrollViewerPos);
+
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// 指定された座標に基づいてラバーバンド矩形を描画し、接触するページの選択状態を更新します。
+    /// </summary>
+    private void UpdateRubberBandSelection(Point current)
+    {
+        if (ViewModel == null) return;
+
         double x = Math.Min(_rubberBandStart.X, current.X);
         double y = Math.Min(_rubberBandStart.Y, current.Y);
         double width = Math.Abs(current.X - _rubberBandStart.X);
@@ -530,7 +621,6 @@ public partial class GridView : UserControl
                     : intersects;
             }
         }
-        e.Handled = true;
     }
 
     /// <summary>
@@ -540,6 +630,7 @@ public partial class GridView : UserControl
     {
         if (_isRubberBandActive)
         {
+            _autoScroller.Stop();
             _isRubberBandActive = false;
             RubberBandBorder.Visibility = Visibility.Collapsed;
             GridScrollViewer.ReleaseMouseCapture();
@@ -548,10 +639,18 @@ public partial class GridView : UserControl
     }
 
     /// <summary>
-    /// マウスホイール操作を先行検知し、Ctrlキー押下時はサムネイルのズームイン・ズームアウトを実行します。
+    /// マウスホイール操作を先行検知し、ドラッグ中は縦スクロール、通常時かつCtrlキー押下時はサムネイルのズームを実行します。
     /// </summary>
     private void OnGridPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        // ドラッグ中またはラバーバンド選択中はCtrl押下時でもズームを抑止し、通常の縦スクロールを実行
+        if (_isRubberBandActive || _isDragging || _isExternalDragOver)
+        {
+            HandleDragMouseWheel(e.Delta);
+            e.Handled = true;
+            return;
+        }
+
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 && ViewModel != null)
         {
             if (e.Delta > 0)

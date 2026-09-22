@@ -67,6 +67,7 @@
 | **F58** | UI・印刷 | 印刷機能（インアプリ・オーバーレイ、左右2分割レイアウト、リアルタイムプレビュー、Fit/N-up/冊子中綴じ面付け、プリンター印刷設定ダイアログ連携・DEVMODE同期・保持、96 DPI原寸等倍印刷、System.Printing統合） | **完了** | Issue #45, #130, #132 / WpfPrintService, PrinterDevModeHelper & PrintViewModel |
 | **F59** | レンダリング / 安定化 | PDFium排他・優先度制御（PriorityAsyncLock）、ページ高速切替デバウンス、サムネイル仮プレビューによるフリーズ・クラッシュ防止 | **完了** | Issue #118 / PriorityAsyncLock, PdfiumRenderer & DetailEditor |
 | **F60** | PDF操作コア / UI | ページ分割機能（表示向き長辺2等分分割、A3→A4等、手書きストローク境界切断・引き継ぎ、Undo/Redo対応） | **完了** | Issue #137 / StrokeSplitHelper & ReplaceAllPagesCommand |
+| **F61** | UI・グリッド俯瞰 | グリッド表示でのドラッグ中マウスホイールスクロール＆オートスクロール（ページ並び替え・外部PDF挿入・ラバーバンド選択対応、上下端40px可変速度自動スクロール、ドラッグ中ズーム抑止） | **完了** | Issue #142 / AutoScroller & DragMouseWheelHook |
 
 ---
 
