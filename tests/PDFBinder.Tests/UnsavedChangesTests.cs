@@ -354,6 +354,107 @@ public class UnsavedChangesTests
         Assert.True(testService.SaveCalled);
         Assert.False(vm.IsSaveConfirmationVisible);
     }
+
+    [Fact]
+    public void Document_WhenInkStrokesRestored_ResetModifiedStateLeavesUnmodified()
+    {
+        // Arrange
+        var doc = new PdfDocumentModel();
+        var page = new PdfPageModel();
+        doc.AddPage(page);
+
+        // 手書き注釈の復元をシミュレート
+        var restoredPoints = new StylusPointCollection { new StylusPoint(5.0, 5.0), new StylusPoint(15.0, 15.0) };
+        page.InkStrokes.Clear();
+        page.InkStrokes.Add(new Stroke(restoredPoints));
+
+        // Act: ドキュメント読み込み完了時の状態リセット
+        doc.ResetModifiedState();
+
+        // Assert: 読み込み直後は変更なし状態
+        Assert.False(page.IsModified);
+        Assert.False(page.IsThumbnailDirty);
+        Assert.False(doc.IsModified);
+    }
+
+    [Fact]
+    public void Document_WhenRestoredInkStrokesEdited_SetsBothPageAndDocumentModified()
+    {
+        // Arrange: 手書き注釈が復元された既存ドキュメント
+        var doc = new PdfDocumentModel();
+        var page = new PdfPageModel();
+        doc.AddPage(page);
+
+        var initialPoints = new StylusPointCollection { new StylusPoint(5.0, 5.0), new StylusPoint(15.0, 15.0) };
+        page.InkStrokes.Clear();
+        page.InkStrokes.Add(new Stroke(initialPoints));
+        doc.ResetModifiedState();
+
+        Assert.False(doc.IsModified);
+
+        // Act: 復元後に新しいストロークを追加
+        var newPoints = new StylusPointCollection { new StylusPoint(30.0, 30.0), new StylusPoint(40.0, 40.0) };
+        page.InkStrokes.Add(new Stroke(newPoints));
+
+        // Assert: ページおよびドキュメントの両方が変更状態・サムネイル更新対象になる
+        Assert.True(page.IsModified);
+        Assert.True(page.IsThumbnailDirty);
+        Assert.True(doc.IsModified);
+    }
+
+    [Fact]
+    public void Document_WhenInkStrokesReassigned_SubsequentEditSetsModified()
+    {
+        // Arrange: プロパティ再代入によりストロークコレクションが差し替えられた場合
+        var doc = new PdfDocumentModel();
+        var page = new PdfPageModel();
+        doc.AddPage(page);
+
+        var points = new StylusPointCollection { new StylusPoint(1.0, 1.0), new StylusPoint(2.0, 2.0) };
+        page.InkStrokes = new StrokeCollection { new Stroke(points) };
+        doc.ResetModifiedState();
+
+        Assert.False(doc.IsModified);
+
+        // Act: コレクション差し替え後にストロークを編集
+        var addedPoints = new StylusPointCollection { new StylusPoint(50.0, 50.0), new StylusPoint(60.0, 60.0) };
+        page.InkStrokes.Add(new Stroke(addedPoints));
+
+        // Assert: 再代入後もStrokesChangedイベントが正しく接続され変更検知される
+        Assert.True(page.IsModified);
+        Assert.True(page.IsThumbnailDirty);
+        Assert.True(doc.IsModified);
+    }
+
+    [Fact]
+    public async Task ConfirmSaveAndProceedAsync_WhenRestoredInkStrokesEdited_ShowsSaveConfirmation()
+    {
+        // Arrange: 手書き復元ドキュメントを読み込み後に編集した状態
+        var testService = new TestPdfService();
+        var vm = new MainViewModel(testService);
+        var page = new PdfPageModel();
+        vm.Document.AddPage(page);
+        vm.Document.FilePath = @"C:\Fake\WithInk.pdf";
+
+        var initialPoints = new StylusPointCollection { new StylusPoint(10.0, 10.0) };
+        page.InkStrokes.Add(new Stroke(initialPoints));
+        vm.Document.ResetModifiedState();
+
+        // Act: 手書きを追加
+        var editPoints = new StylusPointCollection { new StylusPoint(20.0, 20.0) };
+        page.InkStrokes.Add(new Stroke(editPoints));
+
+        // 確認処理を実行
+        var proceedTask = vm.ConfirmSaveAndProceedAsync();
+
+        // Assert: 手書き編集を検知して確認ダイアログ（オーバーレイ）が表示される
+        Assert.True(vm.IsSaveConfirmationVisible);
+
+        // 破棄して続行を選択
+        vm.ConfirmSaveCommand.Execute(SaveConfirmationResult.Discard);
+        bool proceedResult = await proceedTask;
+        Assert.True(proceedResult);
+    }
 }
 
 /// <summary>

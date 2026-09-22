@@ -13,6 +13,23 @@ namespace PDFBinder.Core.Services;
 /// </summary>
 public class PdfiumRenderer : IPdfRenderer
 {
+    private readonly PriorityAsyncLock _renderLock = new();
+
+    /// <summary>
+    /// 現在のレンダリング排他ロックインスタンスを取得します（単体テスト検証用）。
+    /// </summary>
+    internal PriorityAsyncLock RenderLock => _renderLock;
+
+    /// <inheritdoc/>
+    public Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, RenderPriority.Normal);
+
     /// <inheritdoc/>
     public async Task<BitmapSource?> RenderPageAsync(
         string? filePath,
@@ -20,7 +37,8 @@ public class PdfiumRenderer : IPdfRenderer
         int targetWidth,
         int targetHeight,
         PageRotation rotation,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken,
+        RenderPriority priority)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -28,6 +46,9 @@ public class PdfiumRenderer : IPdfRenderer
         {
             return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
         }
+
+        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return await Task.Run(() =>
         {
@@ -148,13 +169,24 @@ public class PdfiumRenderer : IPdfRenderer
     }
 
     /// <inheritdoc/>
-    public async Task<PageInteractiveData> ExtractInteractiveDataAsync(
+    public Task<PageInteractiveData> ExtractInteractiveDataAsync(
         string? filePath,
         int pageIndex,
         double displayWidth,
         double displayHeight,
         PageRotation rotation,
         CancellationToken cancellationToken = default)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, RenderPriority.Normal);
+
+    /// <inheritdoc/>
+    public async Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -162,6 +194,9 @@ public class PdfiumRenderer : IPdfRenderer
         {
             return PageInteractiveData.Empty;
         }
+
+        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
 
         return await Task.Run(() =>
         {

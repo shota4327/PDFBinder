@@ -195,6 +195,76 @@ public class CompositeUndoableCommand : IUndoableCommand
 }
 
 /// <summary>
+/// 複数ページの並び替えを元に戻す/やり直すコマンド
+/// </summary>
+public class ReorderPagesCommand : IUndoableCommand
+{
+    private readonly PdfDocumentModel _doc;
+    private readonly List<PdfPageModel> _oldOrder;
+    private readonly List<PdfPageModel> _newOrder;
+
+    public string Description => "ページの並び替え";
+
+    public ReorderPagesCommand(PdfDocumentModel doc, IEnumerable<PdfPageModel> oldOrder, IEnumerable<PdfPageModel> newOrder)
+    {
+        _doc = doc;
+        _oldOrder = oldOrder.ToList();
+        _newOrder = newOrder.ToList();
+    }
+
+    public void Execute() => ApplyOrder(_newOrder);
+    public void Undo() => ApplyOrder(_oldOrder);
+
+    private void ApplyOrder(List<PdfPageModel> targetOrder)
+    {
+        for (int i = 0; i < targetOrder.Count; i++)
+        {
+            var item = targetOrder[i];
+            int currentIdx = _doc.Pages.IndexOf(item);
+            if (currentIdx >= 0 && currentIdx != i)
+            {
+                _doc.Pages.Move(currentIdx, i);
+            }
+        }
+    }
+}
+
+/// <summary>
+/// 複数ページの挿入を一括して元に戻す/やり直すコマンド
+/// </summary>
+public class InsertPagesCommand : IUndoableCommand
+{
+    private readonly PdfDocumentModel _doc;
+    private readonly List<PdfPageModel> _pages;
+    private readonly int _startIndex;
+
+    public string Description => "ページの挿入";
+
+    public InsertPagesCommand(PdfDocumentModel doc, IEnumerable<PdfPageModel> pages, int startIndex)
+    {
+        _doc = doc;
+        _pages = pages.ToList();
+        _startIndex = startIndex;
+    }
+
+    public void Execute()
+    {
+        for (int i = 0; i < _pages.Count; i++)
+        {
+            _doc.InsertPage(_startIndex + i, _pages[i]);
+        }
+    }
+
+    public void Undo()
+    {
+        foreach (var page in _pages)
+        {
+            _doc.RemovePage(page);
+        }
+    }
+}
+
+/// <summary>
 /// ページ分割などによりドキュメントの全ページを置換する操作を元に戻す/やり直すコマンド
 /// </summary>
 public class ReplaceAllPagesCommand : IUndoableCommand

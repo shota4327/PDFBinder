@@ -253,7 +253,9 @@ public class PdfService : IPdfService
                 string? base64 = annot.Elements.GetString(PdfBinderInkAnnotation.InkKey);
                 if (!string.IsNullOrWhiteSpace(base64))
                 {
-                    pageModel.InkStrokes = PdfBinderInkAnnotation.DeserializeStrokes(base64);
+                    var restoredStrokes = PdfBinderInkAnnotation.DeserializeStrokes(base64);
+                    pageModel.InkStrokes.Clear();
+                    pageModel.InkStrokes.Add(restoredStrokes);
                     break;
                 }
             }

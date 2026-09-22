@@ -94,4 +94,40 @@ public class CommandLineArgsHelperTests
         Assert.Contains(targetPath, startInfo.Arguments);
         Assert.False(startInfo.UseShellExecute);
     }
+
+    [Theory]
+    [InlineData("--new-window")]
+    [InlineData("--NEW-WINDOW")]
+    [InlineData("-n")]
+    [InlineData("-N")]
+    public void Parse_WithNewWindowFlag_SetsForceNewWindowTrue(string flag)
+    {
+        var samplePath = Path.Combine(Path.GetTempPath(), "test.pdf");
+        var result = CommandLineArgsHelper.Parse(new[] { flag, samplePath });
+
+        Assert.True(result.ForceNewWindow);
+        Assert.Single(result.Files);
+        Assert.Equal(Path.GetFullPath(samplePath), result.Files[0]);
+    }
+
+    [Fact]
+    public void Parse_WithoutNewWindowFlag_SetsForceNewWindowFalse()
+    {
+        var samplePath = Path.Combine(Path.GetTempPath(), "test.pdf");
+        var result = CommandLineArgsHelper.Parse(new[] { samplePath });
+
+        Assert.False(result.ForceNewWindow);
+        Assert.Single(result.Files);
+        Assert.Equal(Path.GetFullPath(samplePath), result.Files[0]);
+    }
+
+    [Fact]
+    public void Parse_WithDuplicateFiles_DeduplicatesEntries()
+    {
+        var samplePath = Path.Combine(Path.GetTempPath(), "duplicate.pdf");
+        var result = CommandLineArgsHelper.Parse(new[] { samplePath, samplePath });
+
+        Assert.Single(result.Files);
+        Assert.Equal(Path.GetFullPath(samplePath), result.Files[0]);
+    }
 }

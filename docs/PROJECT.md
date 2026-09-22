@@ -22,15 +22,15 @@
 | **F03** | プロジェクト基盤 | CI・コーディング規約 (`GEMINI.md`) 整備 | **完了** | 初期コミット済 |
 | **F04** | プロジェクト基盤 | 単一EXE発行環境（Self-Contained & Framework-Dependent / `build.ps1`） | **完了** | `dist/PDFBinder.exe` (フレームワーク依存版: 約8.4MB) & `dist/self-contained/PDFBinder.exe` (自己完結版: 約66MB) |
 | **F10** | PDF操作コア | 非破壊ドキュメント読み込み（メモリ展開/ファイルロック回避） | **完了** | PdfService (PdfSharp) |
-| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°、手書きインク追従幾何変換、Undo/Redo同期） | **完了** | Issue #70 / InkTransformHelper / PdfPageModel |
+| **F11** | PDF操作コア | ページ回転（時計回り90°、反時計回り90°、180°、手書きインク追従幾何変換、WPFネイティブ一括アフィン変換高速化、回転時FitMode自動再計算追従、Undo/Redo同期） | **完了** | Issue #70, #106 / InkTransformHelper / PdfPageModel |
 | **F12** | PDF操作コア | ページ削除 | **完了** | PdfDocumentModel.RemovePage |
 | **F13** | PDF操作コア | ページ順序入れ替え（Reordering） | **完了** | MovePageCommand / PdfDocumentModel |
 | **F14** | PDF操作コア | 空白ページの追加（隣接サイズ継承 / A4標準） | **完了** | PdfService.CreateBlankPage |
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
 | **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
-| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54 / インアプリオーバーレイ & OnClosing |
-| **F19** | PDF操作コア / 起動 | 起動時コマンドライン引数処理（「プログラムから開く」・関連付け起動・複数ファイル個別プロセス起動） | **完了** | Issue #83 / CommandLineArgsHelper & App.OnStartup |
+| **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、手書き既存ファイル復元後の変更検知、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54, #111 / インアプリオーバーレイ & OnClosing |
+| **F19** | PDF操作コア / 起動 | 起動時コマンドライン引数処理および単一インスタンス管理（「プログラムから開く」・関連付け起動時の同一ウィンドウ新タブ統合・IPC通信・最前面復元・--new-windowオプション・複数ウィンドウ統合管理） | **完了** | Issue #83, #123 / SingleInstanceManager, CommandLineArgsHelper & App.OnStartup |
 | **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大360px・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
 | **F21** | レンダリング | 手書きストローク（InkStrokes）のサムネイル縮小合成反映 | **完了** | Issue #21 / CompositeStrokes |
 | **F30** | UI・グリッド俯瞰 | ページタイル状グリッド一覧表示（仮想化・カードUI） | **完了** | GridView.xaml |
@@ -47,7 +47,7 @@
 | **F36** | UI・タイトルバー | タイトルバー廃止とタブバー統合（Chrome/Edgeスタイル・WindowChrome） | **完了** | Issue #28 / WindowChrome |
 | **F45** | 手書き詳細 | ズーム（拡大縮小）＆パン（手のひら／移動ツール、初期デフォルトツール化、50%〜3200%適応型スナップズーム、最大レンダリング解像度8192px拡張） | **完了** | Issue #60, #93 / ScaleTransform & ZoomSnapSteps |
 | **F46** | 手書き詳細 | 手書きストロークの再編集可能保存・復元（アピアランス付き注釈 /AP ＋ ISFメタデータ埋め込み＆他社注釈分離背景描画） | **完了** | Issue #89 / PdfBinderInkAnnotation & PdfService |
-| **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム・自動スクロール抑止・タッチスロップ・タッチ描画遮断） | **完了** | Issue #9, #13, #41, #46 / EditorInkCanvas |
+| **F47** | 手書き詳細 | パームリジェクション & タッチ操作（1本指パン・2本指ピンチズーム・自動スクロール抑止・タッチスロップ・タッチ描画遮断・移動ツールタッチ昇格競合解消） | **完了** | Issue #9, #13, #41, #46, #127 / EditorInkCanvas |
 | **F22** | レンダリング | スキャンPDF対応（差分回転レンダリング・Docnet正規化・手書き座標逆変換） | **完了** | Issue #34 |
 | **F23** | レンダリング | 詳細ビューのズーム連動動的レンダリング（デバウンス・高品質補間・縮小細線保護） | **完了** | Issue #24 |
 | **F24** | レンダリング | 詳細ビューの選択的動的レンダリング（初回先頭10ページ制限、単一表示前後1ページ制限、600%超現在ページ限定、連続表示可視ページ限定） | **完了** | Issue #95 |
@@ -57,14 +57,16 @@
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
 | **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
-| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 294件全PASS） | **完了** | PDFBinder.Tests |
-| **F56** | PDF操作コア / UI | ページ分割機能（表示向き長辺2等分分割、A3→A4等、手書きストローク境界切断・引き継ぎ、Undo/Redo対応） | **完了** | Issue #137 / StrokeSplitHelper & ReplaceAllPagesCommand |
+| **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 単体テスト全件PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
 | **F53** | UI・デザイン | スレート／ネイビー系ダークテーマへの完全移行（常時ダーク・PDF原本用紙白地保持・カスタムスリムスクロールバー） | **完了** | Issue #91 / App.xaml, MainWindow, GridView, DetailEditorView |
 | **F55** | UI・レンダリング | ピクセル整合レンダリング＆テキスト整形最適化（UseLayoutRounding / TextFormattingMode=Display / ClearType / BaseFont継承） | **完了** | Issue #102 / MainWindow, GridView, DetailEditorView, App.xaml |
-| **F58** | 手書き詳細 | 拡大縮小連動ペンホバープレビューカーソル（通常ペン・蛍光ペン・部分消しゴムのズーム倍率連動動的プレビュー、WYSIWYG、最小3px・最大128pxクランプ、メモリ内DIBカーソル生成・キャッシュ） | **完了** | Issue #107 / PenCursorHelper & EditorInkCanvas |
-| **F57** | 手書き詳細 | 外付けペンタブレット（WinTab）筆圧感知対応（自前P/Invoke、Windows Ink無効環境対応、リニア筆圧正規化、動的マウス抑制・インク注入、デバイス検出通知＆ツールチップ表示） | **完了** | Issue #112 / WinTabService & EditorInkCanvas |
+| **F56** | 手書き詳細 | 拡大縮小連動ペンホバープレビューカーソル（通常ペン・蛍光ペン・部分消しゴムのズーム倍率連動動的プレビュー、WYSIWYG、最小3px・最大128pxクランプ、メモリ内DIBカーソル生成・キャッシュ） | **完了** | Issue #107 / PenCursorHelper & EditorInkCanvas |
+| **F57** | UI・ファイル管理 | 複数ファイルを開いて切り替える機能（タイトルバー中央プルダウンUI、個別終了・保存確認、独立Undo/Redo＆表示状態保持、複数起動統合） | **完了** | Issue #51 / DocumentSession & MainViewModel |
+| **F58** | UI・印刷 | 印刷機能（インアプリ・オーバーレイ、左右2分割レイアウト、リアルタイムプレビュー、Fit/N-up/冊子中綴じ面付け、プリンター印刷設定ダイアログ連携・DEVMODE同期・保持、96 DPI原寸等倍印刷、System.Printing統合） | **完了** | Issue #45, #130, #132 / WpfPrintService, PrinterDevModeHelper & PrintViewModel |
+| **F59** | レンダリング / 安定化 | PDFium排他・優先度制御（PriorityAsyncLock）、ページ高速切替デバウンス、サムネイル仮プレビューによるフリーズ・クラッシュ防止 | **完了** | Issue #118 / PriorityAsyncLock, PdfiumRenderer & DetailEditor |
+| **F60** | PDF操作コア / UI | ページ分割機能（表示向き長辺2等分分割、A3→A4等、手書きストローク境界切断・引き継ぎ、Undo/Redo対応） | **完了** | Issue #137 / StrokeSplitHelper & ReplaceAllPagesCommand |
 
 ---
 

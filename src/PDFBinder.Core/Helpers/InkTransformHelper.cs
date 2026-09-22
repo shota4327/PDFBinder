@@ -10,7 +10,7 @@ namespace PDFBinder.Core.Helpers;
 public static class InkTransformHelper
 {
     /// <summary>
-    /// 差分回転角度と現在のページ表示寸法に基づいて、手書きストロークコレクションを幾何学的に回転変換します。
+    /// 差分回転角度と現在のページ表示寸法に基づいて、手書きストロークコレクションを一括行列演算で高速に幾何学変換します。
     /// </summary>
     /// <param name="strokes">変換対象のストロークコレクション</param>
     /// <param name="deltaRotation">差分回転角度（時計回り）</param>
@@ -32,52 +32,37 @@ public static class InkTransformHelper
             return;
         }
 
-        var transformedStrokes = new List<Stroke>(strokes.Count);
-        foreach (var stroke in strokes)
-        {
-            transformedStrokes.Add(TransformSingleStroke(
-                stroke,
-                deltaRotation,
-                currentDisplayWidth,
-                currentDisplayHeight));
-        }
+        var matrix = CreateRotationMatrix(deltaRotation, currentDisplayWidth, currentDisplayHeight);
+        strokes.Transform(matrix, false);
 
-        strokes.Clear();
-        foreach (var transformedStroke in transformedStrokes)
+        if (deltaRotation is PageRotation.Rotate90 or PageRotation.Rotate270)
         {
-            strokes.Add(transformedStroke);
+            foreach (var stroke in strokes)
+            {
+                var attr = stroke.DrawingAttributes;
+                if (attr.Width != attr.Height)
+                {
+                    (attr.Width, attr.Height) = (attr.Height, attr.Width);
+                }
+            }
         }
     }
 
     /// <summary>
-    /// 単一のストロークを指定された回転角度で幾何学変換します。
+    /// 差分回転角度と元の寸法に応じた座標変換行列を作成します。
     /// </summary>
-    private static Stroke TransformSingleStroke(
-        Stroke stroke,
+    public static System.Windows.Media.Matrix CreateRotationMatrix(
         PageRotation deltaRotation,
-        double currentDisplayWidth,
-        double currentDisplayHeight)
+        double currentWidth,
+        double currentHeight)
     {
-        var newPoints = new StylusPointCollection(stroke.StylusPoints.Count);
-        foreach (var pt in stroke.StylusPoints)
+        return deltaRotation switch
         {
-            var (newX, newY) = TransformPoint(
-                pt.X,
-                pt.Y,
-                deltaRotation,
-                currentDisplayWidth,
-                currentDisplayHeight);
-
-            newPoints.Add(new StylusPoint(newX, newY, pt.PressureFactor));
-        }
-
-        var newAttr = stroke.DrawingAttributes.Clone();
-        if (deltaRotation is PageRotation.Rotate90 or PageRotation.Rotate270)
-        {
-            (newAttr.Width, newAttr.Height) = (newAttr.Height, newAttr.Width);
-        }
-
-        return new Stroke(newPoints, newAttr);
+            PageRotation.Rotate90 => new System.Windows.Media.Matrix(0, 1, -1, 0, currentHeight, 0),
+            PageRotation.Rotate180 => new System.Windows.Media.Matrix(-1, 0, 0, -1, currentWidth, currentHeight),
+            PageRotation.Rotate270 => new System.Windows.Media.Matrix(0, -1, 1, 0, 0, currentWidth),
+            _ => System.Windows.Media.Matrix.Identity
+        };
     }
 
     /// <summary>

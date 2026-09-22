@@ -33,6 +33,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     public int DebounceDelayMs { get; set; } = 150;
 
     /// <summary>
+    /// ページ切り替え後の動的レンダリング遅延（デバウンス）時間（ミリ秒）
+    /// </summary>
+    public int PageSwitchDebounceDelayMs { get; set; } = 75;
+
+    /// <summary>
     /// ポイント単位（72pt/inch）をWPF論理ピクセル（96DIP/inch）に変換する標準基準スケール係数（約1.333）
     /// </summary>
     public const double PtToDipScale = 96.0 / 72.0;
@@ -146,32 +151,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _isPenPressureEnabled;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PenPressureToolTip))]
-    private string? _penTabletDeviceName;
-
-    /// <summary>
-    /// 筆圧ボタンのツールチップテキスト（デバイス検出状態を反映）
-    /// </summary>
-    public string PenPressureToolTip => string.IsNullOrEmpty(PenTabletDeviceName)
-        ? "筆圧感知（ペン使用時のみ / Windows Ink・ペンタブレット対応）"
-        : $"筆圧感知（ペン使用時のみ / WinTab: {PenTabletDeviceName} 検出済み）";
-
-    /// <summary>
-    /// ステータスメッセージの表示要求イベント
-    /// </summary>
-    public event Action<string>? StatusMessageRequested;
-
-    /// <summary>
-    /// ペンタブレット（WinTab）デバイスが検出された際に呼び出し、ステータス通知とツールチップを更新します。
-    /// </summary>
-    /// <param name="deviceName">検出されたデバイス名</param>
-    public void NotifyTabletDeviceDetected(string deviceName)
-    {
-        PenTabletDeviceName = deviceName;
-        StatusMessageRequested?.Invoke($"ペンタブレット（WinTab）を検出しました: {deviceName}");
-    }
 
     /// <summary>
     /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
@@ -475,6 +454,15 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
+        if (oldValue != null)
+        {
+            oldValue.PropertyChanged -= OnCurrentPagePropertyChanged;
+        }
+        if (newValue != null)
+        {
+            newValue.PropertyChanged += OnCurrentPagePropertyChanged;
+        }
+
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
@@ -489,7 +477,46 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         if (PageViewMode == DetailPageViewMode.SinglePage && newValue != null)
         {
-            _ = ScheduleDynamicRender(immediate: true);
+            _ = ScheduleDynamicRender(immediate: false, isInitialLoad: false, isPageSwitch: true);
+        }
+    }
+
+    private void OnCurrentPagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PdfPageModel.Rotation))
+        {
+            OnPropertyChanged(nameof(PageBackground));
+            OnPageDimensionsChanged();
+        }
+        else if (e.PropertyName is nameof(PdfPageModel.DisplayWidth) or nameof(PdfPageModel.DisplayHeight))
+        {
+            OnPageDimensionsChanged();
+        }
+    }
+
+    /// <summary>
+    /// 指定されたページアイテムに対して即時幾何回転プレビューを適用します。
+    /// </summary>
+    public void ApplyInstantRotationToPage(PdfPageModel page, int deltaDegrees)
+    {
+        var item = Pages.FirstOrDefault(p => p.Page == page);
+        item?.ApplyInstantRotation(deltaDegrees);
+        if (item == CurrentPageItem)
+        {
+            OnPropertyChanged(nameof(PageBackground));
+            OnPageDimensionsChanged();
+        }
+    }
+
+    /// <summary>
+    /// カレントページの寸法または回転が変更された際にFitModeを再計算します。
+    /// 単一ページ表示・連続表示のいずれでも、FitModeが有効であれば用紙の新しい向きに合わせて拡大率を再計算・適用します。
+    /// </summary>
+    public void OnPageDimensionsChanged()
+    {
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
         }
     }
 
@@ -522,16 +549,23 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// ズームまたはページ変更に応じた動的レンダリングをスケジュールします。
     /// </summary>
-    public Task ScheduleDynamicRender(bool immediate = false, bool isInitialLoad = false)
+    public Task ScheduleDynamicRender(bool immediate = false, bool isInitialLoad = false, bool isPageSwitch = false)
     {
-        _renderCts?.Cancel();
-        _renderCts?.Dispose();
+        var oldCts = _renderCts;
         _renderCts = new CancellationTokenSource();
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch
+        {
+            // キャンセル例外のハンドリング
+        }
 
         var token = _renderCts.Token;
         long generation = Interlocked.Increment(ref _renderGeneration);
 
-        return PerformDynamicRenderAsync(generation, token, immediate, isInitialLoad);
+        return PerformDynamicRenderAsync(generation, token, immediate, isInitialLoad, isPageSwitch);
     }
 
     /// <summary>
@@ -643,13 +677,19 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         return result;
     }
 
-    private async Task PerformDynamicRenderAsync(long generation, CancellationToken token, bool immediate, bool isInitialLoad)
+    private async Task PerformDynamicRenderAsync(
+        long generation,
+        CancellationToken token,
+        bool immediate,
+        bool isInitialLoad,
+        bool isPageSwitch = false)
     {
         try
         {
-            if (!immediate && DebounceDelayMs > 0)
+            int delay = isPageSwitch ? PageSwitchDebounceDelayMs : DebounceDelayMs;
+            if (!immediate && delay > 0)
             {
-                await Task.Delay(DebounceDelayMs, token);
+                await Task.Delay(delay, token);
             }
 
             token.ThrowIfCancellationRequested();
@@ -662,50 +702,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 token.ThrowIfCancellationRequested();
                 if (generation != Volatile.Read(ref _renderGeneration)) return;
 
-                var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
-
-                // すでに目標解像度・回転でレンダリング済みの場合は無駄な再生成をスキップ
-                if (item.IsRenderedAt(targetWidth, targetHeight, item.Page.RenderRotation) &&
-                    item.InteractiveData != null &&
-                    item.InteractiveData.Rotation == item.Page.RenderRotation)
-                {
-                    continue;
-                }
-
-                var rendered = await _pdfRenderer.RenderPageAsync(
-                    item.Page.SourceFilePath,
-                    item.Page.OriginalPageIndex,
-                    targetWidth,
-                    targetHeight,
-                    item.Page.RenderRotation,
-                    token);
-
-                token.ThrowIfCancellationRequested();
-                if (generation == Volatile.Read(ref _renderGeneration))
-                {
-                    if (rendered != null)
-                    {
-                        // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
-                        item.PageBackground = rendered;
-                        item.LastRenderedWidth = targetWidth;
-                        item.LastRenderedHeight = targetHeight;
-                        item.LastRenderedRotation = item.Page.RenderRotation;
-                    }
-
-                    // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
-                    UpdatePageStrokeCache(item);
-
-                    if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
-                    {
-                        item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
-                            item.Page.SourceFilePath,
-                            item.Page.OriginalPageIndex,
-                            item.Page.DisplayWidth,
-                            item.Page.DisplayHeight,
-                            item.Page.RenderRotation,
-                            token);
-                    }
-                }
+                await RenderPageItemAsync(item, generation, token);
             }
 
             OnPropertyChanged(nameof(PageBackground));
@@ -717,6 +714,63 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         catch
         {
             // レンダリング例外時もクラッシュを防止
+        }
+    }
+
+    /// <summary>
+    /// 個々のページアイテムに対して動的レンダリングおよびインタラクティブデータ抽出を実行します。
+    /// </summary>
+    private async Task RenderPageItemAsync(
+        DetailPageItemViewModel item,
+        long generation,
+        CancellationToken token)
+    {
+        var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
+
+        // すでに目標解像度・回転でレンダリング済みの場合は無駄な再生成をスキップ
+        if (item.IsRenderedAt(targetWidth, targetHeight, item.Page.RenderRotation) &&
+            item.InteractiveData != null &&
+            item.InteractiveData.Rotation == item.Page.RenderRotation)
+        {
+            return;
+        }
+
+        var priority = (item == CurrentPageItem) ? RenderPriority.High : RenderPriority.Low;
+
+        var rendered = await _pdfRenderer.RenderPageAsync(
+            item.Page.SourceFilePath,
+            item.Page.OriginalPageIndex,
+            targetWidth,
+            targetHeight,
+            item.Page.RenderRotation,
+            token,
+            priority);
+
+        token.ThrowIfCancellationRequested();
+        if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+        if (rendered != null)
+        {
+            // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
+            item.PageBackground = rendered;
+            item.LastRenderedWidth = targetWidth;
+            item.LastRenderedHeight = targetHeight;
+            item.LastRenderedRotation = item.Page.RenderRotation;
+        }
+
+        // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
+        UpdatePageStrokeCache(item);
+
+        if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
+        {
+            item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
+                item.Page.SourceFilePath,
+                item.Page.OriginalPageIndex,
+                item.Page.DisplayWidth,
+                item.Page.DisplayHeight,
+                item.Page.RenderRotation,
+                token,
+                priority);
         }
     }
 
@@ -1108,6 +1162,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             if (disposing)
             {
+                if (CurrentPage != null)
+                {
+                    CurrentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+                }
                 _renderCts?.Cancel();
                 _renderCts?.Dispose();
                 _renderCts = null;

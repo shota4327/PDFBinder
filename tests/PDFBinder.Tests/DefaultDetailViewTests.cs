@@ -183,12 +183,12 @@ public class DefaultDetailViewTests
     }
 
     [Fact]
-    public async Task MainViewModel_HandleFileDrop_WhenNoDocument_OpensFirstAndAppendsSubsequent()
+    public async Task MainViewModel_HandleFileDrop_WhenNoDocument_OpensEachAsSeparateDocument()
     {
         // Arrange
         var mockService = new MockPdfService();
         var vm = new MainViewModel(pdfService: mockService);
-        Assert.Equal(0, vm.Document.PageCount);
+        Assert.Empty(vm.Documents);
 
         var dropFiles = new[] { "c:\\sample1.pdf", "c:\\sample2.pdf" };
 
@@ -196,21 +196,23 @@ public class DefaultDetailViewTests
         await vm.HandleFileDropAsync(dropFiles);
 
         // Assert
-        Assert.Single(mockService.OpenedFiles);
+        Assert.Equal(2, mockService.OpenedFiles.Count);
         Assert.Equal("c:\\sample1.pdf", mockService.OpenedFiles[0]);
-        Assert.Single(mockService.AppendedFiles);
-        Assert.Equal("c:\\sample2.pdf", mockService.AppendedFiles[0]);
-        Assert.Equal(2, vm.Document.PageCount);
+        Assert.Equal("c:\\sample2.pdf", mockService.OpenedFiles[1]);
+        Assert.Empty(mockService.AppendedFiles);
+        Assert.Equal(2, vm.Documents.Count);
+        Assert.NotNull(vm.ActiveSession);
+        Assert.Equal("sample2.pdf", vm.ActiveSession.Document.FileName);
     }
 
     [Fact]
-    public async Task MainViewModel_HandleFileDrop_WhenDocumentLoaded_AppendsAllFiles()
+    public async Task MainViewModel_HandleFileDrop_WhenDocumentLoaded_OpensAllAsSeparateDocuments()
     {
         // Arrange
         var mockService = new MockPdfService();
         var vm = new MainViewModel(pdfService: mockService);
-        vm.AddBlankPage(); // 既存ページ1枚
-        Assert.Equal(1, vm.Document.PageCount);
+        vm.AddBlankPage(); // 既存ページ1枚（名称未設定.pdf）
+        Assert.Single(vm.Documents);
 
         var dropFiles = new[] { "c:\\sample1.pdf", "c:\\sample2.pdf" };
 
@@ -218,11 +220,12 @@ public class DefaultDetailViewTests
         await vm.HandleFileDropAsync(dropFiles);
 
         // Assert
-        Assert.Empty(mockService.OpenedFiles);
-        Assert.Equal(2, mockService.AppendedFiles.Count);
-        Assert.Equal("c:\\sample1.pdf", mockService.AppendedFiles[0]);
-        Assert.Equal("c:\\sample2.pdf", mockService.AppendedFiles[1]);
-        Assert.Equal(3, vm.Document.PageCount);
+        Assert.Equal(2, mockService.OpenedFiles.Count);
+        Assert.Equal("c:\\sample1.pdf", mockService.OpenedFiles[0]);
+        Assert.Equal("c:\\sample2.pdf", mockService.OpenedFiles[1]);
+        Assert.Empty(mockService.AppendedFiles);
+        // 元の名称未設定.pdf（1ページ）に加えて2ファイルが追加され計3セッション
+        Assert.Equal(3, vm.Documents.Count);
     }
 
     [Fact]

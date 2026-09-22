@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using PDFBinder.App.Helpers;
+using PDFBinder.App.Services;
 using PDFBinder.App.ViewModels;
 
 namespace PDFBinder.App;
@@ -10,30 +11,109 @@ namespace PDFBinder.App;
 /// </summary>
 public partial class App : Application
 {
+    private SingleInstanceManager? _singleInstanceManager;
+
     /// <summary>
     /// アプリケーション起動時の処理を行います。
-    /// コマンドライン引数を解析し、対象PDFの自動読み込みおよび複数ファイル指定時の別プロセス起動を制御します。
+    /// 単一インスタンス判定を実施し、既存プロセスへの引数転送またはプライマリとしての起動・IPCサーバー待機を制御します。
     /// </summary>
     /// <param name="e">起動イベント引数</param>
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        EnsureLeftAlignedPopups();
+
         var parseResult = CommandLineArgsHelper.Parse(e.Args);
 
-        // 複数ファイルが渡された場合、2つ目以降のファイルを別プロセスとして起動
-        foreach (var additionalFile in parseResult.AdditionalFiles)
+        _singleInstanceManager = new SingleInstanceManager();
+        if (!_singleInstanceManager.TryAcquireOwnership())
         {
-            CommandLineArgsHelper.LaunchAdditionalProcess(additionalFile);
+            // 既存インスタンスへ引数を送信
+            bool sent = await _singleInstanceManager.TrySendToExistingInstanceAsync(parseResult);
+            if (sent)
+            {
+                Shutdown();
+                return;
+            }
+
+            // 既存インスタンスが応答しなかった場合は自プロセスがプライマリを引き継ぎ
+            _singleInstanceManager.TryAcquireOwnership();
         }
+
+        ShutdownMode = ShutdownMode.OnLastWindowClose;
+        _singleInstanceManager.StartServer(OnIpcPayloadReceivedAsync);
 
         var mainWindow = new MainWindow();
         MainWindow = mainWindow;
         mainWindow.Show();
+        WindowActivationHelper.BringToForeground(mainWindow);
 
-        if (!string.IsNullOrEmpty(parseResult.PrimaryFile))
+        foreach (var file in parseResult.Files)
         {
-            await LoadStartupFileAsync(mainWindow, parseResult.PrimaryFile);
+            await LoadStartupFileAsync(mainWindow, file);
+        }
+    }
+
+    /// <summary>
+    /// プロセス終了時のクリーンアップ処理を行います。
+    /// </summary>
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _singleInstanceManager?.Dispose();
+        base.OnExit(e);
+    }
+
+    /// <summary>
+    /// 外部の起動インスタンスから名前付きパイプ経由で受信したペイロードを処理します。
+    /// </summary>
+    private async Task OnIpcPayloadReceivedAsync(SingleInstancePayload payload)
+    {
+        await Dispatcher.InvokeAsync(async () =>
+        {
+            if (payload.ForceNewWindow || payload.Files.Count == 0)
+            {
+                await OpenInNewWindowAsync(payload.Files);
+            }
+            else
+            {
+                await OpenInExistingActiveWindowAsync(payload.Files);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 新規ウィンドウを作成して指定されたファイル群を開きます。
+    /// </summary>
+    private static async Task OpenInNewWindowAsync(IReadOnlyList<string> files)
+    {
+        var window = new MainWindow();
+        window.Show();
+        WindowActivationHelper.BringToForeground(window);
+
+        foreach (var file in files)
+        {
+            await LoadStartupFileAsync(window, file);
+        }
+    }
+
+    /// <summary>
+    /// 最も直近にアクティブだった既存ウィンドウで指定されたファイル群を新しいタブとして開きます。
+    /// </summary>
+    private static async Task OpenInExistingActiveWindowAsync(IReadOnlyList<string> files)
+    {
+        var window = WindowActivationHelper.GetMostRecentActiveWindow();
+        if (window == null)
+        {
+            window = new MainWindow();
+            window.Show();
+        }
+
+        WindowActivationHelper.BringToForeground(window);
+
+        foreach (var file in files)
+        {
+            await LoadStartupFileAsync(window, file);
         }
     }
 
@@ -54,6 +134,26 @@ public partial class App : Application
         }
 
         await vm.OpenDocumentAsync(filePath);
+    }
+
+    /// <summary>
+    /// タブレットモード等のOS設定によりポップアップやメニューが右揃えになる現象を防止し、
+    /// 常に左揃えで開くように強制します。
+    /// </summary>
+    private static void EnsureLeftAlignedPopups()
+    {
+        try
+        {
+            if (SystemParameters.MenuDropAlignment)
+            {
+                var field = typeof(SystemParameters).GetField("_menuDropAlignment", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                field?.SetValue(null, false);
+            }
+        }
+        catch
+        {
+            // リフレクション失敗時は安全に無視
+        }
     }
 }
 

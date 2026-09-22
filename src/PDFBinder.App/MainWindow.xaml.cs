@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         StateChanged += OnWindowStateChanged;
 
         RestoreWindowSettings();
+        WindowActivationHelper.RegisterWindow(this);
     }
 
     /// <summary>
@@ -54,7 +55,10 @@ public partial class MainWindow : Window
         // 1. 保存確認ダイアログのキー制御
         if (HandleSaveConfirmationKeyDown(vm, e)) return;
 
-        // 2. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
+        // 2. 印刷確認ダイアログのキー制御
+        if (HandlePrintDialogKeyDown(vm, e)) return;
+
+        // 3. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
         if (Keyboard.FocusedElement is TextBoxBase || e.OriginalSource is TextBoxBase)
         {
             return;
@@ -82,6 +86,30 @@ public partial class MainWindow : Window
         }
 
         // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 印刷確認ダイアログ表示中のキーボード操作（Escによるキャンセル等）を先行処理します。
+    /// </summary>
+    private static bool HandlePrintDialogKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsPrintDialogVisible) return false;
+
+        if (e.Key == Key.Escape)
+        {
+            vm.ClosePrintDialogCommand.Execute(null);
+            e.Handled = true;
+            return true;
+        }
+
+        // 印刷ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
         if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
         {
             e.Handled = true;
@@ -246,7 +274,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DataContext is not MainViewModel vm || !vm.Document.IsModified || vm.Document.Pages.Count == 0)
+        if (DataContext is not MainViewModel vm || !vm.HasModifiedDocuments)
         {
             SaveWindowSettings();
             return;
@@ -259,33 +287,51 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、インアプリオーバーレイを表示
+        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、順次確認を実施
         e.Cancel = true;
 
-        var choice = await vm.PromptSaveConfirmationAsync(vm.Document.FileName);
-        if (choice == SaveConfirmationResult.Cancel)
-        {
-            return;
-        }
-
-        if (choice == SaveConfirmationResult.Discard)
+        bool canClose = await vm.ConfirmSaveAllAsync();
+        if (canClose)
         {
             _isClosingConfirmed = true;
             SaveWindowSettings();
             Close();
-            return;
         }
+    }
 
-        if (choice == SaveConfirmationResult.Save)
+    private void OnFileDropdownItemClick(object sender, RoutedEventArgs e)
+    {
+        if (FindName("FileDropdownToggle") is System.Windows.Controls.Primitives.ToggleButton toggle)
         {
-            bool saved = await vm.SaveDocumentAsync();
-            if (saved)
-            {
-                _isClosingConfirmed = true;
-                SaveWindowSettings();
-                Close();
-            }
+            toggle.IsChecked = false;
         }
+    }
+
+    private void OnFileDropdownCloseClick(object sender, RoutedEventArgs e)
+    {
+        if (FindName("FileDropdownToggle") is System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            toggle.IsChecked = false;
+        }
+    }
+
+    /// <summary>
+    /// タイトルバー中央のファイル切り替えポップアップをトグルボタンの中央揃えで配置します。
+    /// </summary>
+    private CustomPopupPlacement[] OnFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        return CalculateFileDropdownPopupPlacement(popupSize, targetSize, offset);
+    }
+
+    /// <summary>
+    /// ポップアップがトグルボタンの中央下部に揃う座標を計算します（テスト用ヘルパー）。
+    /// </summary>
+    internal static CustomPopupPlacement[] CalculateFileDropdownPopupPlacement(Size popupSize, Size targetSize, Point offset)
+    {
+        // トグルボタンの中心とポップアップの中心が一致するように X 座標をオフセット
+        double x = (targetSize.Width - popupSize.Width) / 2.0;
+        double y = targetSize.Height + 2.0;
+        return [new CustomPopupPlacement(new Point(x, y), PopupPrimaryAxis.Horizontal)];
     }
 
     /// <summary>
@@ -364,6 +410,13 @@ public partial class MainWindow : Window
         if (DataContext is MainViewModel vm)
         {
             vm.IsDragOver = false;
+
+            // グリッドビュー表示中かつページが存在する場合は、GridView 側の OnGridDrop に委ねる
+            if (!vm.IsDetailViewActive && vm.Document.Pages.Count > 0)
+            {
+                return;
+            }
+
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
@@ -385,11 +438,16 @@ public partial class MainWindow : Window
             if (hasPdf)
             {
                 e.Effects = DragDropEffects.Copy;
-                if (vm.Document.Pages.Count > 0)
+                // 詳細ビュー表示中のみ全画面ドロップオーバーレイを表示
+                if (vm.Document.Pages.Count > 0 && vm.IsDetailViewActive)
                 {
                     vm.IsDragOver = true;
+                    e.Handled = true;
                 }
-                e.Handled = true;
+                else
+                {
+                    vm.IsDragOver = false;
+                }
                 return;
             }
         }
@@ -400,6 +458,7 @@ public partial class MainWindow : Window
             vmReset.IsDragOver = false;
         }
     }
+
 
     /// <summary>
     /// ステータスバーのページ番号入力欄でのEnterキー押下時にバインディングを更新してフォーカスを外します。

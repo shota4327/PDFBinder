@@ -20,6 +20,19 @@ public interface IPdfRenderer
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 指定されたPDFページを実行優先度を指定してレンダリングし、WPFで表示可能なBitmapSourceを返します。
+    /// </summary>
+    Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken);
+
+    /// <summary>
     /// 白紙ページのプレビュービットマップを生成します。
     /// </summary>
     BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation);
@@ -43,4 +56,17 @@ public interface IPdfRenderer
         double displayHeight,
         PageRotation rotation,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 指定されたPDFページのテキスト・文字座標およびリンク注釈データを優先度を指定して抽出します。
+    /// </summary>
+    Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
 }
