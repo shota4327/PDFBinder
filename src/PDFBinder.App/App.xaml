@@ -1018,12 +1018,15 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <ContentPresenter Grid.Column="0" ContentSource="Icon" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                    <ContentPresenter x:Name="IconPresenter" Grid.Column="0" ContentSource="Icon" Margin="0,0,8,0" VerticalAlignment="Center" />
                                     <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" />
                                     <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{StaticResource TextMutedBrush}" Margin="16,0,0,0" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
                             <ControlTemplate.Triggers>
+                                <Trigger Property="Icon" Value="{x:Null}">
+                                    <Setter TargetName="IconPresenter" Property="Visibility" Value="Collapsed" />
+                                </Trigger>
                                 <Trigger Property="IsHighlighted" Value="True">
                                     <Setter TargetName="Border" Property="Background" Value="{StaticResource ControlHoverBrush}" />
                                 </Trigger>

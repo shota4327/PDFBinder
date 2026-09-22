@@ -45,13 +45,13 @@
                 <Border Background="{StaticResource SurfaceSecondaryBrush}"
                         BorderBrush="{StaticResource SurfaceBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="10,2"
+                        CornerRadius="13"
+                        Padding="12,3"
                         Margin="0,6,0,0"
                         HorizontalAlignment="Center">
                     <TextBlock x:Name="VersionTextBlock"
                                Text="v0.1.0"
-                               FontSize="12" FontWeight="SemiBold"
+                               FontSize="14" FontWeight="SemiBold"
                                Foreground="{StaticResource AccentBrush}" />
                 </Border>
             </StackPanel>
