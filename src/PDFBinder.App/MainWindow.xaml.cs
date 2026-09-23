@@ -58,6 +58,9 @@ public partial class MainWindow : Window
         // 2. 印刷確認ダイアログのキー制御
         if (HandlePrintDialogKeyDown(vm, e)) return;
 
+        // 3. バージョン情報ダイアログのキー制御
+        if (HandleAboutDialogKeyDown(vm, e)) return;
+
         // 3. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
         if (Keyboard.FocusedElement is TextBoxBase || e.OriginalSource is TextBoxBase)
         {
@@ -110,6 +113,30 @@ public partial class MainWindow : Window
         }
 
         // 印刷ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// バージョン情報ダイアログ表示中のキーボード操作（Escによる閉じる等）を先行処理します。
+    /// </summary>
+    private static bool HandleAboutDialogKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsAboutDialogVisible) return false;
+
+        if (e.Key == Key.Escape)
+        {
+            vm.CloseAboutCommand.Execute(null);
+            e.Handled = true;
+            return true;
+        }
+
+        // バージョン情報ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
         if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
         {
             e.Handled = true;
@@ -485,5 +512,24 @@ public partial class MainWindow : Window
             button.ContextMenu.Placement = PlacementMode.Bottom;
             button.ContextMenu.IsOpen = true;
         }
+    }
+
+    /// <summary>
+    /// バージョン情報ダイアログの背景（暗転部分）クリック時にダイアログを閉じます。
+    /// </summary>
+    private void OnAboutBackdropMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.CloseAboutCommand.Execute(null);
+        }
+    }
+
+    /// <summary>
+    /// バージョン情報ダイアログのカード本体クリック時にイベントのバブリングを防止します。
+    /// </summary>
+    private void OnAboutCardMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
     }
 }

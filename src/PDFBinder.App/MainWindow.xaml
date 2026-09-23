@@ -693,22 +693,15 @@
 
         <!-- 未保存変更確認ダイアログ（インアプリ・オーバーレイ） -->
         <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
               Visibility="{Binding IsSaveConfirmationVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-              Background="#80000000"
-              Focusable="False"
               Panel.ZIndex="1000">
             <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
             <Border Width="460"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="{StaticResource SurfaceBackgroundBrush}"
-                    BorderBrush="{StaticResource SurfaceBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="12"
+                    Style="{StaticResource ModalCardBorderStyle}"
                     Padding="24">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" Color="#000000" Direction="270" Opacity="0.5" ShadowDepth="8" />
-                </Border.Effect>
                 <StackPanel>
                     <!-- ヘッダー（アイコンとタイトル） -->
                     <DockPanel LastChildFill="True" Margin="0,0,0,14">
@@ -756,23 +749,16 @@
 
         <!-- 印刷設定・プレビュー確認ダイアログ（インアプリ・オーバーレイ） -->
         <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
               Visibility="{Binding IsPrintDialogVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-              Background="#80000000"
-              Focusable="False"
               Panel.ZIndex="1001">
             <Border HorizontalAlignment="Stretch"
                     VerticalAlignment="Center"
                     MaxHeight="750"
                     Margin="24,16"
-                    Background="{StaticResource SurfaceBackgroundBrush}"
-                    BorderBrush="{StaticResource SurfaceBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="12"
+                    Style="{StaticResource ModalCardBorderStyle}"
                     Padding="22"
                     DataContext="{Binding PrintViewModel}">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" Color="#000000" Direction="270" Opacity="0.5" ShadowDepth="8" />
-                </Border.Effect>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -1003,6 +989,18 @@
                     </DockPanel>
                 </Grid>
             </Border>
+        </Grid>
+
+        <!-- バージョン情報ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
+              Visibility="{Binding IsAboutDialogVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              MouseDown="OnAboutBackdropMouseDown"
+              Panel.ZIndex="1002">
+            <!-- ダイアログカード（カード本体クリック時のMouseDownイベントはバブリングを止めてダイアログを閉じないようにする） -->
+            <views:AboutOverlayControl HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       MouseDown="OnAboutCardMouseDown" />
         </Grid>
     </Grid>
 </Window>

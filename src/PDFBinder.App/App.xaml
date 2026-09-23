@@ -1064,6 +1064,27 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <!-- ======================================================== -->
+            <!-- モーダルダイアログ・オーバーレイ共通スタイル               -->
+            <!-- ======================================================== -->
+            <!-- 半透明暗転背景スタイル -->
+            <Style TargetType="Grid" x:Key="ModalBackdropGridStyle">
+                <Setter Property="Background" Value="#80000000" />
+                <Setter Property="Focusable" Value="False" />
+            </Style>
+
+            <!-- モーダルカード共通枠線・背景・角丸・シャドウスタイル -->
+            <Style TargetType="Border" x:Key="ModalCardBorderStyle">
+                <Setter Property="Background" Value="{StaticResource SurfaceBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect BlurRadius="28" Color="#000000" Direction="270" Opacity="0.5" ShadowDepth="8" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
