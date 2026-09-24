@@ -360,19 +360,19 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// PDFドキュメントのページ構成と同期して全ページのアイテムを生成します。
     /// </summary>
-    public void InitializeDocument(PdfDocumentModel document)
+    /// <param name="document">同期対象のPDFドキュメントモデル</param>
+    /// <param name="preferredPage">優先してカレントページに設定するページ（省略時は直前のページやインデックスを維持）</param>
+    public void InitializeDocument(PdfDocumentModel document, PdfPageModel? preferredPage = null)
     {
         var previousPage = CurrentPage;
+        var previousIndex = CurrentPageIndex;
         ClearPageItems();
         foreach (var page in document.Pages)
         {
             AddPageItem(new DetailPageItemViewModel(page));
         }
 
-        // 以前のカレントページが存在する場合は維持し、存在しない場合は先頭ページを選択
-        var targetPage = (previousPage != null
-            ? document.Pages.FirstOrDefault(p => p.Id == previousPage.Id || p == previousPage)
-            : null) ?? document.Pages.FirstOrDefault();
+        var targetPage = ResolveTargetPage(document, preferredPage, previousPage, previousIndex);
 
         // プロパティ変更通知を確実に発火させ、UIバインディング（CurrentPageItem等）の更新を保証
         CurrentPage = null;
@@ -391,6 +391,42 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         UpdatePageEdgeFlags();
         ApplyFitMode();
         _ = LoadInitialDocumentBackgroundAsync();
+
+        if (targetPage != null)
+        {
+            ScrollToPageRequested?.Invoke(targetPage);
+        }
+    }
+
+    /// <summary>
+    /// ドキュメント初期化時に表示対象とすべきページを決定します。
+    /// </summary>
+    private static PdfPageModel? ResolveTargetPage(
+        PdfDocumentModel document,
+        PdfPageModel? preferredPage,
+        PdfPageModel? previousPage,
+        int previousIndex)
+    {
+        if (document.Pages.Count == 0) return null;
+
+        if (preferredPage != null && document.Pages.Contains(preferredPage))
+        {
+            return preferredPage;
+        }
+
+        if (previousPage != null)
+        {
+            var match = document.Pages.FirstOrDefault(p => p.Id == previousPage.Id || p == previousPage);
+            if (match != null) return match;
+        }
+
+        if (previousIndex >= 0)
+        {
+            int fallbackIndex = Math.Clamp(previousIndex - 1, 0, document.Pages.Count - 1);
+            return document.Pages[fallbackIndex];
+        }
+
+        return document.Pages.FirstOrDefault();
     }
 
     /// <summary>
