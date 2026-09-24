@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using PDFBinder.App.Controls;
@@ -214,5 +215,159 @@ public class DetailEditorStraightLineTests
         thread.Start();
         bool finished = thread.Join(5000);
         Assert.True(finished, "Thread timed out");
+    }
+
+    [Fact]
+    public void EditorInkCanvas_OnPreviewMouseUp_DoesNotThrow_AndCommitsStraightLine()
+    {
+        RunInSta(() =>
+        {
+            // Arrange
+            var page = new PdfPageModel { Width = 500, Height = 800 };
+            var pageItem = new DetailPageItemViewModel(page);
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                PageItem = pageItem
+            };
+
+            // 描画中の状態を設定
+            var startPt = new Point(10.0, 20.0);
+            var endPt = new Point(100.0, 200.0);
+            SetPrivateField(canvas, "_lineStartPoint", (Point?)startPt);
+            SetPrivateField(canvas, "_currentLinePoint", (Point?)endPt);
+            SetPrivateField(canvas, "_isDrawingLine", true);
+
+            // Act: PreviewMouseUpをシミュレート
+            var onMouseUp = typeof(EditorInkCanvas).GetMethod("OnPreviewMouseUp",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.NotNull(onMouseUp);
+
+            var mouseArgs = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseUpEvent
+            };
+
+            // 例外が発生せずに正常終了すること（Issue #156: Nullable object must have a value 例外の防止）
+            onMouseUp.Invoke(canvas, new object[] { mouseArgs });
+
+            // Assert: マスターコレクションに直線がコミットされていること
+            Assert.False(canvas.IsDrawingLineForTesting);
+            Assert.Null(canvas.LineStartPointForTesting);
+            Assert.Null(canvas.CurrentLinePointForTesting);
+            Assert.Single(page.InkStrokes);
+
+            var committedStroke = page.InkStrokes[0];
+            Assert.Equal(2, committedStroke.StylusPoints.Count);
+            Assert.Equal(10.0, committedStroke.StylusPoints[0].X);
+            Assert.Equal(20.0, committedStroke.StylusPoints[0].Y);
+            Assert.Equal(100.0, committedStroke.StylusPoints[1].X);
+            Assert.Equal(200.0, committedStroke.StylusPoints[1].Y);
+        });
+    }
+
+    [Fact]
+    public void EditorInkCanvas_OnPreviewMouseUp_SingleClick_CommitsDotStroke()
+    {
+        RunInSta(() =>
+        {
+            // Arrange: 始点と終点が同一座標（クリックのみ）
+            var page = new PdfPageModel { Width = 500, Height = 800 };
+            var pageItem = new DetailPageItemViewModel(page);
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                PageItem = pageItem
+            };
+
+            var clickPt = new Point(50.0, 50.0);
+            SetPrivateField(canvas, "_lineStartPoint", (Point?)clickPt);
+            SetPrivateField(canvas, "_currentLinePoint", (Point?)clickPt);
+            SetPrivateField(canvas, "_isDrawingLine", true);
+
+            var onMouseUp = typeof(EditorInkCanvas).GetMethod("OnPreviewMouseUp",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.NotNull(onMouseUp);
+
+            var mouseArgs = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseUpEvent
+            };
+
+            // Act
+            onMouseUp.Invoke(canvas, new object[] { mouseArgs });
+
+            // Assert: ドットとしてコミットされること
+            Assert.Single(page.InkStrokes);
+            var stroke = page.InkStrokes[0];
+            Assert.Equal(2, stroke.StylusPoints.Count);
+            Assert.Equal(50.0, stroke.StylusPoints[0].X);
+            Assert.Equal(50.0, stroke.StylusPoints[1].X);
+        });
+    }
+
+    [Fact]
+    public void EditorInkCanvas_OnLostMouseCapture_CancelsDrawingWithoutCommitting()
+    {
+        RunInSta(() =>
+        {
+            // Arrange
+            var page = new PdfPageModel { Width = 500, Height = 800 };
+            var pageItem = new DetailPageItemViewModel(page);
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                PageItem = pageItem
+            };
+
+            SetPrivateField(canvas, "_lineStartPoint", (Point?)new Point(10.0, 20.0));
+            SetPrivateField(canvas, "_currentLinePoint", (Point?)new Point(50.0, 60.0));
+            SetPrivateField(canvas, "_isDrawingLine", true);
+
+            // Act: キャプチャ喪失をシミュレート
+            canvas.ProcessLostMouseCaptureForTesting();
+
+            // Assert: 描画状態が安全にクリアされ、ストロークはコミットされないこと
+            Assert.False(canvas.IsDrawingLineForTesting);
+            Assert.Null(canvas.LineStartPointForTesting);
+            Assert.Null(canvas.CurrentLinePointForTesting);
+            Assert.Empty(page.InkStrokes);
+        });
+    }
+
+    private static void RunInSta(Action action)
+    {
+        Exception? exception = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "STA thread timed out");
+        if (exception != null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+    }
+
+    private static void SetPrivateField(object obj, string fieldName, object? value)
+    {
+        var field = obj.GetType().GetField(fieldName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(field);
+        field.SetValue(obj, value);
     }
 }

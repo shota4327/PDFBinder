@@ -447,13 +447,19 @@ public class EditorInkCanvas : InkCanvas
                 return;
             }
 
-            ReleaseMouseCapture();
+            var start = _lineStartPoint.Value;
+            var end = _currentLinePoint.Value;
             _isDrawingLine = false;
-
-            CommitStraightLine(_lineStartPoint.Value, _currentLinePoint.Value);
-
             _lineStartPoint = null;
             _currentLinePoint = null;
+
+            if (IsMouseCaptured)
+            {
+                ReleaseMouseCapture();
+            }
+
+            CommitStraightLine(start, end);
+
             InvalidateVisual();
             e.Handled = true;
             return;
@@ -862,6 +868,11 @@ public class EditorInkCanvas : InkCanvas
 
     internal Point? PanStartPoint => _panStartPoint;
     internal void SetParentScrollViewerForTesting(ScrollViewer sv) => _parentScrollViewer = sv;
+
+    internal bool IsDrawingLineForTesting => _isDrawingLine;
+    internal Point? LineStartPointForTesting => _lineStartPoint;
+    internal Point? CurrentLinePointForTesting => _currentLinePoint;
+    internal void ProcessLostMouseCaptureForTesting() => OnLostMouseCapture(new MouseEventArgs(Mouse.PrimaryDevice, 0));
 
     #endregion
 
