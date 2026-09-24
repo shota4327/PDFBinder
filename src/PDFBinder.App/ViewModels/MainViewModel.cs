@@ -125,6 +125,24 @@ public partial class MainViewModel : ObservableObject
     private bool _isAboutDialogVisible;
 
     /// <summary>
+    /// エラー・警告ダイアログ（インアプリオーバーレイ）を表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isErrorDialogVisible;
+
+    /// <summary>
+    /// エラー・警告ダイアログのタイトル
+    /// </summary>
+    [ObservableProperty]
+    private string _errorDialogTitle = string.Empty;
+
+    /// <summary>
+    /// エラー・警告ダイアログのメッセージ本文
+    /// </summary>
+    [ObservableProperty]
+    private string _errorDialogMessage = string.Empty;
+
+    /// <summary>
     /// 現在表示中の印刷ダイアログViewModel
     /// </summary>
     [ObservableProperty]
@@ -436,13 +454,6 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(CurrentZoomText));
             OnPropertyChanged(nameof(CanZoomIn));
             OnPropertyChanged(nameof(CanZoomOut));
-        }
-        else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPage))
-        {
-            if (DetailEditor?.CurrentPage != null && IsDetailViewActive)
-            {
-                StatusMessage = $"ページ {DetailEditor.CurrentPage.PageNumber} / {Document.PageCount}";
-            }
         }
         else if (e.PropertyName == nameof(DetailEditorViewModel.CanGoToPreviousPage))
         {
@@ -774,7 +785,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"読み込みエラー: {ex.Message}";
+            ShowErrorDialog("ファイル読み込みエラー", $"ファイルの読み込み中にエラーが発生しました:\n{ex.Message}", "読み込みに失敗しました。");
         }
         finally
         {
@@ -823,7 +834,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"結合エラー: {ex.Message}";
+            ShowErrorDialog("PDF結合エラー", $"PDFの結合中にエラーが発生しました:\n{ex.Message}", "結合に失敗しました。");
         }
         finally
         {
@@ -896,7 +907,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"PDF挿入エラー: {ex.Message}";
+            ShowErrorDialog("PDF挿入エラー", $"PDFページの挿入中にエラーが発生しました:\n{ex.Message}", "挿入に失敗しました。");
         }
         finally
         {
@@ -1078,7 +1089,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"保存エラー: {ex.Message}";
+            ShowErrorDialog("保存エラー", $"ファイルの保存中にエラーが発生しました:\n{ex.Message}", "保存に失敗しました。");
             return false;
         }
         finally
@@ -1209,7 +1220,7 @@ public partial class MainViewModel : ObservableObject
         var targets = Document.Pages.Where(p => p.IsSelected).ToList();
         if (targets.Count == 0)
         {
-            StatusMessage = "エクスポートするページを選択してください。";
+            ShowErrorDialog("ページ未選択", "エクスポートするページを選択してください。", "エクスポートが中止されました。");
             return;
         }
 
@@ -1231,7 +1242,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"エクスポートエラー: {ex.Message}";
+            ShowErrorDialog("エクスポートエラー", $"ページの書き出し中にエラーが発生しました:\n{ex.Message}", "エクスポートに失敗しました。");
         }
         finally
         {
@@ -1263,7 +1274,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"分割エラー: {ex.Message}";
+            ShowErrorDialog("分割エラー", $"全ページの分割中にエラーが発生しました:\n{ex.Message}", "分割に失敗しました。");
         }
         finally
         {
@@ -1310,7 +1321,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"ページ分割エラー: {ex.Message}";
+            ShowErrorDialog("ページ分割エラー", $"ページの分割中にエラーが発生しました:\n{ex.Message}", "分割に失敗しました。");
         }
         finally
         {
@@ -1369,7 +1380,6 @@ public partial class MainViewModel : ObservableObject
         }
         DetailEditor?.ScrollToPage(page);
         SelectedRibbonTabIndex = 1;
-        StatusMessage = $"ページ {page.PageNumber} を編集しています。";
     }
 
     /// <summary>
@@ -1470,9 +1480,9 @@ public partial class MainViewModel : ObservableObject
                 page.IsThumbnailDirty = false;
             }
 
-            if (!token.IsCancellationRequested)
+            if (!token.IsCancellationRequested && StatusMessage == "サムネイルを生成しています...")
             {
-                StatusMessage = $"グリッド表示（全 {Document.PageCount} ページ）";
+                StatusMessage = string.Empty;
             }
         }
         catch (OperationCanceledException)
@@ -1481,7 +1491,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = $"サムネイル生成エラー: {ex.Message}";
+            ShowErrorDialog("サムネイル生成エラー", $"サムネイルの生成中にエラーが発生しました:\n{ex.Message}", "サムネイル生成に失敗しました。");
         }
         finally
         {
@@ -1719,6 +1729,40 @@ public partial class MainViewModel : ObservableObject
     public void CloseAbout()
     {
         IsAboutDialogVisible = false;
+    }
+
+    /// <summary>
+    /// エラー・警告ダイアログ表示の外部デリゲート（単体テスト・検証用）。(title, message)
+    /// </summary>
+    public Action<string, string>? ShowErrorPrompt { get; set; }
+
+    /// <summary>
+    /// エラーまたは警告ダイアログ（インアプリ・オーバーレイ）を表示し、必要に応じてステータスバーを更新します。
+    /// </summary>
+    /// <param name="title">ダイアログのタイトル</param>
+    /// <param name="message">ダイアログのメッセージ詳細</param>
+    /// <param name="statusSummary">ステータスバーに表示する簡潔な失敗文言（省略時は変更なし）</param>
+    public void ShowErrorDialog(string title, string message, string? statusSummary = null)
+    {
+        if (statusSummary != null)
+        {
+            StatusMessage = statusSummary;
+        }
+
+        ErrorDialogTitle = title;
+        ErrorDialogMessage = message;
+        IsErrorDialogVisible = true;
+
+        ShowErrorPrompt?.Invoke(title, message);
+    }
+
+    /// <summary>
+    /// エラー・警告ダイアログ（インアプリ・オーバーレイ）を閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void CloseErrorDialog()
+    {
+        IsErrorDialogVisible = false;
     }
 }
 

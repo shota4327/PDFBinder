@@ -128,8 +128,7 @@ public partial class App : Application
 
         if (!File.Exists(filePath))
         {
-            MessageBox.Show(window, $"指定されたPDFファイルが見つかりませんでした:\n{filePath}", "ファイル読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Warning);
-            vm.StatusMessage = $"ファイルが見つかりません: {filePath}";
+            vm.ShowErrorDialog("ファイル読み込みエラー", $"指定されたPDFファイルが見つかりませんでした:\n{filePath}", "ファイルが見つかりません。");
             return;
         }
 

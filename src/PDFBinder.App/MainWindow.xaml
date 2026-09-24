@@ -1002,5 +1002,42 @@
                                        VerticalAlignment="Center"
                                        MouseDown="OnAboutCardMouseDown" />
         </Grid>
+
+        <!-- エラー・警告通知ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
+              Visibility="{Binding IsErrorDialogVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              Panel.ZIndex="1005">
+            <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
+            <Border Width="460"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource ModalCardBorderStyle}"
+                    Padding="24">
+                <StackPanel>
+                    <!-- ヘッダー（エラーアイコンとタイトル） -->
+                    <DockPanel LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="36" Height="36" Background="#7F1D1D" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE000;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#EF4444"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="{Binding ErrorDialogTitle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- メッセージ本文 -->
+                    <TextBlock Text="{Binding ErrorDialogMessage}"
+                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,24" />
+
+                    <!-- アクションボタンエリア -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Content="OK"
+                                MinWidth="84"
+                                Command="{Binding CloseErrorDialogCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
