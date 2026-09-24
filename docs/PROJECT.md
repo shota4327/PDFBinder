@@ -69,6 +69,7 @@
 | **F60** | PDF操作コア / UI | ページ分割機能（表示向き長辺2等分分割、A3→A4等、手書きストローク境界切断・引き継ぎ、Undo/Redo対応） | **完了** | Issue #137 / StrokeSplitHelper & ReplaceAllPagesCommand |
 | **F61** | UI・グリッド俯瞰 | グリッド表示でのドラッグ中マウスホイールスクロール＆オートスクロール（ページ並び替え・外部PDF挿入・ラバーバンド選択対応、上下端40px可変速度自動スクロール、ドラッグ中ズーム抑止） | **完了** | Issue #142 / AutoScroller & DragMouseWheelHook |
 | **F62** | UI・モーダル共通化 | バージョン情報インアプリオーバーレイ化＆モーダルUIスタイル共通化（`ModalBackdropGridStyle`, `ModalCardBorderStyle`、保存確認・印刷・バージョン情報のUI共通化、`AboutOverlayControl`、背景クリック対応） | **完了** | Issue #149 / App.xaml, AboutOverlayControl & MainWindow |
+| **F63** | UI・スクロール操作 | 浮遊オーバーレイスクロールバー＆ステータスバー重複解消（横・縦スクロールバーのステータスバー直上42px浮遊配置、背後コンテンツ通過維持、Shift+ホイール横スクロール） | **完了** | Issue #140 / App.xaml, DetailEditorView & GridView |
 
 ---
 

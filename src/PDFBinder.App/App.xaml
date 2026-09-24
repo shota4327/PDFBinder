@@ -1085,6 +1085,171 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+
+            <!-- ======================================================== -->
+            <!-- モダンスクロールバー＆浮遊オーバーレイスクロールビューアー    -->
+            <!-- ======================================================== -->
+            <!-- スクロールバー トラック用リピートボタンスタイル（透明クリック領域） -->
+            <Style TargetType="{x:Type RepeatButton}" x:Key="ScrollBarTrackRepeatButtonStyle">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                            <Rectangle Fill="{TemplateBinding Background}" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- スクロールバー サムネイルスタイル（角丸ダークデザイン） -->
+            <Style TargetType="{x:Type Thumb}" x:Key="ScrollBarThumbStyle">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Thumb}">
+                            <Border x:Name="thumbBorder"
+                                    Background="{StaticResource ScrollBarThumbBrush}"
+                                    CornerRadius="4"
+                                    BorderThickness="1"
+                                    BorderBrush="{StaticResource SurfaceBorderBrush}"
+                                    Margin="2" />
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="thumbBorder" Property="Background" Value="{StaticResource ScrollBarThumbHoverBrush}" />
+                                    <Setter TargetName="thumbBorder" Property="BorderBrush" Value="{StaticResource SurfaceBorderLightBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsDragging" Value="True">
+                                    <Setter TargetName="thumbBorder" Property="Background" Value="{StaticResource ScrollBarThumbPressedBrush}" />
+                                    <Setter TargetName="thumbBorder" Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- モダンスクロールバースタイル（矢印ボタンを排したスリムデザイン） -->
+            <Style TargetType="{x:Type ScrollBar}" x:Key="ModernScrollBarStyle">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="SnapsToDevicePixels" Value="True" />
+                <Setter Property="Width" Value="12" />
+                <Setter Property="MinWidth" Value="12" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ScrollBar}">
+                            <Border Background="Transparent" SnapsToDevicePixels="True">
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ScrollBarTrackRepeatButtonStyle}" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Style="{StaticResource ScrollBarThumbStyle}" />
+                                    </Track.Thumb>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ScrollBarTrackRepeatButtonStyle}" />
+                                    </Track.IncreaseRepeatButton>
+                                </Track>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="Orientation" Value="Horizontal">
+                        <Setter Property="Width" Value="Auto" />
+                        <Setter Property="MinWidth" Value="0" />
+                        <Setter Property="Height" Value="12" />
+                        <Setter Property="MinHeight" Value="12" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                                    <Border Background="Transparent" SnapsToDevicePixels="True">
+                                        <Track x:Name="PART_Track" IsDirectionReversed="False">
+                                            <Track.DecreaseRepeatButton>
+                                                <RepeatButton Command="ScrollBar.PageLeftCommand" Style="{StaticResource ScrollBarTrackRepeatButtonStyle}" />
+                                            </Track.DecreaseRepeatButton>
+                                            <Track.Thumb>
+                                                <Thumb Style="{StaticResource ScrollBarThumbStyle}" />
+                                            </Track.Thumb>
+                                            <Track.IncreaseRepeatButton>
+                                                <RepeatButton Command="ScrollBar.PageRightCommand" Style="{StaticResource ScrollBarTrackRepeatButtonStyle}" />
+                                            </Track.IncreaseRepeatButton>
+                                        </Track>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- 浮遊オーバーレイスクロールビューアースタイル（下部ステータスバー42pxとの重複を回避） -->
+            <Style TargetType="{x:Type ScrollViewer}" x:Key="OverlayScrollViewerStyle">
+                <Setter Property="OverridesDefaultStyle" Value="True" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ScrollViewer}">
+                            <Grid x:Name="RootGrid" Background="{TemplateBinding Background}">
+                                <!-- レイヤー0: コンテンツ表示領域（全画面・ステータスバー背後まで展開） -->
+                                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                        CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                        CanHorizontallyScroll="False"
+                                                        CanVerticallyScroll="False"
+                                                        Content="{TemplateBinding Content}"
+                                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                        Margin="{TemplateBinding Padding}" />
+
+                                <!-- レイヤー1: 浮遊スクロールバー層（下部42pxのステータスバー領域を回避） -->
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="42" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- 横スクロールバー（ステータスバー直上に浮遊配置） -->
+                                        <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                                   Grid.Column="0"
+                                                   Orientation="Horizontal"
+                                                   VerticalAlignment="Bottom"
+                                                   Style="{StaticResource ModernScrollBarStyle}"
+                                                   Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                                                   ViewportSize="{TemplateBinding ViewportWidth}"
+                                                   Maximum="{TemplateBinding ScrollableWidth}"
+                                                   Minimum="0"
+                                                   Value="{Binding HorizontalOffset, Mode=OneWay, RelativeSource={RelativeSource Mode=TemplatedParent}}"
+                                                   Cursor="Arrow"
+                                                   AutomationProperties.AutomationId="HorizontalScrollBar" />
+
+                                        <!-- 縦スクロールバー（下端がステータスバー直上42pxで停止） -->
+                                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                                   Grid.Column="1"
+                                                   Orientation="Vertical"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Stretch"
+                                                   Style="{StaticResource ModernScrollBarStyle}"
+                                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                                   Minimum="0"
+                                                   Value="{Binding VerticalOffset, Mode=OneWay, RelativeSource={RelativeSource Mode=TemplatedParent}}"
+                                                   Cursor="Arrow"
+                                                   AutomationProperties.AutomationId="VerticalScrollBar" />
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

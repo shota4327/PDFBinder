@@ -186,20 +186,59 @@ public partial class DetailEditorView : UserControl
         // Ctrlキー押下時は表示モードを問わずズームイン・ズームアウトを実行
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
-            if (e.Delta > 0)
-            {
-                ViewModel.ZoomInCommand.Execute(null);
-            }
-            else if (e.Delta < 0)
-            {
-                ViewModel.ZoomOutCommand.Execute(null);
-            }
-            e.Handled = true;
+            HandleZoomWheel(e);
             return;
         }
 
-        if (ViewModel.PageViewMode != DetailPageViewMode.SinglePage) return;
+        // Shiftキー押下時は表示モードを問わず横スクロールを実行
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            HandleHorizontalScrollWheel(e);
+            return;
+        }
 
+        if (ViewModel.PageViewMode == DetailPageViewMode.SinglePage)
+        {
+            HandleSinglePageWheelTurn(e);
+        }
+    }
+
+    /// <summary>
+    /// Ctrl + マウスホイールによるズームイン・ズームアウト処理
+    /// </summary>
+    private void HandleZoomWheel(MouseWheelEventArgs e)
+    {
+        if (e.Delta > 0)
+        {
+            ViewModel?.ZoomInCommand.Execute(null);
+        }
+        else if (e.Delta < 0)
+        {
+            ViewModel?.ZoomOutCommand.Execute(null);
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Shift + マウスホイールによる水平スクロール処理
+    /// </summary>
+    private void HandleHorizontalScrollWheel(MouseWheelEventArgs e)
+    {
+        if (DetailScrollViewer.ScrollableWidth > 0)
+        {
+            // 標準的な1ノッチ(Delta 120)あたり48pxスクロール
+            double scrollDelta = -(e.Delta / 120.0) * 48.0;
+            double targetOffset = Math.Clamp(DetailScrollViewer.HorizontalOffset + scrollDelta, 0.0, DetailScrollViewer.ScrollableWidth);
+            DetailScrollViewer.ScrollToHorizontalOffset(targetOffset);
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// 単一ページ表示時におけるマウスホイール端到達でのページ送り処理
+    /// </summary>
+    private void HandleSinglePageWheelTurn(MouseWheelEventArgs e)
+    {
         double scrollableHeight = DetailScrollViewer.ScrollableHeight;
         bool isFitInView = scrollableHeight <= 1.0;
         bool isAtTop = DetailScrollViewer.VerticalOffset <= 1.0;
