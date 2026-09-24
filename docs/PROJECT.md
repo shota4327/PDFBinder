@@ -41,7 +41,7 @@
 | **F35** | UI・グリッド俯瞰 | メインヘッダーツールバー刷新（リボンタブ化・手書きツール統合・太さ刷新・ツール並び替え・移動デフォルト化） | **完了** | Issue #3, #7, #15, #17, #93, #94 |
 | **F40** | 手書き詳細 | ページダブルクリックでの詳細エディタ切り替え（216 DPI高解像度化） | **完了** | DetailEditorView.xaml / Issue #21 |
 | **F41** | 手書き詳細 | ペンツール（色・太さ変更・現在値強調・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel |
-| **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・専用太さプリセット・現在値強調・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel |
+| **F42** | 手書き詳細 | 蛍光ペンツール（半透明描画・時系列重なり順保持・重ね塗り濃色化・専用太さプリセット・現在値強調・独立状態保持） | **完了** | Issue #26, #108 / DetailEditorViewModel & EditorInkCanvas |
 | **F43** | 手書き詳細 | 消しゴムツール（ストローク消し / 部分消し切替・部分消し太さ変更・独立状態保持） | **完了** | Issue #26 / DetailEditorViewModel & EraserShape |
 | **F44** | 手書き詳細 | 直線トグル描画（ペン・蛍光ペン連動トグル化・十字カーソルプレビュー） | **完了** | Issue #25 / IsStraightLine & CommitStraightLine |
 | **F36** | UI・タイトルバー | タイトルバー廃止とタブバー統合（Chrome/Edgeスタイル・WindowChrome） | **完了** | Issue #28 / WindowChrome |

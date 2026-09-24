@@ -271,7 +271,7 @@ public class EditorInkCanvas : InkCanvas
                 ApplyDrawingOrStraightLineMode();
                 break;
             case EditorToolMode.Highlighter:
-                DefaultDrawingAttributes.IsHighlighter = true;
+                DefaultDrawingAttributes.IsHighlighter = false;
                 ApplyDrawingOrStraightLineMode();
                 break;
             case EditorToolMode.EraserStroke:
@@ -301,16 +301,22 @@ public class EditorInkCanvas : InkCanvas
 
     /// <summary>
     /// 現在の描画色、太さ、およびツールに応じた描画属性と消しゴム形状を設定します。
+    /// 蛍光ペン時は IsHighlighter = false とし、半透明色（アルファ値 120）を設定して時系列の重なり順と重ね塗りを実現します。
     /// </summary>
     public void ApplyDrawingAttributes()
     {
+        var isHighlighter = ToolMode == EditorToolMode.Highlighter;
+        var color = isHighlighter
+            ? Color.FromArgb(120, DrawingColor.R, DrawingColor.G, DrawingColor.B)
+            : DrawingColor;
+
         var attr = new DrawingAttributes
         {
-            Color = DrawingColor,
+            Color = color,
             Width = StrokeThickness,
             Height = StrokeThickness,
             FitToCurve = true,
-            IsHighlighter = ToolMode == EditorToolMode.Highlighter,
+            IsHighlighter = false,
             IgnorePressure = !IsPenPressureActive
         };
 
@@ -872,7 +878,7 @@ public class EditorInkCanvas : InkCanvas
         {
             var attr = DefaultDrawingAttributes;
             var color = attr.Color;
-            if (attr.IsHighlighter)
+            if (attr.IsHighlighter || ToolMode == EditorToolMode.Highlighter)
             {
                 color = Color.FromArgb(120, color.R, color.G, color.B);
             }
