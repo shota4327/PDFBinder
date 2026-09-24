@@ -244,8 +244,10 @@ public partial class DetailEditorView : UserControl
         bool isAtTop = DetailScrollViewer.VerticalOffset <= 1.0;
         bool isAtBottom = DetailScrollViewer.VerticalOffset >= scrollableHeight - 1.0;
 
-        bool isAtEdge = (e.Delta > 0 && (isFitInView || isAtTop)) ||
-                        (e.Delta < 0 && (isFitInView || isAtBottom));
+        // 前後ページが存在する場合のみ端到達でのページ送りを許可
+        bool canTurnPrevious = (e.Delta > 0) && (isFitInView || isAtTop) && (ViewModel?.CanGoToPreviousPage ?? false);
+        bool canTurnNext = (e.Delta < 0) && (isFitInView || isAtBottom) && (ViewModel?.CanGoToNextPage ?? false);
+        bool isAtEdge = canTurnPrevious || canTurnNext;
 
         int pageTurns = _wheelTracker.ProcessScroll(e.Delta, DateTime.UtcNow, isAtEdge);
         if (pageTurns == 0)
@@ -266,6 +268,7 @@ public partial class DetailEditorView : UserControl
     {
         if (pageTurns > 0)
         {
+            int executedTurns = 0;
             for (int i = 0; i < pageTurns; i++)
             {
                 if (!ViewModel!.CanGoToPreviousPage)
@@ -274,14 +277,20 @@ public partial class DetailEditorView : UserControl
                     break;
                 }
                 ViewModel.GoToPreviousPageCommand.Execute(null);
+                executedTurns++;
             }
 
-            Action? postScroll = isAtTop && !isFitInView ? () => DetailScrollViewer.ScrollToBottom() : () => DetailScrollViewer.ScrollToTop();
-            Dispatcher.InvokeAsync(postScroll, System.Windows.Threading.DispatcherPriority.Loaded);
+            // 実際に前ページへ移動した場合のみ、スクロール位置を調整
+            if (executedTurns > 0)
+            {
+                Action? postScroll = isAtTop && !isFitInView ? () => DetailScrollViewer.ScrollToBottom() : () => DetailScrollViewer.ScrollToTop();
+                Dispatcher.InvokeAsync(postScroll, System.Windows.Threading.DispatcherPriority.Loaded);
+            }
         }
         else if (pageTurns < 0)
         {
             int count = -pageTurns;
+            int executedTurns = 0;
             for (int i = 0; i < count; i++)
             {
                 if (!ViewModel!.CanGoToNextPage)
@@ -290,9 +299,14 @@ public partial class DetailEditorView : UserControl
                     break;
                 }
                 ViewModel.GoToNextPageCommand.Execute(null);
+                executedTurns++;
             }
 
-            Dispatcher.InvokeAsync(() => DetailScrollViewer.ScrollToTop(), System.Windows.Threading.DispatcherPriority.Loaded);
+            // 実際に次ページへ移動した場合のみ、上端へスクロール
+            if (executedTurns > 0)
+            {
+                Dispatcher.InvokeAsync(() => DetailScrollViewer.ScrollToTop(), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
         }
     }
 }
