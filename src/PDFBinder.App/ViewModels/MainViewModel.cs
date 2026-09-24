@@ -1115,7 +1115,7 @@ public partial class MainViewModel : ObservableObject
             var insertCmd = new InsertPageCommand(newDoc, blankPage, 0);
             session.UndoRedoService.Execute(insertCmd);
 
-            DetailEditor?.InitializeDocument(newDoc);
+            DetailEditor?.InitializeDocument(newDoc, blankPage);
             StatusMessage = "白紙ページを追加しました。";
             return;
         }
@@ -1133,8 +1133,12 @@ public partial class MainViewModel : ObservableObject
         if (!IsDetailViewActive)
         {
             blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap(ThumbnailRenderWidth, ThumbnailRenderHeight, blank.Rotation);
+            DetailEditor?.InitializeDocument(Document);
         }
-        DetailEditor?.InitializeDocument(Document);
+        else
+        {
+            DetailEditor?.InitializeDocument(Document, blank);
+        }
         StatusMessage = "白紙ページを追加しました。";
     }
 
