@@ -312,6 +312,26 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// ステータスバーの拡大率クリック時に、詳細ビューでは表示モードを順繰り切り替え（100% → ウィンドウ → 幅）、
+    /// グリッドビューでは標準サイズ（100%）にリセットします。
+    /// </summary>
+    [RelayCommand]
+    public void CycleZoomMode()
+    {
+        if (IsDetailViewActive)
+        {
+            DetailEditor?.CycleFitModeCommand.Execute(null);
+        }
+        else
+        {
+            ThumbnailSize = DefaultThumbnailSize;
+        }
+        OnPropertyChanged(nameof(CurrentZoomText));
+        OnPropertyChanged(nameof(CanZoomIn));
+        OnPropertyChanged(nameof(CanZoomOut));
+    }
+
+    /// <summary>
     /// サムネイル表示サイズを1段階拡大します。
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanZoomInThumbnail))]
