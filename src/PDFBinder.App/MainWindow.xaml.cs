@@ -52,6 +52,9 @@ public partial class MainWindow : Window
 
         if (DataContext is not MainViewModel vm) return;
 
+        // 0. エラー・警告通知ダイアログのキー制御
+        if (HandleErrorDialogKeyDown(vm, e)) return;
+
         // 1. 保存確認ダイアログのキー制御
         if (HandleSaveConfirmationKeyDown(vm, e)) return;
 
@@ -72,6 +75,30 @@ public partial class MainWindow : Window
 
         // 4. その他のグローバルショートカット（Window.InputBindings）
         HandleGlobalInputBindingsKeyDown(vm, e);
+    }
+
+    /// <summary>
+    /// エラー・警告通知ダイアログ表示中のキーボード操作（Enter/Esc/Spaceによる閉じる等）を先行処理します。
+    /// </summary>
+    private static bool HandleErrorDialogKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsErrorDialogVisible) return false;
+
+        if (e.Key is Key.Escape or Key.Enter or Key.Space)
+        {
+            vm.CloseErrorDialog();
+            e.Handled = true;
+            return true;
+        }
+
+        // エラー・警告通知ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
