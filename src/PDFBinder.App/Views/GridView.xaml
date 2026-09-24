@@ -27,6 +27,7 @@
 
         <!-- サムネイル一覧グリッド（最下部スクロール時にカードがステータスバーに隠れないよう下部オフセット62pxを確保） -->
         <ScrollViewer x:Name="GridScrollViewer"
+                      Style="{StaticResource OverlayScrollViewerStyle}"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Padding="20,20,20,62"
