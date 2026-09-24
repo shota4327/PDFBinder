@@ -157,11 +157,12 @@ public class DetailEditorStraightLineTests
                 Assert.Equal(Cursors.Cross, canvas.Cursor);
                 Assert.True(canvas.IsStraightLineActive);
 
-                // 蛍光ペン（直線オン）: Noneモード & 十字カーソル & IsHighlighter=true
+                // 蛍光ペン（直線オン）: Noneモード & 十字カーソル & IsHighlighter=false（Issue #108: 半透明Alpha=120で重なり順を保持）
                 canvas.ToolMode = EditorToolMode.Highlighter;
                 Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
                 Assert.Equal(Cursors.Cross, canvas.Cursor);
-                Assert.True(canvas.DefaultDrawingAttributes.IsHighlighter);
+                Assert.False(canvas.DefaultDrawingAttributes.IsHighlighter);
+                Assert.Equal(120, canvas.DefaultDrawingAttributes.Color.A);
                 Assert.True(canvas.IsStraightLineActive);
 
                 // 蛍光ペン（直線オフ）: インクモード & ペンプレビューカーソル（十字以外）
