@@ -992,6 +992,24 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// 表示フィットモードを「100% → ウィンドウに合わせる → 幅に合わせる」の順でサイクル切り替えします。
+    /// 手動ズーム等の未選択状態（None）の場合は「ウィンドウに合わせる」に切り替えます。
+    /// </summary>
+    [RelayCommand]
+    public void CycleFitMode()
+    {
+        DetailViewFitMode nextMode = FitMode switch
+        {
+            DetailViewFitMode.ActualSize => DetailViewFitMode.FitToWindow,
+            DetailViewFitMode.FitToWindow => DetailViewFitMode.FitToWidth,
+            DetailViewFitMode.FitToWidth => DetailViewFitMode.ActualSize,
+            _ => DetailViewFitMode.FitToWindow
+        };
+
+        SetFitMode(nextMode);
+    }
+
+    /// <summary>
     /// 現在のフィットモードに従ってズーム倍率を再計算・適用します。
     /// </summary>
     public void ApplyFitMode()

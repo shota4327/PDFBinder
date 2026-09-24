@@ -671,8 +671,8 @@
                         <TextBlock Text="&#xE15B;" FontFamily="{StaticResource IconFontFamily}" FontSize="13" />
                     </Button>
                     <Button Style="{StaticResource MiniIconButtonStyle}"
-                            Command="{Binding ZoomResetCommand}"
-                            ToolTip="等倍表示 / 標準リセット (Ctrl+0)"
+                            Command="{Binding CycleZoomModeCommand}"
+                            ToolTip="表示モード切り替え (100% → ウィンドウ → 幅)"
                             MinWidth="50" Width="Auto" Height="28" Padding="4,0" Margin="2,0">
                         <TextBlock Text="{Binding CurrentZoomText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                     </Button>
