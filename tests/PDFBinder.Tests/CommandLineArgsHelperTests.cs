@@ -73,7 +73,7 @@ public class CommandLineArgsHelperTests
             "--option",
             "/v",
             Path.Combine(Path.GetTempPath(), "text.txt"),
-            Path.Combine(Path.GetTempPath(), "image.png"),
+            Path.Combine(Path.GetTempPath(), "doc.docx"),
             validPdf,
             ""
         };
@@ -82,6 +82,20 @@ public class CommandLineArgsHelperTests
 
         Assert.Equal(Path.GetFullPath(validPdf), result.PrimaryFile);
         Assert.Empty(result.AdditionalFiles);
+    }
+
+    [Fact]
+    public void Parse_WithImageFiles_AcceptsSupportedImages()
+    {
+        var validPng = Path.Combine(Path.GetTempPath(), "image.png");
+        var validJpg = Path.Combine(Path.GetTempPath(), "photo.jpg");
+        var args = new[] { validPng, validJpg };
+
+        var result = CommandLineArgsHelper.Parse(args);
+
+        Assert.Equal(2, result.Files.Count);
+        Assert.Equal(Path.GetFullPath(validPng), result.Files[0]);
+        Assert.Equal(Path.GetFullPath(validJpg), result.Files[1]);
     }
 
     [Fact]

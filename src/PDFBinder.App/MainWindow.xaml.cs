@@ -465,15 +465,16 @@ public partial class MainWindow : Window
         {
             vm.IsDragOver = false;
 
-            // グリッドビュー表示中かつページが存在する場合は、GridView 側の OnGridDrop に委ねる
-            if (!vm.IsDetailViewActive && vm.Document.Pages.Count > 0)
-            {
-                return;
-            }
-
+            // グリッドビュー表示中かつページが存在し、PDFが含まれる場合は、GridView 側の OnGridDrop に委ねる
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                bool hasPdf = files != null && files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+                if (!vm.IsDetailViewActive && vm.Document.Pages.Count > 0 && hasPdf)
+                {
+                    return;
+                }
+
                 await vm.HandleFileDropAsync(files);
                 e.Handled = true;
             }
@@ -488,8 +489,8 @@ public partial class MainWindow : Window
         if (e.Data.GetDataPresent(DataFormats.FileDrop) && DataContext is MainViewModel vm)
         {
             var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-            bool hasPdf = files != null && files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
-            if (hasPdf)
+            bool hasSupportedFile = files != null && files.Any(IsSupportedDropFile);
+            if (hasSupportedFile)
             {
                 e.Effects = DragDropEffects.Copy;
                 // 詳細ビュー表示中のみ全画面ドロップオーバーレイを表示
@@ -511,6 +512,16 @@ public partial class MainWindow : Window
         {
             vmReset.IsDragOver = false;
         }
+    }
+
+    private static bool IsSupportedDropFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string ext = System.IO.Path.GetExtension(path);
+        return string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
     }
 
 

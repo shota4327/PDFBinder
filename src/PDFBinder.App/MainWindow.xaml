@@ -97,7 +97,7 @@
                     <!-- タブ（クリック可能にするため IsHitTestVisibleInChrome="True"） -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"
                                 WindowChrome.IsHitTestVisibleInChrome="True">
-                        <RadioButton Content="PDF編集" GroupName="RibbonTabs"
+                        <RadioButton Content="編集" GroupName="RibbonTabs"
                                      IsChecked="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=0, Mode=TwoWay}"
                                      Style="{StaticResource RibbonTabRadioButtonStyle}" />
                         <RadioButton Content="手書き" GroupName="RibbonTabs"
@@ -227,11 +227,11 @@
         <!-- ツールバーコンテンツ領域 -->
         <Border Grid.Row="1" Background="{StaticResource RibbonBackgroundBrush}" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="0,0,0,1" Padding="12,6">
                     <Grid>
-                        <!-- PDF編集タブコンテンツ -->
+                        <!-- 編集タブコンテンツ -->
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"
                                    Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=0}">
                             <!-- ファイル操作（リボンスタイル） -->
-                            <Button Command="{Binding OpenDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="PDFファイルを開く (Ctrl+O)">
+                            <Button Command="{Binding OpenDocumentCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="ファイルを開く (Ctrl+O)">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xEAF3;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="開く" FontSize="11" HorizontalAlignment="Center" />
@@ -494,6 +494,7 @@
                                    Visibility="{Binding SelectedRibbonTabIndex, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=2}">
                             <!-- グループ1: 【表示モード】 -->
                             <RadioButton GroupName="RibbonViewModeGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="詳細ビュー (縦連続表示)"
+                                         IsEnabled="{Binding CanToggleViewMode}"
                                          IsChecked="{Binding IsDetailViewActive, Mode=TwoWay}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE873;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
@@ -501,6 +502,7 @@
                                 </StackPanel>
                             </RadioButton>
                             <RadioButton GroupName="RibbonViewModeGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="グリッドビュー (ページ一覧)"
+                                         IsEnabled="{Binding CanToggleViewMode}"
                                          IsChecked="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}, Mode=TwoWay}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE9B0;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
@@ -540,7 +542,7 @@
 
                             <!-- グループ3: 【ページ配置】（詳細ビュー時のみ有効） -->
                             <RadioButton GroupName="RibbonPageLayoutGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="単一ページ表示 (1ページずつ表示)"
-                                         IsEnabled="{Binding IsDetailViewActive}"
+                                         IsEnabled="{Binding CanToggleContinuousScroll}"
                                          IsChecked="{Binding DetailEditor.PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=SinglePage, Mode=TwoWay}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE8ED;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
@@ -548,7 +550,7 @@
                                 </StackPanel>
                             </RadioButton>
                             <RadioButton GroupName="RibbonPageLayoutGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="連続スクロール表示 (縦連続表示)"
-                                         IsEnabled="{Binding IsDetailViewActive}"
+                                         IsEnabled="{Binding CanToggleContinuousScroll}"
                                          IsChecked="{Binding DetailEditor.PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Continuous, Mode=TwoWay}">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE8F2;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />

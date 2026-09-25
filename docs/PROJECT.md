@@ -70,6 +70,8 @@
 | **F61** | UI・グリッド俯瞰 | グリッド表示でのドラッグ中マウスホイールスクロール＆オートスクロール（ページ並び替え・外部PDF挿入・ラバーバンド選択対応、上下端40px可変速度自動スクロール、ドラッグ中ズーム抑止） | **完了** | Issue #142 / AutoScroller & DragMouseWheelHook |
 | **F62** | UI・モーダル共通化 | バージョン情報インアプリオーバーレイ化＆モーダルUIスタイル共通化（`ModalBackdropGridStyle`, `ModalCardBorderStyle`、保存確認・印刷・バージョン情報のUI共通化、`AboutOverlayControl`、背景クリック対応） | **完了** | Issue #149 / App.xaml, AboutOverlayControl & MainWindow |
 | **F63** | UI・スクロール操作 | 浮遊オーバーレイスクロールバー＆ステータスバー重複解消（横・縦スクロールバーのステータスバー直上42px浮遊配置、背後コンテンツ通過維持、Shift+ホイール横スクロール） | **完了** | Issue #140 / App.xaml, DetailEditorView & GridView |
+| **F64** | UI・リボンタブ | リボンタブ表記を「PDF編集」から「編集」に一般化変更 | **完了** | Issue #167 / MainWindow.xaml |
+| **F65** | 画像編集コア / UI | 画像データ（JPEG/PNG）の直接編集・回転・手書きアノテーション・元形式保存およびPDFエクスポート対応（元解像度・DPI保持、手書き高精細合成、画像専用セッション管理、機能グレーアウト） | **完了** | Issue #167 / ImageService, DocumentKind, MainViewModel, PdfiumRenderer |
 
 ---
 
