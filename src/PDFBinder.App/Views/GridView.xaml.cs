@@ -355,7 +355,7 @@ public partial class GridView : UserControl
         else if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-            if (files != null && files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
+            if (files != null && files.Any(IsSupportedFile))
             {
                 if (!_isDragging && !_isExternalDragOver)
                 {
@@ -368,6 +368,16 @@ public partial class GridView : UserControl
                 e.Handled = true;
             }
         }
+    }
+
+    private static bool IsSupportedFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string ext = System.IO.Path.GetExtension(path);
+        return string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

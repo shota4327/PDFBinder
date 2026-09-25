@@ -59,11 +59,8 @@ public static class CommandLineArgsHelper
                 continue;
             }
 
-            // その他のオプション引数（- または / で始まるもの）は除外
-            if (arg.StartsWith('-') || arg.StartsWith('/')) continue;
-
-            // .pdf 拡張子を持つ引数のみを抽出
-            if (!arg.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) continue;
+            // サポート対象拡張子（.pdf, .jpg, .jpeg, .png）を持つ引数のみを抽出
+            if (!IsSupportedFile(arg)) continue;
 
             try
             {
@@ -80,6 +77,15 @@ public static class CommandLineArgsHelper
         }
 
         return new CommandLineArgsResult(pdfFiles, forceNewWindow);
+    }
+
+    private static bool IsSupportedFile(string path)
+    {
+        string ext = Path.GetExtension(path);
+        return string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

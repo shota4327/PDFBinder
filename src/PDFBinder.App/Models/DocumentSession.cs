@@ -50,6 +50,9 @@ public partial class DocumentSession : ObservableObject
     /// </summary>
     public string FullPathOrTitle => Document.FilePath ?? Document.FileName;
 
+    /// <summary>画像ドキュメントかどうか</summary>
+    public bool IsImage => Document.IsImage;
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
@@ -67,10 +70,12 @@ public partial class DocumentSession : ObservableObject
     {
         if (e.PropertyName == nameof(PdfDocumentModel.IsModified) ||
             e.PropertyName == nameof(PdfDocumentModel.FileName) ||
-            e.PropertyName == nameof(PdfDocumentModel.FilePath))
+            e.PropertyName == nameof(PdfDocumentModel.FilePath) ||
+            e.PropertyName == nameof(PdfDocumentModel.IsImage))
         {
             OnPropertyChanged(nameof(DisplayTitle));
             OnPropertyChanged(nameof(FullPathOrTitle));
+            OnPropertyChanged(nameof(IsImage));
         }
     }
 }

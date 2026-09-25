@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPdfRenderer _pdfRenderer;
     private readonly IUndoRedoService _undoRedoService;
     private readonly IPrintService _printService;
+    private readonly IImageService _imageService;
     private readonly PrintSettings _persistentPrintSettings = new();
     private CancellationTokenSource? _thumbnailCts;
     private Task? _thumbnailTask;
@@ -202,6 +203,12 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnIsDetailViewActiveChanged(bool value)
     {
+        if (IsImageDocumentActive && !value)
+        {
+            IsDetailViewActive = true;
+            return;
+        }
+
         if (!value)
         {
             // グリッドビューに切り替わった場合
@@ -336,17 +343,44 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 前のページへ移動可能かどうかを取得します（詳細ビューかつ先頭ページ以外）。
     /// </summary>
-    public bool CanGoToPreviousPage => IsDetailViewActive && (DetailEditor?.CanGoToPreviousPage ?? false);
+    public bool CanGoToPreviousPage => IsDetailViewActive && !IsImageDocumentActive && (DetailEditor?.CanGoToPreviousPage ?? false);
 
     /// <summary>
     /// 次のページへ移動可能かどうかを取得します（詳細ビューかつ末尾ページ以外）。
     /// </summary>
-    public bool CanGoToNextPage => IsDetailViewActive && (DetailEditor?.CanGoToNextPage ?? false);
+    public bool CanGoToNextPage => IsDetailViewActive && !IsImageDocumentActive && (DetailEditor?.CanGoToNextPage ?? false);
 
     /// <summary>
-    /// ページ移動操作が可能かどうかを取得します（詳細ビューかつ1ページ以上存在）。
+    /// ページ移動操作が可能かどうかを取得します（詳細ビューかつ複数ページ存在）。
     /// </summary>
-    public bool CanNavigatePages => IsDetailViewActive && Document.PageCount > 0;
+    public bool CanNavigatePages => IsDetailViewActive && !IsImageDocumentActive && Document.PageCount > 1;
+
+    /// <summary>現在アクティブなドキュメントが画像ファイルかどうかを取得します。</summary>
+    public bool IsImageDocumentActive => ActiveSession?.IsImage ?? false;
+
+    /// <summary>外部ドキュメントを結合・追加可能かどうかを取得します。</summary>
+    public bool CanAppendDocument => HasOpenDocuments && !IsImageDocumentActive;
+
+    /// <summary>白紙ページを追加可能かどうかを取得します。</summary>
+    public bool CanAddBlankPage => !IsImageDocumentActive;
+
+    /// <summary>選択ページを抽出可能かどうかを取得します。</summary>
+    public bool CanExportSelectedPages => HasOpenDocuments && !IsImageDocumentActive;
+
+    /// <summary>全ページを一括分割可能かどうかを取得します。</summary>
+    public bool CanSplitAllPages => HasOpenDocuments && !IsImageDocumentActive && Document.PageCount > 0;
+
+    /// <summary>全ページを半分に分割可能かどうかを取得します。</summary>
+    public bool CanSplitPagesHalf => HasOpenDocuments && !IsImageDocumentActive && Document.PageCount > 0;
+
+    /// <summary>選択ページを削除可能かどうかを取得します。</summary>
+    public bool CanDeleteSelectedPages => HasOpenDocuments && !IsImageDocumentActive && Document.PageCount > 1;
+
+    /// <summary>詳細/グリッド表示モードを切り替え可能かどうかを取得します。</summary>
+    public bool CanToggleViewMode => !IsImageDocumentActive;
+
+    /// <summary>連続スクロール表示を切り替え可能かどうかを取得します。</summary>
+    public bool CanToggleContinuousScroll => !IsImageDocumentActive;
 
     /// <summary>
     /// 現在表示中のページ番号（1-based）を取得または設定します。
@@ -408,12 +442,14 @@ public partial class MainViewModel : ObservableObject
         IPdfService? pdfService = null,
         IPdfRenderer? pdfRenderer = null,
         IUndoRedoService? undoRedoService = null,
-        IPrintService? printService = null)
+        IPrintService? printService = null,
+        IImageService? imageService = null)
     {
         _pdfService = pdfService ?? new PdfService();
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _undoRedoService = undoRedoService ?? new UndoRedoService();
         _printService = printService ?? new WpfPrintService();
+        _imageService = imageService ?? new ImageService();
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
         _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
@@ -492,12 +528,16 @@ public partial class MainViewModel : ObservableObject
             newValue.PropertyChanged += OnSessionPropertyChanged;
 
             Document = newValue.Document;
-            IsDetailViewActive = newValue.IsDetailViewActive;
+            IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
             SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
 
             DetailEditor?.InitializeDocument(newValue.Document);
             if (DetailEditor != null)
             {
+                if (newValue.IsImage)
+                {
+                    DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
+                }
                 DetailEditor.FitMode = newValue.FitMode;
                 if (newValue.FitMode != DetailViewFitMode.None)
                 {
@@ -532,10 +572,12 @@ public partial class MainViewModel : ObservableObject
     private void OnSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(DocumentSession.DisplayTitle) ||
-            e.PropertyName == nameof(DocumentSession.FullPathOrTitle))
+            e.PropertyName == nameof(DocumentSession.FullPathOrTitle) ||
+            e.PropertyName == nameof(DocumentSession.IsImage))
         {
             OnPropertyChanged(nameof(DisplayFileName));
             OnPropertyChanged(nameof(WindowTitle));
+            NotifySessionStateChanged();
         }
     }
 
@@ -546,8 +588,30 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasOpenDocuments));
         OnPropertyChanged(nameof(CanUndo));
         OnPropertyChanged(nameof(CanRedo));
+        OnPropertyChanged(nameof(IsImageDocumentActive));
+        OnPropertyChanged(nameof(CanAppendDocument));
+        OnPropertyChanged(nameof(CanAddBlankPage));
+        OnPropertyChanged(nameof(CanExportSelectedPages));
+        OnPropertyChanged(nameof(CanSplitAllPages));
+        OnPropertyChanged(nameof(CanSplitPagesHalf));
+        OnPropertyChanged(nameof(CanDeleteSelectedPages));
+        OnPropertyChanged(nameof(CanToggleViewMode));
+        OnPropertyChanged(nameof(CanToggleContinuousScroll));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(CanGoToNextPage));
+        OnPropertyChanged(nameof(CanNavigatePages));
+
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
+        AppendDocumentCommand.NotifyCanExecuteChanged();
+        AddBlankPageCommand.NotifyCanExecuteChanged();
+        ExportSelectedPagesCommand.NotifyCanExecuteChanged();
+        SplitAllPagesCommand.NotifyCanExecuteChanged();
+        SplitPagesHalfCommand.NotifyCanExecuteChanged();
+        DeleteSelectedPagesCommand.NotifyCanExecuteChanged();
+        ClosePageDetailCommand.NotifyCanExecuteChanged();
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnDocumentChanged(PdfDocumentModel? oldValue, PdfDocumentModel newValue)
@@ -706,7 +770,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// PDFファイルを開きます。複数選択された場合は別ドキュメントとして順次追加します。
+    /// PDFまたは画像ファイルを開きます。複数選択された場合は別ドキュメントとして順次追加します。
     /// </summary>
     [RelayCommand]
     public async Task OpenDocumentAsync(string? filePath = null)
@@ -715,8 +779,8 @@ public partial class MainViewModel : ObservableObject
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "PDFファイル (*.pdf)|*.pdf|すべてのファイル (*.*)|*.*",
-                Title = "PDFファイルを開く",
+                Filter = "対応ファイル (*.pdf;*.jpg;*.jpeg;*.png)|*.pdf;*.jpg;*.jpeg;*.png|PDFファイル (*.pdf)|*.pdf|画像ファイル (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png|すべてのファイル (*.*)|*.*",
+                Title = "ファイルを開く",
                 Multiselect = true
             };
 
@@ -733,7 +797,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 単一のPDFファイルを読み込み、新規ドキュメントセッションとして追加・アクティブ化します。
+    /// 単一のPDFまたは画像ファイルを読み込み、新規ドキュメントセッションとして追加・アクティブ化します。
     /// 既に開かれているファイルの場合は、既存のセッションへ切り替えます。
     /// </summary>
     public async Task OpenSingleDocumentAsync(string filePath)
@@ -764,9 +828,12 @@ public partial class MainViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            StatusMessage = "PDFを読み込んでいます...";
+            bool isImage = _imageService.IsSupportedImage(filePath);
+            StatusMessage = isImage ? "画像を読み込んでいます..." : "PDFを読み込んでいます...";
 
-            var doc = await _pdfService.LoadDocumentAsync(filePath);
+            var doc = isImage
+                ? await _imageService.LoadImageDocumentAsync(filePath)
+                : await _pdfService.LoadDocumentAsync(filePath);
             var session = new DocumentSession(doc);
 
             // 未編集かつ0ページの「名称未設定」セッションが存在する場合はそれを除去
@@ -781,7 +848,9 @@ public partial class MainViewModel : ObservableObject
 
             Documents.Add(session);
             ActiveSession = session;
-            StatusMessage = $"{doc.FileName} を読み込みました（全 {doc.PageCount} ページ）";
+            StatusMessage = isImage
+                ? $"{doc.FileName} を読み込みました。"
+                : $"{doc.FileName} を読み込みました（全 {doc.PageCount} ページ）";
         }
         catch (Exception ex)
         {
@@ -796,7 +865,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 外部PDFを現在のアクティブドキュメントの末尾または任意の位置に結合・追加します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAppendDocument))]
     public async Task AppendDocumentAsync(string? filePath = null)
     {
         if (string.IsNullOrEmpty(filePath))
@@ -843,20 +912,22 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// ドロップされた外部ファイル群（PDFファイル）を別ドキュメントとして順次開きます。
+    /// ドロップされた外部ファイル群（PDFまたは画像ファイル）を別ドキュメントとして順次開きます。
     /// </summary>
     /// <param name="filePaths">ドロップされたファイルパス一覧</param>
     public async Task HandleFileDropAsync(IEnumerable<string>? filePaths)
     {
         if (filePaths == null) return;
 
-        var pdfFiles = filePaths
-            .Where(f => !string.IsNullOrWhiteSpace(f) && f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        var supportedFiles = filePaths
+            .Where(f => !string.IsNullOrWhiteSpace(f) &&
+                        (f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
+                         _imageService.IsSupportedImage(f)))
             .ToList();
 
-        if (pdfFiles.Count == 0) return;
+        if (supportedFiles.Count == 0) return;
 
-        foreach (var file in pdfFiles)
+        foreach (var file in supportedFiles)
         {
             await OpenSingleDocumentAsync(file);
         }
@@ -864,20 +935,35 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// 外部PDFファイル群の全ページを指定したインデックス位置に挿入・結合します（Undo/Redo対応）。
+    /// ドロップされたファイル群に画像が含まれる場合は、画像は新規ドキュメントとして独立して開きます。
     /// </summary>
-    /// <param name="filePaths">PDFファイルのパス一覧</param>
+    /// <param name="filePaths">ファイルパス一覧</param>
     /// <param name="insertIndex">挿入先インデックス（0始まり）</param>
     public async Task InsertPdfFilesAsync(IEnumerable<string>? filePaths, int insertIndex)
     {
         if (filePaths == null) return;
 
+        var targetSession = ActiveSession;
+        var targetDoc = targetSession?.Document ?? Document;
+        bool isTargetImage = targetSession?.IsImage ?? false;
+
+        var imageFiles = filePaths
+            .Where(f => !string.IsNullOrWhiteSpace(f) && _imageService.IsSupportedImage(f))
+            .ToList();
+
         var pdfFiles = filePaths
             .Where(f => !string.IsNullOrWhiteSpace(f) && f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        // 画像ファイルは常に独立した新規ドキュメントとして開く
+        foreach (var img in imageFiles)
+        {
+            await OpenSingleDocumentAsync(img);
+        }
+
         if (pdfFiles.Count == 0) return;
 
-        if (ActiveSession == null || Documents.Count == 0)
+        if (targetSession == null || Documents.Count == 0 || isTargetImage)
         {
             await HandleFileDropAsync(pdfFiles);
             return;
@@ -897,12 +983,15 @@ public partial class MainViewModel : ObservableObject
 
             if (pagesToInsert.Count == 0) return;
 
-            int targetIndex = Math.Clamp(insertIndex, 0, Document.Pages.Count);
-            var cmd = new InsertPagesCommand(Document, pagesToInsert, targetIndex);
-            CurrentUndoRedoService.Execute(cmd);
+            int targetIdx = Math.Clamp(insertIndex, 0, targetDoc.Pages.Count);
+            var cmd = new InsertPagesCommand(targetDoc, pagesToInsert, targetIdx);
+            targetSession.UndoRedoService.Execute(cmd);
 
-            DetailEditor?.InitializeDocument(Document);
-            _ = EnsureThumbnailsGeneratedAsync();
+            if (ActiveSession == targetSession)
+            {
+                DetailEditor?.InitializeDocument(targetDoc);
+                _ = EnsureThumbnailsGeneratedAsync();
+            }
             StatusMessage = $"{pdfFiles.Count} 件のファイルから {pagesToInsert.Count} ページを挿入しました。";
         }
         catch (Exception ex)
@@ -1058,12 +1147,29 @@ public partial class MainViewModel : ObservableObject
     {
         var targetDoc = session?.Document ?? ActiveSession?.Document ?? Document;
 
-        var dialog = new SaveFileDialog
+        var dialog = new SaveFileDialog();
+        if (targetDoc.IsImage)
         {
-            Filter = "PDFファイル (*.pdf)|*.pdf",
-            Title = "PDFファイルを保存",
-            FileName = targetDoc.FileName
-        };
+            dialog.Filter = "JPEG画像 (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG画像 (*.png)|*.png|PDFファイル (*.pdf)|*.pdf";
+            dialog.Title = "画像を保存";
+            dialog.FileName = targetDoc.FileName;
+            string ext = Path.GetExtension(targetDoc.FileName);
+            if (string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                dialog.FilterIndex = 1;
+            }
+            else
+            {
+                dialog.FilterIndex = 2;
+            }
+        }
+        else
+        {
+            dialog.Filter = "PDFファイル (*.pdf)|*.pdf";
+            dialog.Title = "PDFファイルを保存";
+            dialog.FileName = targetDoc.FileName;
+        }
 
         if (dialog.ShowDialog() != true) return false;
         return await ExecuteSaveForDocumentAsync(targetDoc, dialog.FileName);
@@ -1081,10 +1187,28 @@ public partial class MainViewModel : ObservableObject
             IsLoading = true;
             StatusMessage = "保存しています...";
 
-            await _pdfService.SaveDocumentAsync(doc, targetPath);
+            string ext = Path.GetExtension(targetPath);
+            if (doc.IsImage)
+            {
+                if (string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _imageService.SaveImageAsPdfAsync(doc, targetPath);
+                    doc.DocumentKind = DocumentKind.Pdf;
+                }
+                else
+                {
+                    await _imageService.SaveImageAsync(doc, targetPath);
+                }
+            }
+            else
+            {
+                await _pdfService.SaveDocumentAsync(doc, targetPath);
+            }
+
             doc.FilePath = targetPath;
             doc.IsModified = false;
             StatusMessage = $"保存しました: {targetPath}";
+            NotifySessionStateChanged();
             return true;
         }
         catch (Exception ex)
@@ -1101,7 +1225,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 白紙ページを追加します。ドキュメント未読み込み時は新規「名称未設定.pdf」を作成します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAddBlankPage))]
     public void AddBlankPage()
     {
         if (ActiveSession == null || Documents.Count == 0)
@@ -1189,7 +1313,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 選択中のページを削除します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDeleteSelectedPages))]
     public void DeleteSelectedPages()
     {
         var targets = Document.Pages.Where(p => p.IsSelected).ToList();
@@ -1214,7 +1338,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 選択したページを別PDFファイルとして抽出（分割）します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanExportSelectedPages))]
     public async Task ExportSelectedPagesAsync()
     {
         var targets = Document.Pages.Where(p => p.IsSelected).ToList();
@@ -1253,7 +1377,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 全ページを1ページずつの個別PDFに一括分割します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSplitAllPages))]
     public async Task SplitAllPagesAsync()
     {
         if (Document.Pages.Count == 0) return;
@@ -1285,7 +1409,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// ドキュメントの全ページをそれぞれ半分のサイズ（横長なら左右、縦長なら上下）に2分割します。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSplitPagesHalf))]
     public async Task SplitPagesHalfAsync()
     {
         if (Document.Pages.Count == 0) return;
@@ -1385,12 +1509,16 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// ページ詳細エディタを閉じ、グリッドビューに戻ります。
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanClosePageDetail))]
     public void ClosePageDetail()
     {
+        if (IsImageDocumentActive) return;
         IsDetailViewActive = false;
         StatusMessage = "グリッド表示に戻りました。";
     }
+
+    /// <summary>ページ詳細エディタを閉じてグリッド表示に戻れるかどうか</summary>
+    public bool CanClosePageDetail => !IsImageDocumentActive;
 
     /// <summary>
     /// 進行中のサムネイル生成タスクをその時点までで安全に中断し、完了を待機します。
