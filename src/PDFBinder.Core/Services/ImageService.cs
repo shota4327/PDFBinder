@@ -43,8 +43,16 @@ public class ImageService : IImageService
         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
         var frame = decoder.Frames[0];
 
-        double widthPt = frame.PixelWidth * 72.0 / 96.0;
-        double heightPt = frame.PixelHeight * 72.0 / 96.0;
+        double dpiX = frame.DpiX > 10.0 ? frame.DpiX : 96.0;
+        double dpiY = frame.DpiY > 10.0 ? frame.DpiY : 96.0;
+
+        // スキャン画像など明示的な高DPIメタデータ（120 DPI以上）が存在する場合は物理寸法を算出
+        // それ以外（一般的なスクリーンショットやWeb画像、96 DPI以下）は96 DPI基準（1:1ピクセル）
+        double effectiveDpiX = dpiX >= 120.0 ? dpiX : 96.0;
+        double effectiveDpiY = dpiY >= 120.0 ? dpiY : 96.0;
+
+        double widthPt = frame.PixelWidth * 72.0 / effectiveDpiX;
+        double heightPt = frame.PixelHeight * 72.0 / effectiveDpiY;
 
         var doc = new PdfDocumentModel
         {
@@ -57,6 +65,7 @@ public class ImageService : IImageService
         {
             SourceFilePath = filePath,
             OriginalPageIndex = 0,
+            DocumentKind = DocumentKind.Image,
             Width = widthPt,
             Height = heightPt,
             OriginalRotation = PageRotation.Rotate0,

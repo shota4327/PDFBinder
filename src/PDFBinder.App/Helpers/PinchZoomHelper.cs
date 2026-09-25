@@ -18,8 +18,8 @@ public readonly record struct PinchZoomResult(
 /// </summary>
 public static class PinchZoomHelper
 {
-    /// <summary>最小ズーム倍率（50%）</summary>
-    public const double DefaultMinZoom = 0.5;
+    /// <summary>最小ズーム倍率（5%）</summary>
+    public const double DefaultMinZoom = ZoomHelper.MinZoom;
 
     /// <summary>最大ズーム倍率（3200%）</summary>
     public const double DefaultMaxZoom = 32.0;

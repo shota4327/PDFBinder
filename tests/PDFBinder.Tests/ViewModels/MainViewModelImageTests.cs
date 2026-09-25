@@ -1,4 +1,7 @@
 using System.IO;
+using System.Threading;
+using PDFBinder.App.Controls;
+using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
@@ -27,6 +30,9 @@ public class MainViewModelImageTests
                    string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
         }
 
+        public double CustomPageWidth { get; set; } = 400;
+        public double CustomPageHeight { get; set; } = 300;
+
         public Task<PdfDocumentModel> LoadImageDocumentAsync(string filePath)
         {
             LoadedPaths.Add(filePath);
@@ -38,8 +44,9 @@ public class MainViewModelImageTests
             doc.AddPage(new PdfPageModel
             {
                 SourceFilePath = filePath,
-                Width = 400,
-                Height = 300,
+                DocumentKind = DocumentKind.Image,
+                Width = CustomPageWidth,
+                Height = CustomPageHeight,
                 OriginalRotation = PageRotation.Rotate0,
                 Rotation = PageRotation.Rotate0
             });
@@ -225,5 +232,85 @@ public class MainViewModelImageTests
         Assert.True(saved);
         Assert.Contains(imagePath, mockImageService.SavedPaths);
         Assert.False(vm.Document.IsModified);
+    }
+
+    [Fact]
+    public async Task ApplyFitToWindow_WithHugeImage_CalculatesZoomBelowFiftyPercent()
+    {
+        var mockImageService = new MockImageService
+        {
+            CustomPageWidth = 4000,
+            CustomPageHeight = 3000
+        };
+        var vm = new MainViewModel(imageService: mockImageService);
+
+        await vm.OpenSingleDocumentAsync(@"C:\images\huge_photo.jpg");
+
+        var detailEditor = vm.DetailEditor;
+        Assert.NotNull(detailEditor);
+
+        // ビューポートを 1000 x 800 に設定
+        detailEditor.UpdateViewportSize(1000, 800);
+        detailEditor.SetFitMode(DetailViewFitMode.FitToWindow);
+
+        // 4000x3000 に対するフィット倍率は 50%（0.5）を大幅に下回る（約 0.2〜0.25）
+        Assert.True(detailEditor.Zoom < 0.5, $"Zoom should be less than 0.5, but was {detailEditor.Zoom}");
+        Assert.True(detailEditor.Zoom >= ZoomHelper.MinZoom, $"Zoom should be at least MinZoom (0.05), but was {detailEditor.Zoom}");
+    }
+
+    [Fact]
+    public void EditorInkCanvas_GetStrokeScale_ScalesForImageAndMaintainsOneForPdf()
+    {
+        var thread = new Thread(() =>
+        {
+            var canvas = new EditorInkCanvas();
+
+            // 1. PDF ページ（595x842）の場合: GetStrokeScale は常に 1.0
+            var pdfPage = new PdfPageModel
+            {
+                DocumentKind = DocumentKind.Pdf,
+                Width = 595.28,
+                Height = 841.89
+            };
+            var pdfItem = new DetailPageItemViewModel(pdfPage);
+            canvas.PageItem = pdfItem;
+            canvas.StrokeThickness = 2.0;
+            canvas.ApplyDrawingAttributes();
+
+            Assert.Equal(1.0, canvas.GetStrokeScale());
+            Assert.Equal(2.0, canvas.DefaultDrawingAttributes.Width);
+
+            // 2. 標準寸法（A4以下）の画像ページの場合: GetStrokeScale は 1.0
+            var smallImagePage = new PdfPageModel
+            {
+                DocumentKind = DocumentKind.Image,
+                Width = 500,
+                Height = 400
+            };
+            var smallImageItem = new DetailPageItemViewModel(smallImagePage);
+            canvas.PageItem = smallImageItem;
+            canvas.ApplyDrawingAttributes();
+
+            Assert.Equal(1.0, canvas.GetStrokeScale());
+            Assert.Equal(2.0, canvas.DefaultDrawingAttributes.Width);
+
+            // 3. 巨大画像ページ（2380x1785: 595の約3倍）の場合:
+            // minDim = 1785, scale = 1785 / 595 = 3.0
+            var hugeImagePage = new PdfPageModel
+            {
+                DocumentKind = DocumentKind.Image,
+                Width = 2380,
+                Height = 1785
+            };
+            var hugeImageItem = new DetailPageItemViewModel(hugeImagePage);
+            canvas.PageItem = hugeImageItem;
+            canvas.ApplyDrawingAttributes();
+
+            Assert.Equal(3.0, canvas.GetStrokeScale(), precision: 2);
+            Assert.Equal(6.0, canvas.DefaultDrawingAttributes.Width, precision: 2);
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
     }
 }

@@ -151,11 +151,32 @@ public class ImageServiceTests : IDisposable
         Assert.False(doc.IsModified);
     }
 
+    [Fact]
+    public async Task LoadImageDocumentAsync_HighDpiImage_CalculatesPhysicalDimensionsFromDpi()
+    {
+        // 300 DPI の画像（300x300 ピクセル -> 1インチ = 72pt）
+        string highDpiPath = CreateTestImageFileWithDpi("scan300.png", 300, 300, 300, 300);
+
+        var doc = await _service.LoadImageDocumentAsync(highDpiPath);
+
+        Assert.NotNull(doc);
+        var page = doc.Pages[0];
+        // 300px / 300 DPI * 72pt/inch = 72 pt
+        Assert.Equal(72.0, page.Width, precision: 1);
+        Assert.Equal(72.0, page.Height, precision: 1);
+        Assert.True(page.IsImage);
+    }
+
     private string CreateTestImageFile(string fileName, int width, int height, bool isPng)
+    {
+        return CreateTestImageFileWithDpi(fileName, width, height, 96, 96, isPng);
+    }
+
+    private string CreateTestImageFileWithDpi(string fileName, int width, int height, double dpiX, double dpiY, bool isPng = true)
     {
         string filePath = Path.Combine(_tempDir, fileName);
 
-        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        var rtb = new RenderTargetBitmap(width, height, dpiX, dpiY, PixelFormats.Pbgra32);
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {

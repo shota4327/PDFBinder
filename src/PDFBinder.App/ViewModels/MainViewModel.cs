@@ -155,9 +155,14 @@ public partial class MainViewModel : ObservableObject
     public const double DefaultThumbnailSize = 220.0;
 
     /// <summary>
+    /// サムネイル最小表示倍率（50%）
+    /// </summary>
+    public const double MinThumbnailZoom = 0.5;
+
+    /// <summary>
     /// サムネイル最小表示サイズ（px、基準サイズの50%）
     /// </summary>
-    public const double MinThumbnailSize = DefaultThumbnailSize * ZoomHelper.MinZoom;
+    public const double MinThumbnailSize = DefaultThumbnailSize * MinThumbnailZoom;
 
     /// <summary>
     /// サムネイル最大表示サイズ（px、基準サイズの3200%）
@@ -336,7 +341,7 @@ public partial class MainViewModel : ObservableObject
     public void ZoomOutThumbnail()
     {
         double currentZoom = ThumbnailSize / DefaultThumbnailSize;
-        double nextZoom = ZoomHelper.GetNextZoomOut(currentZoom);
+        double nextZoom = Math.Max(MinThumbnailZoom, ZoomHelper.GetNextZoomOut(currentZoom));
         ThumbnailSize = Math.Round(nextZoom * DefaultThumbnailSize, 2);
     }
 

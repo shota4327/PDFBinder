@@ -63,6 +63,8 @@ public class EditorInkCanvas : InkCanvas
                 newItem.Page.InkStrokes.StrokesChanged += canvas.OnMasterStrokesChanged;
             }
             canvas.SyncStrokesWithCurrentMode();
+            canvas.ApplyDrawingAttributes();
+            canvas.UpdateCursor();
         }
     }
 
@@ -300,6 +302,19 @@ public class EditorInkCanvas : InkCanvas
     }
 
     /// <summary>
+    /// ページの寸法および種別に応じたストロークスケーリング係数を取得します。
+    /// PDFファイルでは常に 1.0 を維持し、画像ファイルの場合にのみ基準A4短辺（595pt）比率で適正化します。
+    /// </summary>
+    public double GetStrokeScale()
+    {
+        if (PageItem?.Page == null || !PageItem.Page.IsImage) return 1.0;
+        const double baseDimension = 595.0; // A4標準短辺（pt）
+        double minPageDim = Math.Min(PageItem.Page.Width, PageItem.Page.Height);
+        if (minPageDim <= baseDimension) return 1.0;
+        return minPageDim / baseDimension;
+    }
+
+    /// <summary>
     /// 現在の描画色、太さ、およびツールに応じた描画属性と消しゴム形状を設定します。
     /// 蛍光ペン時は IsHighlighter = false とし、半透明色（アルファ値 120）を設定して時系列の重なり順と重ね塗りを実現します。
     /// </summary>
@@ -310,11 +325,13 @@ public class EditorInkCanvas : InkCanvas
             ? Color.FromArgb(120, DrawingColor.R, DrawingColor.G, DrawingColor.B)
             : DrawingColor;
 
+        double effectiveThickness = StrokeThickness * GetStrokeScale();
+
         var attr = new DrawingAttributes
         {
             Color = color,
-            Width = StrokeThickness,
-            Height = StrokeThickness,
+            Width = effectiveThickness,
+            Height = effectiveThickness,
             FitToCurve = true,
             IsHighlighter = false,
             IgnorePressure = !IsPenPressureActive
@@ -324,7 +341,7 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.EraserPoint)
         {
-            EraserShape = new EllipseStylusShape(StrokeThickness, StrokeThickness);
+            EraserShape = new EllipseStylusShape(effectiveThickness, effectiveThickness);
         }
     }
 
@@ -341,7 +358,8 @@ public class EditorInkCanvas : InkCanvas
         else
         {
             EditingMode = InkCanvasEditingMode.Ink;
-            Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Pen;
+            double effectiveThickness = StrokeThickness * GetStrokeScale();
+            Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Pen;
         }
     }
 
@@ -352,13 +370,14 @@ public class EditorInkCanvas : InkCanvas
     {
         if (PenCursorHelper.IsCircleCursorTool(ToolMode))
         {
+            double effectiveThickness = StrokeThickness * GetStrokeScale();
             if (ToolMode == EditorToolMode.EraserPoint)
             {
-                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Cross;
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Cross;
             }
             else if (!IsStraightLine)
             {
-                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, StrokeThickness, Zoom) ?? Cursors.Pen;
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Pen;
             }
         }
     }
