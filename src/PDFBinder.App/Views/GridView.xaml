@@ -54,7 +54,7 @@
                         <DataTemplate DataType="{x:Type models:PdfPageModel}">
                             <Border x:Name="PageBorder"
                                     Margin="10"
-                                    Background="{StaticResource SurfaceBackgroundBrush}"
+                                    Background="White"
                                     CornerRadius="4"
                                     BorderThickness="5"
                                     SnapsToDevicePixels="True"

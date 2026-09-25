@@ -6,6 +6,7 @@ using Docnet.Core;
 using Docnet.Core.Models;
 using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
+using PdfSharp.Drawing;
 
 namespace PDFBinder.Core.Services;
 
@@ -524,12 +525,17 @@ public class PdfiumRenderer : IPdfRenderer
             }
 
             var page = doc.Pages[pageIndex];
-            if (!PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+
+            // ページ最下層（既存コンテンツの背後）に白色の背景矩形を描画し、用紙の地色を白色として保証
+            using (var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Prepend))
             {
-                return pdfBytes;
+                gfx.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
             }
 
-            PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+            {
+                PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            }
 
             using var msOut = new MemoryStream();
             doc.Save(msOut);
