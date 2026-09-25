@@ -1279,4 +1279,41 @@ public class DetailEditorViewModelTests
         Assert.Equal(500, vm.CurrentPageItem.PageBackground!.PixelWidth);
         Assert.Equal(1000, vm.CurrentPageItem.PageBackground.PixelHeight);
     }
+
+    [Fact]
+    public void CycleFitMode_CyclesThroughModes_InCorrectOrder()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.FitMode = DetailViewFitMode.ActualSize;
+
+        // Act & Assert 1: ActualSize -> FitToWindow
+        vm.CycleFitMode();
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.FitMode);
+
+        // Act & Assert 2: FitToWindow -> FitToWidth
+        vm.CycleFitMode();
+        Assert.Equal(DetailViewFitMode.FitToWidth, vm.FitMode);
+
+        // Act & Assert 3: FitToWidth -> ActualSize
+        vm.CycleFitMode();
+        Assert.Equal(DetailViewFitMode.ActualSize, vm.FitMode);
+    }
+
+    [Fact]
+    public void CycleFitMode_WhenModeIsNone_SwitchesToFitToWindow()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.FitMode = DetailViewFitMode.None;
+
+        // Act: 手動ズーム状態からサイクル実行
+        vm.CycleFitMode();
+
+        // Assert: ウィンドウに合わせるに遷移すること
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.FitMode);
+    }
 }
+

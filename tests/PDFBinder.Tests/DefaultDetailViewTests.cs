@@ -120,12 +120,16 @@ public class DefaultDetailViewTests
 
         // Act 1: ページ回転（詳細ビューのカレントページを対象）
         var page1 = vm.Document.Pages[0];
+        var page2 = vm.Document.Pages[1];
+        // 白紙ページ追加後は追加されたページ (page2) がカレントページになっている
+        Assert.Equal(page2, vm.DetailEditor?.CurrentPage);
+
+        vm.DetailEditor?.ScrollToPage(page1);
         Assert.Equal(page1, vm.DetailEditor?.CurrentPage);
         vm.RotateClockwiseCommand.Execute(null);
         Assert.Equal(PageRotation.Rotate90, page1.Rotation);
 
         // Act 2: カレントページをページ2に移動して削除
-        var page2 = vm.Document.Pages[1];
         vm.DetailEditor?.ScrollToPage(page2);
         Assert.Equal(page2, vm.DetailEditor?.CurrentPage);
         vm.DeleteSelectedPagesCommand.Execute(null);

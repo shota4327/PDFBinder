@@ -181,6 +181,50 @@ public class StatusBarAndErrorDialogTests
         Assert.Equal("結合に失敗しました。", vm.StatusMessage);
     }
 
+    [Fact]
+    public void CycleZoomModeCommand_WhenDetailViewActive_CyclesFitMode()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        var page = new PdfPageModel { PageNumber = 1, Width = 595, Height = 842 };
+        vm.Document.AddPage(page);
+        vm.IsDetailViewActive = true;
+        Assert.NotNull(vm.DetailEditor);
+        vm.DetailEditor.FitMode = DetailViewFitMode.ActualSize;
+
+        // Act & Assert 1: ActualSize -> FitToWindow
+        vm.CycleZoomModeCommand.Execute(null);
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+
+        // Act & Assert 2: FitToWindow -> FitToWidth
+        vm.CycleZoomModeCommand.Execute(null);
+        Assert.Equal(DetailViewFitMode.FitToWidth, vm.DetailEditor.FitMode);
+
+        // Act & Assert 3: FitToWidth -> ActualSize
+        vm.CycleZoomModeCommand.Execute(null);
+        Assert.Equal(DetailViewFitMode.ActualSize, vm.DetailEditor.FitMode);
+
+        // Act & Assert 4: None -> FitToWindow
+        vm.DetailEditor.FitMode = DetailViewFitMode.None;
+        vm.CycleZoomModeCommand.Execute(null);
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+    }
+
+    [Fact]
+    public void CycleZoomModeCommand_WhenGridViewActive_ResetsThumbnailSizeToDefault()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        vm.IsDetailViewActive = false;
+        vm.ThumbnailSize = 350.0; // 変更後のサイズ
+
+        // Act: サイクル実行
+        vm.CycleZoomModeCommand.Execute(null);
+
+        // Assert: 既定のサムネイルサイズにリセットされること
+        Assert.Equal(MainViewModel.DefaultThumbnailSize, vm.ThumbnailSize);
+    }
+
     /// <summary>
     /// エラー発生シミュレーション用のモックPdfService
     /// </summary>

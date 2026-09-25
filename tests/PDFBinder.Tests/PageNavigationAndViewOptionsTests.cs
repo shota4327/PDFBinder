@@ -324,4 +324,33 @@ public class PageNavigationAndViewOptionsTests
         var convertedBack = converter.ConvertBack(true, typeof(DetailViewFitMode), "FitToWidth", System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal(DetailViewFitMode.FitToWidth, convertedBack);
     }
+
+    [Fact]
+    public void PageNavigation_AtFirstAndLastPage_CommandsShouldSafelyIgnoreWithoutStateCorruption()
+    {
+        // Arrange: 2ページのドキュメントを用意
+        var doc = CreateSampleDocument(2);
+        using var vm = new DetailEditorViewModel(new DummyPdfRenderer(), doc);
+
+        // Assert: 1ページ目（先頭）
+        Assert.Equal(1, vm.CurrentPageNumber);
+        Assert.False(vm.CanGoToPreviousPage);
+        Assert.True(vm.CanGoToNextPage);
+
+        // Act: 先頭ページで前のページへのコマンドを実行しても変化しない
+        vm.GoToPreviousPageCommand.Execute(null);
+        Assert.Equal(1, vm.CurrentPageNumber);
+        Assert.False(vm.CanGoToPreviousPage);
+
+        // Act: 2ページ目（末尾）へ移動
+        vm.GoToNextPageCommand.Execute(null);
+        Assert.Equal(2, vm.CurrentPageNumber);
+        Assert.True(vm.CanGoToPreviousPage);
+        Assert.False(vm.CanGoToNextPage);
+
+        // Act: 末尾ページで次のページへのコマンドを実行しても変化しない
+        vm.GoToNextPageCommand.Execute(null);
+        Assert.Equal(2, vm.CurrentPageNumber);
+        Assert.False(vm.CanGoToNextPage);
+    }
 }
