@@ -191,7 +191,7 @@ public class ReEditableInkAnnotationTests : IDisposable
         byte[] pixels = new byte[stride * bitmap.PixelHeight];
         bitmap.CopyPixels(pixels, stride, 0);
 
-        // アルファが255（不透明な描画ピクセル）が存在しないこと（すべて0の透過白紙）
-        Assert.DoesNotContain(pixels, b => b == 255);
+        // 手書きストローク（黒）が除外され、背景全体が純白（すべてのバイトが255）であること
+        Assert.All(pixels, b => Assert.Equal(255, b));
     }
 }

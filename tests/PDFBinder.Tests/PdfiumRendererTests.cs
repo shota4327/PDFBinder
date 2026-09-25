@@ -168,4 +168,76 @@ public class PdfiumRendererTests : IDisposable
             Assert.True(bitmap.IsFrozen);
         }
     }
+
+    [Fact]
+    public void CompositeOverWhite_ConvertsTransparentAndSemiTransparentPixelsProperly()
+    {
+        // Arrange: 3つのピクセル（完全透明、完全不透明黒、半透明黒(A=128)）
+        byte[] bgra = new byte[]
+        {
+            0, 0, 0, 0,       // 完全透明 -> 白 (255, 255, 255, 255)
+            10, 20, 30, 255,  // 完全不透明 -> そのまま (10, 20, 30, 255)
+            0, 0, 0, 128      // 半透明黒 (Premultiplied: B=0, G=0, R=0, A=128) -> (127, 127, 127, 255)
+        };
+
+        // Act
+        PdfiumRenderer.CompositeOverWhite(bgra);
+
+        // Assert: 1つ目
+        Assert.Equal(255, bgra[0]);
+        Assert.Equal(255, bgra[1]);
+        Assert.Equal(255, bgra[2]);
+        Assert.Equal(255, bgra[3]);
+
+        // Assert: 2つ目
+        Assert.Equal(10, bgra[4]);
+        Assert.Equal(20, bgra[5]);
+        Assert.Equal(30, bgra[6]);
+        Assert.Equal(255, bgra[7]);
+
+        // Assert: 3つ目
+        Assert.Equal(127, bgra[8]);
+        Assert.Equal(127, bgra[9]);
+        Assert.Equal(127, bgra[10]);
+        Assert.Equal(255, bgra[11]);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_TransparentPdf_ProducesOpaqueWhiteBackground()
+    {
+        // Arrange: 白背景矩形を描画しない透明PDF
+        string transparentPdf = Path.Combine(_testDirectory, "transparent.pdf");
+        using (var doc = new PdfDocument())
+        {
+            var page = doc.AddPage();
+            page.Width = XUnit.FromPoint(200);
+            page.Height = XUnit.FromPoint(300);
+            using (var gfx = XGraphics.FromPdfPage(page))
+            {
+                gfx.DrawRectangle(XBrushes.Black, 50, 50, 50, 50);
+            }
+            doc.Save(transparentPdf);
+        }
+
+        // Act
+        var bitmap = await _renderer.RenderPageAsync(transparentPdf, 0, 200, 300, PageRotation.Rotate0);
+
+        // Assert: ビットマップが不透明かつ背景が白
+        Assert.NotNull(bitmap);
+        int stride = bitmap.PixelWidth * 4;
+        byte[] pixels = new byte[stride * bitmap.PixelHeight];
+        bitmap.CopyPixels(pixels, stride, 0);
+
+        // (0, 0) は背景なので完全な白 (255, 255, 255, 255)
+        Assert.Equal(255, pixels[0]); // B
+        Assert.Equal(255, pixels[1]); // G
+        Assert.Equal(255, pixels[2]); // R
+        Assert.Equal(255, pixels[3]); // A
+
+        // 全ピクセルで Alpha が 255 であること（透明ピクセルが 0 件）
+        for (int i = 3; i < pixels.Length; i += 4)
+        {
+            Assert.Equal(255, pixels[i]);
+        }
+    }
 }

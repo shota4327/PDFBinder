@@ -82,6 +82,7 @@ public class PdfiumRenderer : IPdfRenderer
                 int actualWidth = pageReader.GetPageWidth();
                 int actualHeight = pageReader.GetPageHeight();
                 byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
+                CompositeOverWhite(rawBytes);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var bitmap = BitmapSource.Create(
@@ -538,6 +539,36 @@ public class PdfiumRenderer : IPdfRenderer
         catch
         {
             return pdfBytes;
+        }
+    }
+
+    /// <summary>
+    /// Docnet (PDFium) から取得した BGRA32 生バイト列の未描画領域・半透明領域を白背景（#FFFFFF）にアルファ合成します。
+    /// これにより、背景矩形を持たない透明背景PDFであっても常に不透明な白紙として自然にレンダリングされます。
+    /// </summary>
+    /// <param name="bgraBytes">合成対象の BGRA32 生バイト配列</param>
+    public static void CompositeOverWhite(byte[] bgraBytes)
+    {
+        for (int i = 0; i < bgraBytes.Length; i += 4)
+        {
+            byte a = bgraBytes[i + 3];
+            if (a == 255) continue;
+
+            if (a == 0)
+            {
+                bgraBytes[i] = 255;
+                bgraBytes[i + 1] = 255;
+                bgraBytes[i + 2] = 255;
+                bgraBytes[i + 3] = 255;
+            }
+            else
+            {
+                int invA = 255 - a;
+                bgraBytes[i] = (byte)(bgraBytes[i] + invA);
+                bgraBytes[i + 1] = (byte)(bgraBytes[i + 1] + invA);
+                bgraBytes[i + 2] = (byte)(bgraBytes[i + 2] + invA);
+                bgraBytes[i + 3] = 255;
+            }
         }
     }
 }
