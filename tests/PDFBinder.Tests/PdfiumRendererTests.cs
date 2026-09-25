@@ -170,39 +170,6 @@ public class PdfiumRendererTests : IDisposable
     }
 
     [Fact]
-    public void CompositeOverWhite_ConvertsTransparentAndSemiTransparentPixelsProperly()
-    {
-        // Arrange: 3つのピクセル（完全透明、完全不透明黒、半透明黒(A=128)）
-        byte[] bgra = new byte[]
-        {
-            0, 0, 0, 0,       // 完全透明 -> 白 (255, 255, 255, 255)
-            10, 20, 30, 255,  // 完全不透明 -> そのまま (10, 20, 30, 255)
-            0, 0, 0, 128      // 半透明黒 (Premultiplied: B=0, G=0, R=0, A=128) -> (127, 127, 127, 255)
-        };
-
-        // Act
-        PdfiumRenderer.CompositeOverWhite(bgra);
-
-        // Assert: 1つ目
-        Assert.Equal(255, bgra[0]);
-        Assert.Equal(255, bgra[1]);
-        Assert.Equal(255, bgra[2]);
-        Assert.Equal(255, bgra[3]);
-
-        // Assert: 2つ目
-        Assert.Equal(10, bgra[4]);
-        Assert.Equal(20, bgra[5]);
-        Assert.Equal(30, bgra[6]);
-        Assert.Equal(255, bgra[7]);
-
-        // Assert: 3つ目
-        Assert.Equal(127, bgra[8]);
-        Assert.Equal(127, bgra[9]);
-        Assert.Equal(127, bgra[10]);
-        Assert.Equal(255, bgra[11]);
-    }
-
-    [Fact]
     public async Task RenderPageAsync_TransparentPdf_ProducesOpaqueWhiteBackground()
     {
         // Arrange: 白背景矩形を描画しない透明PDF

@@ -6,6 +6,7 @@ using Docnet.Core;
 using Docnet.Core.Models;
 using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
+using PdfSharp.Drawing;
 
 namespace PDFBinder.Core.Services;
 
@@ -82,7 +83,6 @@ public class PdfiumRenderer : IPdfRenderer
                 int actualWidth = pageReader.GetPageWidth();
                 int actualHeight = pageReader.GetPageHeight();
                 byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
-                CompositeOverWhite(rawBytes);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var bitmap = BitmapSource.Create(
@@ -525,12 +525,17 @@ public class PdfiumRenderer : IPdfRenderer
             }
 
             var page = doc.Pages[pageIndex];
-            if (!PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+
+            // ページ最下層（既存コンテンツの背後）に白色の背景矩形を描画し、用紙の地色を白色として保証
+            using (var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Prepend))
             {
-                return pdfBytes;
+                gfx.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
             }
 
-            PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+            {
+                PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            }
 
             using var msOut = new MemoryStream();
             doc.Save(msOut);
@@ -539,36 +544,6 @@ public class PdfiumRenderer : IPdfRenderer
         catch
         {
             return pdfBytes;
-        }
-    }
-
-    /// <summary>
-    /// Docnet (PDFium) から取得した BGRA32 生バイト列の未描画領域・半透明領域を白背景（#FFFFFF）にアルファ合成します。
-    /// これにより、背景矩形を持たない透明背景PDFであっても常に不透明な白紙として自然にレンダリングされます。
-    /// </summary>
-    /// <param name="bgraBytes">合成対象の BGRA32 生バイト配列</param>
-    public static void CompositeOverWhite(byte[] bgraBytes)
-    {
-        for (int i = 0; i < bgraBytes.Length; i += 4)
-        {
-            byte a = bgraBytes[i + 3];
-            if (a == 255) continue;
-
-            if (a == 0)
-            {
-                bgraBytes[i] = 255;
-                bgraBytes[i + 1] = 255;
-                bgraBytes[i + 2] = 255;
-                bgraBytes[i + 3] = 255;
-            }
-            else
-            {
-                int invA = 255 - a;
-                bgraBytes[i] = (byte)(bgraBytes[i] + invA);
-                bgraBytes[i + 1] = (byte)(bgraBytes[i + 1] + invA);
-                bgraBytes[i + 2] = (byte)(bgraBytes[i + 2] + invA);
-                bgraBytes[i + 3] = 255;
-            }
         }
     }
 }
