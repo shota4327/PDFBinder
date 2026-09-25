@@ -142,4 +142,60 @@ public class SettingsServiceTests : IDisposable
         var loaded = service.Load();
         Assert.Equal(1280, loaded.Window.Width);
     }
+
+    [Fact]
+    public void SaveAndLoad_WithDisplayProfiles_PreservesProfileSettings()
+    {
+        // 準備
+        var service = new SettingsService(_settingsFilePath);
+        var expectedSettings = new AppSettings
+        {
+            Window = new WindowSettings { Width = 1100, Height = 760, IsMaximized = false },
+            DisplayProfiles = new System.Collections.Generic.Dictionary<string, WindowSettings>
+            {
+                ["T27h-30_2560x1440_1mon"] = new WindowSettings { Width = 1920, Height = 1080, IsMaximized = true },
+                ["Internal_1920x1080_1mon"] = new WindowSettings { Width = 1280, Height = 720, IsMaximized = false }
+            }
+        };
+
+        // 実行
+        service.Save(expectedSettings);
+        var loaded = service.Load();
+
+        // 検証
+        Assert.NotNull(loaded);
+        Assert.NotNull(loaded.DisplayProfiles);
+        Assert.Equal(2, loaded.DisplayProfiles.Count);
+
+        Assert.True(loaded.DisplayProfiles.ContainsKey("T27h-30_2560x1440_1mon"));
+        Assert.Equal(1920, loaded.DisplayProfiles["T27h-30_2560x1440_1mon"].Width);
+        Assert.Equal(1080, loaded.DisplayProfiles["T27h-30_2560x1440_1mon"].Height);
+        Assert.True(loaded.DisplayProfiles["T27h-30_2560x1440_1mon"].IsMaximized);
+
+        Assert.True(loaded.DisplayProfiles.ContainsKey("Internal_1920x1080_1mon"));
+        Assert.Equal(1280, loaded.DisplayProfiles["Internal_1920x1080_1mon"].Width);
+        Assert.Equal(720, loaded.DisplayProfiles["Internal_1920x1080_1mon"].Height);
+        Assert.False(loaded.DisplayProfiles["Internal_1920x1080_1mon"].IsMaximized);
+    }
+
+    [Fact]
+    public void Load_WhenLegacyJsonWithoutDisplayProfiles_DeserializesWithEmptyDisplayProfiles()
+    {
+        // 準備: DisplayProfiles キーが存在しない古い形式の JSON を書き込み
+        string legacyJson = "{\"Window\":{\"Width\":1366,\"Height\":768,\"IsMaximized\":false}}";
+        File.WriteAllText(_settingsFilePath, legacyJson);
+        var service = new SettingsService(_settingsFilePath);
+
+        // 実行
+        var loaded = service.Load();
+
+        // 検証
+        Assert.NotNull(loaded);
+        Assert.NotNull(loaded.Window);
+        Assert.Equal(1366, loaded.Window.Width);
+        Assert.Equal(768, loaded.Window.Height);
+        Assert.False(loaded.Window.IsMaximized);
+        Assert.NotNull(loaded.DisplayProfiles);
+        Assert.Empty(loaded.DisplayProfiles);
+    }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
@@ -6,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using PDFBinder.App.Helpers;
+using PDFBinder.App.Services;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
@@ -18,6 +20,7 @@ namespace PDFBinder.App;
 public partial class MainWindow : Window
 {
     private readonly ISettingsService _settingsService;
+    private readonly IDisplayProfileService _displayProfileService;
     private bool _isClosingConfirmed;
     private bool _isSettingsSaved;
 
@@ -25,9 +28,11 @@ public partial class MainWindow : Window
     /// <see cref="MainWindow"/> の新しいインスタンスを初期化します。
     /// </summary>
     /// <param name="settingsService">設定サービス（テスト用DI、未指定時は既定の SettingsService）</param>
-    public MainWindow(ISettingsService? settingsService = null)
+    /// <param name="displayProfileService">ディスプレイプロファイルサービス（テスト用DI、未指定時は既定の DisplayProfileService）</param>
+    public MainWindow(ISettingsService? settingsService = null, IDisplayProfileService? displayProfileService = null)
     {
         _settingsService = settingsService ?? new SettingsService();
+        _displayProfileService = displayProfileService ?? new DisplayProfileService();
 
         InitializeComponent();
         DataContext = new MainViewModel();
@@ -249,17 +254,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 設定情報から前回のウィンドウサイズおよび最大化状態を復元します。
+    /// 設定情報から現在のディスプレイ環境に応じたウィンドウサイズおよび最大化状態を復元します。
     /// </summary>
     private void RestoreWindowSettings()
     {
         var settings = _settingsService.Load();
-        if (settings?.Window == null) return;
+        var effective = _displayProfileService.ResolveEffectiveWindowSettings(settings);
 
         var workArea = SystemParameters.WorkArea;
         var (adjustedWidth, adjustedHeight) = WindowBoundsHelper.AdjustBounds(
-            settings.Window.Width,
-            settings.Window.Height,
+            effective.Width,
+            effective.Height,
             workArea.Width,
             workArea.Height,
             MinWidth,
@@ -268,14 +273,14 @@ public partial class MainWindow : Window
         Width = adjustedWidth;
         Height = adjustedHeight;
 
-        if (settings.Window.IsMaximized)
+        if (effective.IsMaximized)
         {
             WindowState = WindowState.Maximized;
         }
     }
 
     /// <summary>
-    /// 現在のウィンドウサイズおよび最大化状態を設定情報へ保存します。
+    /// 現在のウィンドウサイズおよび最大化状態を設定情報（ディスプレイプロファイル別および共通設定）へ保存します。
     /// </summary>
     private void SaveWindowSettings()
     {
@@ -284,35 +289,57 @@ public partial class MainWindow : Window
 
         var settings = _settingsService.Load() ?? new AppSettings();
         settings.Window ??= new WindowSettings();
+        settings.DisplayProfiles ??= new Dictionary<string, WindowSettings>();
+
+        var currentSettings = CaptureCurrentWindowSettings();
+
+        // 共通フォールバック設定を更新
+        settings.Window.Width = currentSettings.Width;
+        settings.Window.Height = currentSettings.Height;
+        settings.Window.IsMaximized = currentSettings.IsMaximized;
+
+        // 現在のディスプレイプロファイル別設定を更新
+        var profileKey = _displayProfileService.GetCurrentProfileKey();
+        settings.DisplayProfiles[profileKey] = currentSettings;
+
+        _settingsService.Save(settings);
+    }
+
+    /// <summary>
+    /// 現在のウィンドウの表示状態（幅・高さ・最大化状態）を取得します。
+    /// </summary>
+    private WindowSettings CaptureCurrentWindowSettings()
+    {
+        var current = new WindowSettings();
 
         if (WindowState == WindowState.Maximized)
         {
-            settings.Window.IsMaximized = true;
+            current.IsMaximized = true;
             var bounds = RestoreBounds;
             if (bounds.Width > 0 && bounds.Height > 0)
             {
-                settings.Window.Width = bounds.Width;
-                settings.Window.Height = bounds.Height;
+                current.Width = bounds.Width;
+                current.Height = bounds.Height;
             }
         }
         else if (WindowState == WindowState.Normal)
         {
-            settings.Window.IsMaximized = false;
-            settings.Window.Width = ActualWidth > 0 ? ActualWidth : Width;
-            settings.Window.Height = ActualHeight > 0 ? ActualHeight : Height;
+            current.IsMaximized = false;
+            current.Width = ActualWidth > 0 ? ActualWidth : Width;
+            current.Height = ActualHeight > 0 ? ActualHeight : Height;
         }
         else // 最小化時
         {
-            settings.Window.IsMaximized = false;
+            current.IsMaximized = false;
             var bounds = RestoreBounds;
             if (bounds.Width > 0 && bounds.Height > 0)
             {
-                settings.Window.Width = bounds.Width;
-                settings.Window.Height = bounds.Height;
+                current.Width = bounds.Width;
+                current.Height = bounds.Height;
             }
         }
 
-        _settingsService.Save(settings);
+        return current;
     }
 
     /// <summary>

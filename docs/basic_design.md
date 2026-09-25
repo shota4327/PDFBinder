@@ -130,9 +130,10 @@ PDFBinder/
 
 ### 4.4 `AppSettings` / `WindowSettings`
 アプリ全体の設定およびウィンドウ状態の永続化モデル。
-- `Window.Width`: `double` (ウィンドウ幅、既定値: 1100)
-- `Window.Height`: `double` (ウィンドウ高さ、既定値: 760)
-- `Window.IsMaximized`: `bool` (最大化状態フラグ、既定値: false)
+- `Window.Width`: `double` (共通/フォールバック用ウィンドウ幅、既定値: 1100)
+- `Window.Height`: `double` (共通/フォールバック用ウィンドウ高さ、既定値: 760)
+- `Window.IsMaximized`: `bool` (共通/フォールバック用最大化状態フラグ、既定値: false)
+- `DisplayProfiles`: `Dictionary<string, WindowSettings>` (ディスプレイ接続構成プロファイルキーごとの個別ウィンドウ設定。例: `T27h-30_2560x1440_1mon`, `BOE0892_1920x1080_1mon` など外部モニター接続時や本体画面のみで個別に記憶・復元)
 
 ---
 
@@ -186,6 +187,11 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `Task<PdfDocumentModel> LoadImageDocumentAsync(string filePath)`: 画像ファイルを1ページの `PdfDocumentModel`（`DocumentKind = Image`）として読み込み。元画像のピクセル解像度およびDPIを保持し、等倍（100%）表示時に1:1ピクセルとなるようpt換算（`Width = pixelWidth * 72.0 / 96.0`）
 - `Task SaveImageAsync(PdfDocumentModel doc, string outputPath)`: 元画像に回転および手書きストロークを高解像度合成し、指定パスの画像形式（JPEG / PNG）で保存。元画像のピクセル寸法に合わせてベクターストロークを拡大・合成し、JPEG品質約92%を維持
 - `Task ExportToPdfAsync(PdfDocumentModel doc, string outputPath)`: 画像ドキュメント（回転および手書きストローク反映済み）を単一ページのPDFドキュメントとして新規生成・保存
+
+### 5.9 `IDisplayProfileService`
+接続中のディスプレイ環境（モニター識別名、解像度、画面数）の識別、プロファイルキー生成、および環境に応じた最適なウィンドウサイズ設定の解決を担当。
+- `string GetCurrentProfileKey()`: 現在のアクティブなディスプレイ環境を一意に表すプロファイルキー（例: `T27h-30_2560x1440_1mon`）を取得
+- `WindowSettings ResolveEffectiveWindowSettings(AppSettings? settings)`: 設定情報から、現在のディスプレイプロファイルに対応する設定を解決（未保存時は共通設定へフォールバック）
 
 ---
 
