@@ -174,4 +174,40 @@ public class PdfServiceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(splitDir, "doc_page_002.pdf")));
         Assert.True(File.Exists(Path.Combine(splitDir, "doc_page_003.pdf")));
     }
+
+    [Fact]
+    public async Task SaveDocumentAsync_AfterPageRemoval_ReindexesOriginalPageIndex()
+    {
+        // Arrange: 5ページのPDFを作成して読み込み
+        string sourcePdf = CreateSamplePdf("reindex_test.pdf", 5);
+        var doc = await _service.LoadDocumentAsync(sourcePdf);
+
+        // ページ1とページ2（0始まりのインデックス0と1）を削除
+        doc.RemovePage(doc.Pages[0]);
+        doc.RemovePage(doc.Pages[0]);
+        Assert.Equal(3, doc.PageCount);
+
+        // Act: 上書き保存を実行
+        await _service.SaveDocumentAsync(doc, sourcePdf);
+
+        // Assert: 保存後、残存ページのSourceFilePathとOriginalPageIndexが0, 1, 2に同期されていること
+        for (int i = 0; i < doc.Pages.Count; i++)
+        {
+            Assert.Equal(sourcePdf, doc.Pages[i].SourceFilePath);
+            Assert.Equal(i, doc.Pages[i].OriginalPageIndex);
+        }
+
+        // PDFiumレンダラーで各ページが正常にレンダリング可能であることを検証
+        var renderer = new PdfiumRenderer();
+        for (int i = 0; i < doc.Pages.Count; i++)
+        {
+            var bitmap = await renderer.RenderPageAsync(
+                doc.Pages[i].SourceFilePath,
+                doc.Pages[i].OriginalPageIndex,
+                200,
+                300,
+                doc.Pages[i].RenderRotation);
+            Assert.NotNull(bitmap);
+        }
+    }
 }

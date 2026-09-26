@@ -599,6 +599,25 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// 進行中の動的レンダリングタスクを即時にキャンセルします。
+    /// </summary>
+    public void CancelDynamicRender()
+    {
+        var oldCts = _renderCts;
+        _renderCts = null;
+        try
+        {
+            oldCts?.Cancel();
+            oldCts?.Dispose();
+        }
+        catch
+        {
+            // キャンセル・破棄例外のハンドリング
+        }
+        Interlocked.Increment(ref _renderGeneration);
+    }
+
+    /// <summary>
     /// 連続表示スクロール時の動的レンダリングを150msデバウンスでスケジュールします。
     /// </summary>
     public void ScheduleContinuousScrollRender()
