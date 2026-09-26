@@ -13,7 +13,7 @@
 | **動的レンダリング中断機能** | `src/PDFBinder.App/ViewModels/DetailEditorViewModel.cs` | 進行中のレンダリングタスクを外部から即座にキャンセル可能な `CancelDynamicRender()` メソッドを追加。 |
 | **遅延再同期（Lazy Re-initialization）** | `src/PDFBinder.App/ViewModels/MainViewModel.cs` | `_isDetailEditorDirty` フラグを導入。グリッドビューでの操作（`MovePage`, `MovePages`, `DeleteSelectedPages`, `AddBlankPageCommand`, `AppendDocumentCommand`, `InsertPdfFilesAsync`, `SplitPagesHalfAsync`, `RotateSelected`, `Undo`, `Redo`）時に詳細エディタのレンダリングを即時中断し、グリッド操作中の無駄な裏レンダリングを抑止。詳細ビュー復帰時に最新の `Document` 構成で遅延再同期＆即時レンダリングを実行。 |
 | **連続表示スクロール位置補正** | `src/PDFBinder.App/Views/DetailEditorView.xaml.cs` | `OnScrollToPageRequested` において、WPFのコンテナ生成（`ItemContainerGenerator`）が未完了の場合は `DispatcherPriority.Render` で再試行するフォールバック処理を追加。 |
-| **バージョン更新** | `Directory.Build.props`, `CHANGELOG.md` | バージョンを `0.4.6` → `0.4.7` にインクリメントし、エンドユーザー向けの変更履歴を追記。 |
+| **バージョン更新** | `Directory.Build.props`, `CHANGELOG.md` | master マージに伴いバージョンを `0.6.0` → `0.6.1` にインクリメントし、エンドユーザー向けの変更履歴を追記。 |
 | **基本設計書の同期** | `docs/basic_design.md` | `SaveDocumentAsync` の再インデックス仕様および画面モード構成における遅延再同期仕様を同期更新。 |
 
 ---
@@ -21,7 +21,7 @@
 ## 3. テスト・ビルド検証結果
 
 ### 3.1 単体テスト実行結果 (`dotnet test`)
-全442件の単体テストがすべて 100% PASS することを確認しました。
+全490件（master側の新規テストを含む）の単体テストがすべて 100% PASS することを確認しました。
 
 - **新規追加テストケース**:
   1. `PdfServiceTests.SaveDocumentAsync_AfterPageRemoval_ReindexesOriginalPageIndex`:
@@ -32,7 +32,7 @@
      - グリッドビューでのページ削除により `IsDetailEditorDirty` が `true` になり、詳細ビュー復帰時に残存ページのみで正しく再同期されることを検証。
 
 ```text
-成功!   -失敗: 0、合格: 442、スキップ: 0、合計: 442、期間: 4 s - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗: 0、合格: 490、スキップ: 0、合計: 490、期間: 4 s - PDFBinder.Tests.dll (net10.0)
 ```
 
 ### 3.2 ビルド検証結果 (`dotnet build`)
