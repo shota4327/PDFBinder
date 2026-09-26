@@ -9,6 +9,11 @@ public class AppSettings
     /// ウィンドウの表示状態およびサイズに関する設定
     /// </summary>
     public WindowSettings Window { get; set; } = new();
+
+    /// <summary>
+    /// ディスプレイ構成プロファイルごとの個別ウィンドウ設定（キー: プロファイル識別子）
+    /// </summary>
+    public Dictionary<string, WindowSettings> DisplayProfiles { get; set; } = new();
 }
 
 /// <summary>

@@ -225,7 +225,7 @@ public class PdfService : IPdfService
     /// <summary>
     /// PDFページに手書き注釈を設定します。既存の自前注釈はクリーンアップし、最新ストロークが存在する場合は新設します。
     /// </summary>
-    private static void AttachInkAnnotationToPage(
+    internal static void AttachInkAnnotationToPage(
         PdfDocument outputDoc,
         PdfPage page,
         StrokeCollection? strokes,
@@ -275,7 +275,7 @@ public class PdfService : IPdfService
     /// <summary>
     /// ファイルをアトミックかつ安全に置換します。
     /// </summary>
-    private static void SafeReplaceFile(string sourceTempFile, string targetFile)
+    internal static void SafeReplaceFile(string sourceTempFile, string targetFile)
     {
         if (File.Exists(targetFile))
         {

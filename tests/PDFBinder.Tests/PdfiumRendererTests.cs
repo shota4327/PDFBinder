@@ -168,4 +168,43 @@ public class PdfiumRendererTests : IDisposable
             Assert.True(bitmap.IsFrozen);
         }
     }
+
+    [Fact]
+    public async Task RenderPageAsync_TransparentPdf_ProducesOpaqueWhiteBackground()
+    {
+        // Arrange: 白背景矩形を描画しない透明PDF
+        string transparentPdf = Path.Combine(_testDirectory, "transparent.pdf");
+        using (var doc = new PdfDocument())
+        {
+            var page = doc.AddPage();
+            page.Width = XUnit.FromPoint(200);
+            page.Height = XUnit.FromPoint(300);
+            using (var gfx = XGraphics.FromPdfPage(page))
+            {
+                gfx.DrawRectangle(XBrushes.Black, 50, 50, 50, 50);
+            }
+            doc.Save(transparentPdf);
+        }
+
+        // Act
+        var bitmap = await _renderer.RenderPageAsync(transparentPdf, 0, 200, 300, PageRotation.Rotate0);
+
+        // Assert: ビットマップが不透明かつ背景が白
+        Assert.NotNull(bitmap);
+        int stride = bitmap.PixelWidth * 4;
+        byte[] pixels = new byte[stride * bitmap.PixelHeight];
+        bitmap.CopyPixels(pixels, stride, 0);
+
+        // (0, 0) は背景なので完全な白 (255, 255, 255, 255)
+        Assert.Equal(255, pixels[0]); // B
+        Assert.Equal(255, pixels[1]); // G
+        Assert.Equal(255, pixels[2]); // R
+        Assert.Equal(255, pixels[3]); // A
+
+        // 全ピクセルで Alpha が 255 であること（透明ピクセルが 0 件）
+        for (int i = 3; i < pixels.Length; i += 4)
+        {
+            Assert.Equal(255, pixels[i]);
+        }
+    }
 }

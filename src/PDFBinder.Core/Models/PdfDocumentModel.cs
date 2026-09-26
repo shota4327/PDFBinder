@@ -18,12 +18,20 @@ public partial class PdfDocumentModel : ObservableObject
     [ObservableProperty]
     private bool _isModified;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FileName))]
+    [NotifyPropertyChangedFor(nameof(IsImage))]
+    private DocumentKind _documentKind = DocumentKind.Pdf;
+
+    /// <summary>画像ドキュメントかどうか</summary>
+    public bool IsImage => DocumentKind == DocumentKind.Image;
+
     /// <summary>ドキュメント内の全ページコレクション</summary>
     public ObservableCollection<PdfPageModel> Pages { get; } = new();
 
     /// <summary>現在開いているファイル名（未保存時は名称未設定）</summary>
     public string FileName => string.IsNullOrEmpty(FilePath)
-        ? "名称未設定.pdf"
+        ? (IsImage ? "名称未設定.png" : "名称未設定.pdf")
         : Path.GetFileName(FilePath);
 
     /// <summary>ページ数</summary>

@@ -119,11 +119,11 @@ public class PinchZoomHelperTests
 
         Assert.Equal(PinchZoomHelper.DefaultMaxZoom, zoomInResult.NewZoom);
 
-        // 極端な縮小（0.1倍） -> MinZoom (0.5) にクランプ
+        // 極端な縮小（0.02倍） -> MinZoom (0.05) にクランプ
         var zoomOutResult = PinchZoomHelper.Calculate(
             currentZoom: 1.0,
             previousDistance: 1000.0,
-            currentDistance: 100.0,
+            currentDistance: 20.0,
             previousCenter: center,
             currentCenter: center,
             horizontalOffset: 200,

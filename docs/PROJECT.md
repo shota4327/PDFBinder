@@ -56,7 +56,7 @@
 | **F39** | UI・表示設定 | 連続表示・単ページ表示切り替え機能（初期値: 単一ページ、ホイールページめくり、拡大率固定制御、PageUp/PageDown、高速ホイール追従・Delta累積） | **完了** | Issue #61, #73 / DetailPageViewMode |
 | **F48** | UI・ショートカット | フォーカス非依存のショートカット保証および矢印キー（↑↓←→）ページ送り対応 | **完了** | Issue #78 / OnPreviewKeyDown & NoAutoScrollScrollViewer |
 | **F49** | 手書き詳細 | 筆圧ON/OFFトグル（ペンツール連動・デフォルトOFF均一線・直線連動無効化・状態保持） | **完了** | Issue #88 / IsPenPressureEnabled & IgnorePressure |
-| **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整） | **完了** | Issue #53 / SettingsService & WindowBoundsHelper |
+| **F51** | UI・ウィンドウ管理 | 前回終了時のウィンドウサイズ・最大化状態復元（`settings.json`、画面作業領域自動調整、外部モニター・ディスプレイ構成別プロファイル記憶・復元） | **完了** | Issue #53, #173 / SettingsService, DisplayProfileService & WindowBoundsHelper |
 | **F50** | テスト・品質 | コアロジックの単体テスト自動化（xUnit 単体テスト全件PASS） | **完了** | PDFBinder.Tests |
 | **F52** | UI・デザイン | アイコンを Google Fonts (Material Symbols Outlined) に完全刷新・内包化（オフライン動作・Apache-2.0） | **完了** | Issue #62 / MainWindow, GridView, DetailEditorView |
 | **F54** | 手書き詳細 / インタラクティブ | テキスト選択・コピーおよびリンク機能（ドラッグ選択、Ctrl+C、右クリックコピー、URLブラウザ起動、ページジャンプ、インタラクティブオーバーレイ） | **完了** | Issue #96 / InteractiveOverlayCanvas & PdfiumRenderer |
@@ -70,6 +70,8 @@
 | **F61** | UI・グリッド俯瞰 | グリッド表示でのドラッグ中マウスホイールスクロール＆オートスクロール（ページ並び替え・外部PDF挿入・ラバーバンド選択対応、上下端40px可変速度自動スクロール、ドラッグ中ズーム抑止） | **完了** | Issue #142 / AutoScroller & DragMouseWheelHook |
 | **F62** | UI・モーダル共通化 | バージョン情報インアプリオーバーレイ化＆モーダルUIスタイル共通化（`ModalBackdropGridStyle`, `ModalCardBorderStyle`、保存確認・印刷・バージョン情報のUI共通化、`AboutOverlayControl`、背景クリック対応） | **完了** | Issue #149 / App.xaml, AboutOverlayControl & MainWindow |
 | **F63** | UI・スクロール操作 | 浮遊オーバーレイスクロールバー＆ステータスバー重複解消（横・縦スクロールバーのステータスバー直上42px浮遊配置、背後コンテンツ通過維持、Shift+ホイール横スクロール） | **完了** | Issue #140 / App.xaml, DetailEditorView & GridView |
+| **F64** | UI・リボンタブ | リボンタブ表記を「PDF編集」から「編集」に一般化変更 | **完了** | Issue #167 / MainWindow.xaml |
+| **F65** | 画像編集コア / UI | 画像データ（JPEG/PNG）の直接編集・回転・手書きアノテーション・元形式保存およびPDFエクスポート対応（元解像度・DPI保持、手書き高精細合成、画像専用セッション管理、機能グレーアウト） | **完了** | Issue #167 / ImageService, DocumentKind, MainViewModel, PdfiumRenderer |
 
 ---
 

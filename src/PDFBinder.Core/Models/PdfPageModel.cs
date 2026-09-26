@@ -25,6 +25,12 @@ public partial class PdfPageModel : ObservableObject
     /// <summary>元PDF読み込み時の初期回転角度</summary>
     public PageRotation OriginalRotation { get; set; } = PageRotation.Rotate0;
 
+    /// <summary>ドキュメント種別（PDFまたは画像）</summary>
+    public DocumentKind DocumentKind { get; set; } = DocumentKind.Pdf;
+
+    /// <summary>画像ドキュメントのページかどうかを取得します。</summary>
+    public bool IsImage => DocumentKind == DocumentKind.Image;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RenderRotation))]
     [NotifyPropertyChangedFor(nameof(DisplayWidth))]

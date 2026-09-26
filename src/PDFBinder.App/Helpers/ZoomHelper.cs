@@ -8,9 +8,9 @@ namespace PDFBinder.App.Helpers;
 public static class ZoomHelper
 {
     /// <summary>
-    /// 最小ズーム倍率（50%）
+    /// 最小ズーム倍率（5%）
     /// </summary>
-    public const double MinZoom = 0.5;
+    public const double MinZoom = 0.05;
 
     /// <summary>
     /// 最大ズーム倍率（3200%）
@@ -18,10 +18,11 @@ public static class ZoomHelper
     public const double MaxZoom = 32.0;
 
     /// <summary>
-    /// ズームイン・ズームアウトで使用する標準スナップ目盛り倍率一覧（50%〜3200%）
+    /// ズームイン・ズームアウトで使用する標準スナップ目盛り倍率一覧（5%〜3200%）
     /// </summary>
     public static readonly double[] ZoomSnapSteps =
     [
+        0.05, 0.1, 0.15, 0.2, 0.3, 0.4,
         0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0,
         2.5, 3.0, 3.5, 4.0,
         5.0, 6.0, 7.0, 8.0,

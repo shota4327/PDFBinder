@@ -4,7 +4,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Docnet.Core;
 using Docnet.Core.Models;
+using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
+using PdfSharp.Drawing;
 
 namespace PDFBinder.Core.Services;
 
@@ -45,6 +47,11 @@ public class PdfiumRenderer : IPdfRenderer
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
             return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+        }
+
+        if (IsSupportedImage(filePath))
+        {
+            return await Task.Run(() => RenderImagePage(filePath, targetWidth, targetHeight, rotation, cancellationToken), cancellationToken);
         }
 
         using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
@@ -190,7 +197,7 @@ public class PdfiumRenderer : IPdfRenderer
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath) || IsSupportedImage(filePath))
         {
             return PageInteractiveData.Empty;
         }
@@ -462,6 +469,49 @@ public class PdfiumRenderer : IPdfRenderer
     /// <summary>
     /// レンダリング用に PDF バイト列から自前の手書き注釈を除外します（他社製注釈はそのまま保持）。
     /// </summary>
+    private static bool IsSupportedImage(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return false;
+        string ext = Path.GetExtension(filePath);
+        return string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static BitmapSource? RenderImagePage(
+        string filePath,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        byte[] bytes = File.ReadAllBytes(filePath);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var ms = new MemoryStream(bytes);
+        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+        BitmapSource bitmap = decoder.Frames[0];
+
+        if (rotation != PageRotation.Rotate0)
+        {
+            bitmap = BitmapTransformHelper.CreateRotatedBitmap(bitmap, (int)rotation) ?? bitmap;
+        }
+
+        if (targetWidth > 0 && targetHeight > 0 &&
+            (bitmap.PixelWidth != targetWidth || bitmap.PixelHeight != targetHeight))
+        {
+            double sx = (double)targetWidth / bitmap.PixelWidth;
+            double sy = (double)targetHeight / bitmap.PixelHeight;
+            var scaled = new TransformedBitmap(bitmap, new ScaleTransform(sx, sy));
+            scaled.Freeze();
+            return scaled;
+        }
+
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     private static byte[] SanitizeForRendering(byte[] pdfBytes, int pageIndex)
     {
         try
@@ -475,12 +525,17 @@ public class PdfiumRenderer : IPdfRenderer
             }
 
             var page = doc.Pages[pageIndex];
-            if (!PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+
+            // ページ最下層（既存コンテンツの背後）に白色の背景矩形を描画し、用紙の地色を白色として保証
+            using (var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Prepend))
             {
-                return pdfBytes;
+                gfx.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
             }
 
-            PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+            {
+                PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+            }
 
             using var msOut = new MemoryStream();
             doc.Save(msOut);

@@ -727,10 +727,12 @@ public class DetailEditorViewModelTests
         Assert.Equal(DetailEditorViewModel.MaxZoom, DetailEditorViewModel.GetNextZoomIn(35.0));
         Assert.Equal(28.0, DetailEditorViewModel.GetNextZoomOut(32.0));
 
-        // 境界値（下限 0.5）
-        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.5));
-        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.2));
+        // 境界値（下限 0.05）
+        Assert.Equal(0.4, DetailEditorViewModel.GetNextZoomOut(0.5));
+        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.05));
+        Assert.Equal(DetailEditorViewModel.MinZoom, DetailEditorViewModel.GetNextZoomOut(0.02));
         Assert.Equal(0.75, DetailEditorViewModel.GetNextZoomIn(0.5));
+        Assert.Equal(0.1, DetailEditorViewModel.GetNextZoomIn(0.05));
     }
 
     [Fact]
