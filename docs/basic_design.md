@@ -138,7 +138,7 @@ PDFBinder/
 ### 5.1 `IPdfService`
 PDFファイルの入出力、構造操作を担当。
 - `Task<PdfDocumentModel> LoadDocumentAsync(string filePath)`: ファイルロックを行わずメモリ読み込み
-- `Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath)`: ページ配置・回転・インク合成を行い保存
+- `Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath)`: ページ配置・回転・インク合成を行い保存（保存成功時に全ページのSourceFilePathおよびOriginalPageIndexを最新ファイル構成に合わせて再インデックス同期）
 - `PdfPageModel CreateBlankPage(double width, double height)`: 指定サイズの白紙ページ生成
 - `Task AppendPdfAsync(PdfDocumentModel doc, string filePath, int insertIndex)`: 別PDFのページ差し込み結合
 - `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
@@ -183,12 +183,13 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 
 ### 6.1 画面モード構成
 アプリは **「詳細ビュー（単一ページ／連続表示）」** を基本（デフォルト）画面とし、ページ一覧の確認や自由な並び替えを行う時のみ **「グリッド俯瞰ビュー（Binder Overview）」** へ切り替えて使用します。詳細ビュー内では、「単一ページ表示（初期値）」と「連続表示」を切り替えて利用できます。
+グリッド表示中にページ操作（並び替え・削除・白紙追加・回転・結合等）が行われた際は、詳細エディタのレンダリングタスクを即時中断して「要再同期フラグ」を設定し、詳細ビュー復帰時に初めて最新構成で初期化・即時レンダリングを行う遅延同期（Lazy Re-initialization）を採用することで、不要な排他ロック競合や表示不整合を根本から防止します。
 
 ```mermaid
 stateDiagram-v2
     [*] --> 詳細ビュー: 起動 / PDF読み込み（単一ページ表示・ウィンドウフィット）
     詳細ビュー --> グリッド俯瞰ビュー: 「表示」タブの「グリッド」選択（オンデマンドでサムネイル生成）
-    グリッド俯瞰ビュー --> 詳細ビュー: 「表示」タブの「詳細」選択 / ページカードをダブルクリック
+    グリッド俯瞰ビュー --> 詳細ビュー: 「表示」タブの「詳細」選択 / ページカードをダブルクリック（変更時は最新構成で遅延再同期）
     詳細ビュー --> 外部保存: 保存 / 分割エクスポート
 ```
 

@@ -31,6 +31,16 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     internal Task? CurrentThumbnailTask => _thumbnailTask;
 
+    /// <summary>
+    /// グリッドビューでのページ構造変更により詳細エディタの再同期が必要かどうか
+    /// </summary>
+    private bool _isDetailEditorDirty;
+
+    /// <summary>
+    /// 詳細エディタの再同期が必要かどうかを取得します（単体テスト検証用）。
+    /// </summary>
+    internal bool IsDetailEditorDirty => _isDetailEditorDirty;
+
     /// <summary>開いているすべてのドキュメントセッション</summary>
     public ObservableCollection<DocumentSession> Documents { get; } = new();
 
@@ -216,8 +226,12 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
-            // 詳細ビューへ切り替わった際、フィットモードが有効であれば再計算を適用
-            if (DetailEditor != null && DetailEditor.FitMode != DetailViewFitMode.None)
+            if (_isDetailEditorDirty)
+            {
+                var target = Document.Pages.FirstOrDefault(p => p.IsSelected) ?? Document.Pages.FirstOrDefault();
+                SyncDetailEditorIfDirty(target);
+            }
+            else if (DetailEditor != null && DetailEditor.FitMode != DetailViewFitMode.None)
             {
                 DetailEditor.ApplyFitMode();
             }
@@ -845,12 +859,16 @@ public partial class MainViewModel : ObservableObject
             int prevCount = Document.PageCount;
             await _pdfService.AppendDocumentAsync(Document, filePath);
 
-            DetailEditor?.InitializeDocument(Document);
-            StatusMessage = $"{Path.GetFileName(filePath)} を結合しました（合計 {Document.PageCount} ページ）";
             if (!IsDetailViewActive)
             {
+                MarkDetailEditorDirty();
                 _ = GenerateThumbnailsAsync(prevCount);
             }
+            else
+            {
+                DetailEditor?.InitializeDocument(Document);
+            }
+            StatusMessage = $"{Path.GetFileName(filePath)} を結合しました（合計 {Document.PageCount} ページ）";
         }
         catch (Exception ex)
         {
@@ -921,7 +939,14 @@ public partial class MainViewModel : ObservableObject
             var cmd = new InsertPagesCommand(Document, pagesToInsert, targetIndex);
             CurrentUndoRedoService.Execute(cmd);
 
-            DetailEditor?.InitializeDocument(Document);
+            if (!IsDetailViewActive)
+            {
+                MarkDetailEditorDirty();
+            }
+            else
+            {
+                DetailEditor?.InitializeDocument(Document);
+            }
             _ = EnsureThumbnailsGeneratedAsync();
             StatusMessage = $"{pdfFiles.Count} 件のファイルから {pagesToInsert.Count} ページを挿入しました。";
         }
@@ -1153,7 +1178,7 @@ public partial class MainViewModel : ObservableObject
         if (!IsDetailViewActive)
         {
             blank.Thumbnail = _pdfRenderer.CreateBlankPageBitmap(ThumbnailRenderWidth, ThumbnailRenderHeight, blank.Rotation);
-            DetailEditor?.InitializeDocument(Document);
+            MarkDetailEditorDirty();
         }
         else
         {
@@ -1199,6 +1224,7 @@ public partial class MainViewModel : ObservableObject
             CurrentUndoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの回転"));
             if (!IsDetailViewActive)
             {
+                MarkDetailEditorDirty();
                 _ = RefreshSelectedThumbnailsAsync(targets);
             }
             else
@@ -1223,6 +1249,12 @@ public partial class MainViewModel : ObservableObject
         }
         if (targets.Count == 0) return;
 
+        // グリッドビューでの削除時は進行中のサムネイルタスクを即時キャンセル
+        if (!IsDetailViewActive)
+        {
+            _thumbnailCts?.Cancel();
+        }
+
         var commands = new List<IUndoableCommand>();
         foreach (var page in targets)
         {
@@ -1231,7 +1263,17 @@ public partial class MainViewModel : ObservableObject
         }
 
         CurrentUndoRedoService.Execute(new CompositeUndoableCommand(commands, "ページの削除"));
-        DetailEditor?.InitializeDocument(Document);
+
+        if (!IsDetailViewActive)
+        {
+            MarkDetailEditorDirty();
+            _ = EnsureThumbnailsGeneratedAsync();
+        }
+        else
+        {
+            DetailEditor?.InitializeDocument(Document);
+        }
+
         StatusMessage = $"{targets.Count} ページを削除しました。";
     }
 
@@ -1330,14 +1372,14 @@ public partial class MainViewModel : ObservableObject
             var cmd = new ReplaceAllPagesCommand(Document, oldPages, newPages);
             _undoRedoService.Execute(cmd);
 
-            DetailEditor?.InitializeDocument(Document);
-
             if (IsDetailViewActive)
             {
+                DetailEditor?.InitializeDocument(Document);
                 _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
             }
             else
             {
+                MarkDetailEditorDirty();
                 await EnsureThumbnailsGeneratedAsync();
             }
 
@@ -1361,6 +1403,7 @@ public partial class MainViewModel : ObservableObject
         if (oldIndex == newIndex) return;
         var cmd = new MovePageCommand(Document, oldIndex, newIndex);
         CurrentUndoRedoService.Execute(cmd);
+        MarkDetailEditorDirty();
         StatusMessage = $"ページ {oldIndex + 1} を {newIndex + 1} へ移動しました。";
     }
 
@@ -1387,9 +1430,29 @@ public partial class MainViewModel : ObservableObject
 
         var cmd = new ReorderPagesCommand(Document, currentPages, newOrder);
         CurrentUndoRedoService.Execute(cmd);
+        MarkDetailEditorDirty();
         StatusMessage = $"{pagesToMove.Count} ページを並び替えました。";
     }
 
+
+    /// <summary>
+    /// グリッドビューでの構造変更（並び替え・削除・追加等）に伴い、詳細エディタのレンダリングタスクを中断し要再同期フラグを立てます。
+    /// </summary>
+    private void MarkDetailEditorDirty()
+    {
+        _isDetailEditorDirty = true;
+        DetailEditor?.CancelDynamicRender();
+    }
+
+    /// <summary>
+    /// グリッドビューでの変更により詳細エディタが非同期状態になっている場合、最新のドキュメント構成で再同期します。
+    /// </summary>
+    private void SyncDetailEditorIfDirty(PdfPageModel? preferredPage = null)
+    {
+        if (DetailEditor == null) return;
+        _isDetailEditorDirty = false;
+        DetailEditor.InitializeDocument(Document, preferredPage);
+    }
 
     /// <summary>
     /// ページ詳細エディタを開き、指定ページへスクロールします。
@@ -1398,11 +1461,14 @@ public partial class MainViewModel : ObservableObject
     public void OpenPageDetail(PdfPageModel page)
     {
         IsDetailViewActive = true;
-        if (DetailEditor != null && DetailEditor.Pages.Count != Document.Pages.Count)
+        if (_isDetailEditorDirty || (DetailEditor != null && DetailEditor.Pages.Count != Document.Pages.Count))
         {
-            DetailEditor.InitializeDocument(Document);
+            SyncDetailEditorIfDirty(page);
         }
-        DetailEditor?.ScrollToPage(page);
+        else
+        {
+            DetailEditor?.ScrollToPage(page);
+        }
         SelectedRibbonTabIndex = 1;
     }
 
@@ -1530,13 +1596,14 @@ public partial class MainViewModel : ObservableObject
     public void Undo()
     {
         CurrentUndoRedoService.Undo();
-        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
+            MarkDetailEditorDirty();
             _ = EnsureThumbnailsGeneratedAsync();
         }
         else
         {
+            DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
         }
@@ -1547,13 +1614,14 @@ public partial class MainViewModel : ObservableObject
     public void Redo()
     {
         CurrentUndoRedoService.Redo();
-        DetailEditor?.InitializeDocument(Document);
         if (!IsDetailViewActive)
         {
+            MarkDetailEditorDirty();
             _ = EnsureThumbnailsGeneratedAsync();
         }
         else
         {
+            DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
         }

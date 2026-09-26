@@ -89,15 +89,30 @@ public partial class DetailEditorView : UserControl
                 return;
             }
 
-            var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
-            if (itemVm != null && PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
-            {
-                var transform = container.TransformToVisual(DetailScrollViewer);
-                Point pt = transform.Transform(new Point(0, 0));
-                double targetOffset = DetailScrollViewer.VerticalOffset + pt.Y - DetailScrollViewer.Padding.Top;
-                DetailScrollViewer.ScrollToVerticalOffset(Math.Max(0.0, targetOffset));
-            }
+            ScrollToPageInContinuousMode(page, isRetry: false);
         }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void ScrollToPageInContinuousMode(PdfPageModel page, bool isRetry)
+    {
+        var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
+        if (itemVm == null) return;
+
+        if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+        {
+            var transform = container.TransformToVisual(DetailScrollViewer);
+            Point pt = transform.Transform(new Point(0, 0));
+            double targetOffset = DetailScrollViewer.VerticalOffset + pt.Y - DetailScrollViewer.Padding.Top;
+            DetailScrollViewer.ScrollToVerticalOffset(Math.Max(0.0, targetOffset));
+        }
+        else if (!isRetry)
+        {
+            // 非表示からの復帰直後等でコンテナが未生成の場合はレイアウト完了後に再試行
+            Dispatcher.InvokeAsync(() =>
+            {
+                ScrollToPageInContinuousMode(page, isRetry: true);
+            }, System.Windows.Threading.DispatcherPriority.Render);
+        }
     }
 
     private void OnPagePreviewMouseDown(object sender, MouseButtonEventArgs e)

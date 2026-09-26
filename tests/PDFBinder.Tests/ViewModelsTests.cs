@@ -402,4 +402,74 @@ public class ViewModelsTests
         Assert.False(vm.IsPrintDialogVisible);
         Assert.Null(vm.PrintViewModel);
     }
+
+    [Fact]
+    public void MainViewModel_MovePage_InGridView_MarksDetailEditorDirty_AndSyncsOnSwitchToDetailView()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        vm.AddBlankPage();
+        vm.AddBlankPage();
+        vm.AddBlankPage();
+        var pageA = vm.Document.Pages[0];
+        var pageB = vm.Document.Pages[1];
+        var pageC = vm.Document.Pages[2];
+
+        // 初期状態で詳細ビューからグリッドビューへ遷移
+        vm.IsDetailViewActive = false;
+        Assert.False(vm.IsDetailEditorDirty);
+
+        // Act: グリッドビューでページ0を末尾（インデックス2）へ移動
+        vm.MovePage(0, 2);
+
+        // Assert: ドキュメントの並び順が更新され、詳細エディタに要再同期フラグが立っていること
+        Assert.Equal(pageB, vm.Document.Pages[0]);
+        Assert.Equal(pageC, vm.Document.Pages[1]);
+        Assert.Equal(pageA, vm.Document.Pages[2]);
+        Assert.True(vm.IsDetailEditorDirty);
+
+        // Act: 詳細ビューへ戻る（pageAを開く）
+        vm.OpenPageDetailCommand.Execute(pageA);
+
+        // Assert: 要再同期フラグが解除され、DetailEditor.Pagesの並び順が最新のDocumentと完全に同期していること
+        Assert.False(vm.IsDetailEditorDirty);
+        Assert.Equal(3, vm.DetailEditor!.Pages.Count);
+        Assert.Equal(pageB, vm.DetailEditor.Pages[0].Page);
+        Assert.Equal(pageC, vm.DetailEditor.Pages[1].Page);
+        Assert.Equal(pageA, vm.DetailEditor.Pages[2].Page);
+        Assert.Equal(pageA, vm.DetailEditor.CurrentPage);
+    }
+
+    [Fact]
+    public void MainViewModel_DeleteSelectedPages_InGridView_MarksDetailEditorDirty_AndSyncsOnSwitchToDetailView()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        vm.AddBlankPage();
+        vm.AddBlankPage();
+        vm.AddBlankPage();
+        var pageA = vm.Document.Pages[0];
+        var pageB = vm.Document.Pages[1];
+        var pageC = vm.Document.Pages[2];
+
+        vm.IsDetailViewActive = false;
+        Assert.False(vm.IsDetailEditorDirty);
+
+        // Act: グリッドビューでpageBを選択して削除
+        pageB.IsSelected = true;
+        vm.DeleteSelectedPagesCommand.Execute(null);
+
+        // Assert: ドキュメントから削除され、要再同期フラグが立っていること
+        Assert.Equal(2, vm.Document.Pages.Count);
+        Assert.True(vm.IsDetailEditorDirty);
+
+        // Act: 詳細ビューへ切り替え
+        vm.IsDetailViewActive = true;
+
+        // Assert: 要再同期フラグが解除され、残存ページが正しく同期されていること
+        Assert.False(vm.IsDetailEditorDirty);
+        Assert.Equal(2, vm.DetailEditor!.Pages.Count);
+        Assert.Equal(pageA, vm.DetailEditor.Pages[0].Page);
+        Assert.Equal(pageC, vm.DetailEditor.Pages[1].Page);
+    }
 }

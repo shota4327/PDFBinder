@@ -100,6 +100,16 @@ public class PdfService : IPdfService
             await Task.Run(() => BuildAndSavePdf(doc.Pages, tempPath));
             SafeReplaceFile(tempPath, outputPath);
             doc.FilePath = outputPath;
+
+            // 保存後のファイル構成に合わせて全ページの参照元情報を再インデックス
+            for (int i = 0; i < doc.Pages.Count; i++)
+            {
+                var page = doc.Pages[i];
+                page.SourceFilePath = outputPath;
+                page.OriginalPageIndex = i;
+                page.OriginalRotation = page.Rotation;
+            }
+
             doc.ResetModifiedState();
         }
         finally
