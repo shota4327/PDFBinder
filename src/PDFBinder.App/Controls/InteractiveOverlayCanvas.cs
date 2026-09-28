@@ -20,6 +20,7 @@ public class InteractiveOverlayCanvas : FrameworkElement
     private Point? _dragStartPoint;
     private bool _isDraggingSelection;
     private IReadOnlyList<PdfTextCharacter> _selectedCharacters = Array.Empty<PdfTextCharacter>();
+    private IReadOnlyList<Rect> _highlightRects = Array.Empty<Rect>();
     private PdfLinkAnnotation? _hoveredLink;
     private readonly ToolTip _linkToolTip = new();
 
@@ -246,13 +247,13 @@ public class InteractiveOverlayCanvas : FrameworkElement
         if (!_isDraggingSelection && diff.Length < 4.0) return;
 
         _isDraggingSelection = true;
-        var rect = new Rect(_dragStartPoint.Value, currentPos);
 
         if (PageItem?.InteractiveData != null)
         {
-            var (text, characters) = PageItem.InteractiveData.GetTextInRect(rect);
-            _selectedCharacters = characters;
-            PageItem.SelectedText = text;
+            var result = PageItem.InteractiveData.GetTextInRange(_dragStartPoint.Value, currentPos);
+            _selectedCharacters = result.SelectedCharacters;
+            _highlightRects = result.HighlightRects;
+            PageItem.SelectedText = result.SelectedText;
             InvalidateVisual();
         }
     }
@@ -354,6 +355,7 @@ public class InteractiveOverlayCanvas : FrameworkElement
     public void ClearSelection()
     {
         _selectedCharacters = Array.Empty<PdfTextCharacter>();
+        _highlightRects = Array.Empty<Rect>();
         if (PageItem != null)
         {
             PageItem.SelectedText = string.Empty;
@@ -397,13 +399,23 @@ public class InteractiveOverlayCanvas : FrameworkElement
     }
 
     /// <summary>
-    /// 選択された文字のバウンディングボックス群をハイライト描画します。
+    /// 選択された文字群の行ハイライト矩形を描画します。
     /// </summary>
     private void RenderSelectionHighlights(DrawingContext dc)
     {
-        foreach (var c in _selectedCharacters)
+        if (_highlightRects.Count > 0)
         {
-            dc.DrawRectangle(SelectionFillBrush, SelectionBorderPen, c.BoundingBox);
+            foreach (var rect in _highlightRects)
+            {
+                dc.DrawRectangle(SelectionFillBrush, SelectionBorderPen, rect);
+            }
+        }
+        else
+        {
+            foreach (var c in _selectedCharacters)
+            {
+                dc.DrawRectangle(SelectionFillBrush, SelectionBorderPen, c.BoundingBox);
+            }
         }
     }
 
