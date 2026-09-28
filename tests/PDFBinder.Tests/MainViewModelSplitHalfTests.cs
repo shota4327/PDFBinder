@@ -119,4 +119,99 @@ public class MainViewModelSplitHalfTests
         Assert.Equal(2, vm.DetailEditor.Pages.Count);
         Assert.Equal(421, vm.DetailEditor.Pages[0].Page.Width);
     }
+
+    /// <summary>
+    /// 未読み込み状態から白紙追加を行った際、1ページ時は削除不可、2ページ目以降で削除コマンドが即時有効化されることを検証します（Issue #179）。
+    /// </summary>
+    [Fact]
+    public void AddBlankPageCommand_SuccessivelyAdded_UpdatesDeleteCommandCanExecute()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+        Assert.Equal(0, vm.Document.PageCount);
+        Assert.False(vm.DeleteSelectedPagesCommand.CanExecute(null));
+
+        // Act 1: 1ページ目の白紙追加
+        vm.AddBlankPageCommand.Execute(null);
+        Assert.Equal(1, vm.Document.PageCount);
+        Assert.False(vm.DeleteSelectedPagesCommand.CanExecute(null));
+
+        // Act 2: 2ページ目の白紙追加
+        vm.AddBlankPageCommand.Execute(null);
+        Assert.Equal(2, vm.Document.PageCount);
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null));
+
+        // Act 3: 6ページまで順次追加
+        for (int i = 0; i < 4; i++)
+        {
+            vm.AddBlankPageCommand.Execute(null);
+        }
+        Assert.Equal(6, vm.Document.PageCount);
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null));
+        Assert.True(vm.SplitAllPagesCommand.CanExecute(null));
+        Assert.True(vm.SplitPagesHalfCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// 6ページのドキュメントをページ分割（分割後12ページ）した際、詳細ビュー・グリッドビューを問わず削除および分割コマンドが有効な状態を維持することを検証します（Issue #179）。
+    /// </summary>
+    [Theory]
+    [InlineData(true)]  // 詳細ビュー
+    [InlineData(false)] // グリッドビュー
+    public async Task SplitPagesHalfCommand_FromSixPages_RetainsDeleteAndSplitCommandsEnabled(bool isDetailView)
+    {
+        // Arrange: 6ページの白紙ドキュメントを用意
+        var vm = new MainViewModel();
+        for (int i = 0; i < 6; i++)
+        {
+            vm.AddBlankPageCommand.Execute(null);
+        }
+        Assert.Equal(6, vm.Document.PageCount);
+        vm.IsDetailViewActive = isDetailView;
+
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null));
+        Assert.True(vm.SplitAllPagesCommand.CanExecute(null));
+        Assert.True(vm.SplitPagesHalfCommand.CanExecute(null));
+
+        // Act: ページ分割実行（6ページ -> 12ページ）
+        await vm.SplitPagesHalfCommand.ExecuteAsync(null);
+
+        // Assert: 12ページに倍増し、各種コマンドがすべて有効であること
+        Assert.Equal(12, vm.Document.PageCount);
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null), "DeleteSelectedPagesCommand should remain enabled after splitting to 12 pages");
+        Assert.True(vm.SplitAllPagesCommand.CanExecute(null), "SplitAllPagesCommand should remain enabled after splitting to 12 pages");
+        Assert.True(vm.SplitPagesHalfCommand.CanExecute(null), "SplitPagesHalfCommand should remain enabled after splitting to 12 pages");
+    }
+
+    /// <summary>
+    /// ページ削除によって残り1ページになった際、削除コマンドが即座に無効化され、Undo/Redoで正しく同期されることを検証します（Issue #179）。
+    /// </summary>
+    [Fact]
+    public void DeleteSelectedPages_ReducesToOnePage_DisablesDeleteCommand_AndUndoRedoWorks()
+    {
+        // Arrange: 2ページのドキュメントを作成
+        var vm = new MainViewModel();
+        vm.AddBlankPageCommand.Execute(null);
+        vm.AddBlankPageCommand.Execute(null);
+        Assert.Equal(2, vm.Document.PageCount);
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null));
+
+        // Act: 1ページを選択して削除 -> 残り1ページ
+        vm.Document.Pages[0].IsSelected = true;
+        vm.DeleteSelectedPagesCommand.Execute(null);
+
+        // Assert: 1ページになったため削除コマンドが無効化されること
+        Assert.Equal(1, vm.Document.PageCount);
+        Assert.False(vm.DeleteSelectedPagesCommand.CanExecute(null), "DeleteSelectedPagesCommand should be disabled when page count is 1");
+
+        // Act: Undo -> 2ページに復元
+        vm.UndoCommand.Execute(null);
+        Assert.Equal(2, vm.Document.PageCount);
+        Assert.True(vm.DeleteSelectedPagesCommand.CanExecute(null), "DeleteSelectedPagesCommand should be re-enabled after Undo restores 2 pages");
+
+        // Act: Redo -> 再び1ページ
+        vm.RedoCommand.Execute(null);
+        Assert.Equal(1, vm.Document.PageCount);
+        Assert.False(vm.DeleteSelectedPagesCommand.CanExecute(null), "DeleteSelectedPagesCommand should be disabled after Redo deletes to 1 page");
+    }
 }
