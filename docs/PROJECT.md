@@ -72,6 +72,7 @@
 | **F63** | UI・スクロール操作 | 浮遊オーバーレイスクロールバー＆ステータスバー重複解消（横・縦スクロールバーのステータスバー直上42px浮遊配置、背後コンテンツ通過維持、Shift+ホイール横スクロール） | **完了** | Issue #140 / App.xaml, DetailEditorView & GridView |
 | **F64** | UI・リボンタブ | リボンタブ表記を「PDF編集」から「編集」に一般化変更 | **完了** | Issue #167 / MainWindow.xaml |
 | **F65** | 画像編集コア / UI | 画像データ（JPEG/PNG）の直接編集・回転・手書きアノテーション・元形式保存およびPDFエクスポート対応（元解像度・DPI保持、手書き高精細合成、画像専用セッション管理、機能グレーアウト、スレッド安全なビットマップ生成） | **完了** | Issue #167, #170 / ImageService, DocumentKind, MainViewModel, PdfiumRenderer |
+| **F66** | 手書き詳細 / インタラクティブ | 行単位・ストリーム順テキスト範囲選択（Y座標優先行スナップ、余白ドラッグスナップ、行切り替わり改行自動挿入、行単位一体ハイライト矩形結合） | **完了** | Issue #98 / TextSelectionHelper, PageInteractiveData, InteractiveOverlayCanvas |
 
 ---
 

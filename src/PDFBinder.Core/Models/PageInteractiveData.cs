@@ -1,5 +1,6 @@
 using System.Text;
 using System.Windows;
+using PDFBinder.Core.Services;
 
 namespace PDFBinder.Core.Models;
 
@@ -46,6 +47,14 @@ public class PageInteractiveData
     public static PageInteractiveData Empty { get; } = new(
         Array.Empty<PdfTextCharacter>(),
         Array.Empty<PdfLinkAnnotation>());
+
+    /// <summary>
+    /// 開始座標と終了座標に基づいて文字範囲を行単位・ストリーム順に選択し、テキスト・選択文字群・ハイライト矩形を取得します。
+    /// </summary>
+    public TextSelectionResult GetTextInRange(Point startPoint, Point endPoint)
+    {
+        return TextSelectionHelper.SelectText(Characters, startPoint, endPoint);
+    }
 
     /// <summary>
     /// 指定された範囲矩形と交差する文字群をインデックス順に抽出し、文字列として取得します。
