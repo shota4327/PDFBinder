@@ -502,6 +502,7 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(CanRedo));
             UndoCommand.NotifyCanExecuteChanged();
             RedoCommand.NotifyCanExecuteChanged();
+            UpdateDocumentPageProperties();
         };
 
         Documents.CollectionChanged += (s, e) =>
@@ -606,6 +607,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CanRedo));
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
+        UpdateDocumentPageProperties();
     }
 
     private void OnSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -682,7 +684,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HasOpenDocuments));
-        UpdateDocumentNavigationProperties();
+        UpdateDocumentPageProperties();
     }
 
     private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -694,13 +696,39 @@ public partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(DisplayFileName));
             OnPropertyChanged(nameof(WindowTitle));
         }
+        else if (e.PropertyName == nameof(PdfDocumentModel.PageCount))
+        {
+            UpdateDocumentPageProperties();
+        }
     }
 
     private void OnDocumentPagesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
+        UpdateDocumentPageProperties();
+    }
+
+    /// <summary>
+    /// ドキュメントのページ数やページ構成の変更に伴い、ナビゲーションおよび各操作コマンドの状態を再評価・通知します。
+    /// </summary>
+    private void UpdateDocumentPageProperties()
+    {
         UpdateDocumentNavigationProperties();
+
+        OnPropertyChanged(nameof(CanSplitAllPages));
+        OnPropertyChanged(nameof(CanSplitPagesHalf));
+        OnPropertyChanged(nameof(CanDeleteSelectedPages));
+        OnPropertyChanged(nameof(CanAddBlankPage));
+        OnPropertyChanged(nameof(CanExportSelectedPages));
+        OnPropertyChanged(nameof(CanAppendDocument));
+
+        SplitAllPagesCommand.NotifyCanExecuteChanged();
+        SplitPagesHalfCommand.NotifyCanExecuteChanged();
+        DeleteSelectedPagesCommand.NotifyCanExecuteChanged();
+        AddBlankPageCommand.NotifyCanExecuteChanged();
+        ExportSelectedPagesCommand.NotifyCanExecuteChanged();
+        AppendDocumentCommand.NotifyCanExecuteChanged();
     }
 
     private void UpdateDocumentNavigationProperties()
@@ -1043,6 +1071,10 @@ public partial class MainViewModel : ObservableObject
                 _ = EnsureThumbnailsGeneratedAsync();
             }
             StatusMessage = $"{pdfFiles.Count} 件のファイルから {pagesToInsert.Count} ページを挿入しました。";
+            if (ActiveSession == targetSession)
+            {
+                UpdateDocumentPageProperties();
+            }
         }
         catch (Exception ex)
         {
@@ -1291,6 +1323,7 @@ public partial class MainViewModel : ObservableObject
 
             DetailEditor?.InitializeDocument(newDoc, blankPage);
             StatusMessage = "白紙ページを追加しました。";
+            UpdateDocumentPageProperties();
             return;
         }
 
@@ -1314,6 +1347,7 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(Document, blank);
         }
         StatusMessage = "白紙ページを追加しました。";
+        UpdateDocumentPageProperties();
     }
 
     /// <summary>
@@ -1404,6 +1438,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         StatusMessage = $"{targets.Count} ページを削除しました。";
+        UpdateDocumentPageProperties();
     }
 
     /// <summary>
@@ -1513,6 +1548,7 @@ public partial class MainViewModel : ObservableObject
             }
 
             StatusMessage = $"全 {oldPages.Count} ページを {newPages.Count} ページに分割しました。";
+            UpdateDocumentPageProperties();
         }
         catch (Exception ex)
         {
