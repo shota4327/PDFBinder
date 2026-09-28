@@ -1,5 +1,6 @@
 using System.IO;
 using System.Threading;
+using System.Windows.Media.Imaging;
 using PDFBinder.App.Controls;
 using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
@@ -232,6 +233,61 @@ public class MainViewModelImageTests
         Assert.True(saved);
         Assert.Contains(imagePath, mockImageService.SavedPaths);
         Assert.False(vm.Document.IsModified);
+    }
+
+    [Theory]
+    [InlineData("test.png", true)]
+    [InlineData("test.jpg", false)]
+    public async Task RotateCommand_WithRealImageFiles_RotatesAndUndosWithoutCrashing(string fileName, bool isPng)
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"ImageRotateCrashTest_{Guid.NewGuid()}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string imagePath = Path.Combine(tempDir, fileName);
+            var rtb = new RenderTargetBitmap(200, 100, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            BitmapEncoder encoder = isPng ? new PngBitmapEncoder() : new JpegBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using (var fs = File.Create(imagePath))
+            {
+                encoder.Save(fs);
+            }
+
+            // 実サービス（PdfiumRenderer + ImageService）を利用してMainViewModelを生成
+            var vm = new MainViewModel();
+            await vm.OpenSingleDocumentAsync(imagePath);
+
+            Assert.Single(vm.Document.Pages);
+            var page = vm.Document.Pages[0];
+            Assert.Equal(PageRotation.Rotate0, page.Rotation);
+
+            // Act 1: 時計回り回転（Issue #170 のクラッシュ再現操作）
+            vm.RotateClockwiseCommand.Execute(null);
+            await Task.Delay(100);
+
+            Assert.Equal(PageRotation.Rotate90, page.Rotation);
+            Assert.True(vm.Document.IsModified);
+            Assert.True(vm.CanUndo);
+
+            // Act 2: Undo（元の角度へ復元）
+            vm.UndoCommand.Execute(null);
+            await Task.Delay(100);
+
+            Assert.Equal(PageRotation.Rotate0, page.Rotation);
+
+            // Act 3: 反時計回り回転（270度）
+            vm.RotateCounterClockwiseCommand.Execute(null);
+            await Task.Delay(100);
+
+            Assert.Equal(PageRotation.Rotate270, page.Rotation);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+        }
     }
 
     [Fact]

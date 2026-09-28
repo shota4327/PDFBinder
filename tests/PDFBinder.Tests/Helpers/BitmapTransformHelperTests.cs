@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PDFBinder.Core.Helpers;
@@ -92,5 +94,45 @@ public class BitmapTransformHelperTests
         Assert.NotNull(result);
         Assert.Equal(200, result.PixelWidth);
         Assert.Equal(100, result.PixelHeight);
+    }
+
+    [Fact]
+    public void CreateDetachedBitmap_NullSource_ReturnsNull()
+    {
+        var result = BitmapTransformHelper.CreateDetachedBitmap(null);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void CreateDetachedBitmap_FromWorkerThread_AllowsCrossThreadTransformedBitmapFreeze()
+    {
+        // ワーカースレッド上でデコーダーからBitmapFrameを生成
+        BitmapSource? detached = null;
+        var thread = new Thread(() =>
+        {
+            var rtb = new RenderTargetBitmap(150, 100, 96, 96, PixelFormats.Pbgra32);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using var ms = new MemoryStream();
+            encoder.Save(ms);
+            ms.Position = 0;
+
+            var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+            detached = BitmapTransformHelper.CreateDetachedBitmap(decoder.Frames[0]);
+        });
+        thread.Start();
+        thread.Join();
+
+        Assert.NotNull(detached);
+        Assert.True(detached.IsFrozen);
+        Assert.Equal(150, detached.PixelWidth);
+        Assert.Equal(100, detached.PixelHeight);
+
+        // メイン（別）スレッド上で TransformedBitmap.Freeze() を実行してもスレッド例外が発生しないこと
+        var rotated = BitmapTransformHelper.CreateRotatedBitmap(detached, 90);
+        Assert.NotNull(rotated);
+        Assert.Equal(100, rotated.PixelWidth);
+        Assert.Equal(150, rotated.PixelHeight);
+        Assert.True(rotated.IsFrozen);
     }
 }
