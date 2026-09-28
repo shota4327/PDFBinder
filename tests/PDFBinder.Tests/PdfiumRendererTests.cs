@@ -1,7 +1,9 @@
 using System.IO;
+using System.Threading;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 using PdfSharp.Drawing;
@@ -206,5 +208,50 @@ public class PdfiumRendererTests : IDisposable
         {
             Assert.Equal(255, pixels[i]);
         }
+    }
+
+    [Theory]
+    [InlineData("test.png", true, PageRotation.Rotate0, 200, 100)]
+    [InlineData("test.png", true, PageRotation.Rotate90, 100, 200)]
+    [InlineData("test.png", true, PageRotation.Rotate180, 200, 100)]
+    [InlineData("test.png", true, PageRotation.Rotate270, 100, 200)]
+    [InlineData("test.jpg", false, PageRotation.Rotate90, 100, 200)]
+    public async Task RenderPageAsync_ImageWithRotation_RendersCorrectDimensions(
+        string fileName,
+        bool isPng,
+        PageRotation rotation,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        // Arrange
+        string imagePath = Path.Combine(_testDirectory, fileName);
+        var rtb = new RenderTargetBitmap(200, 100, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        BitmapEncoder encoder = isPng ? new PngBitmapEncoder() : new JpegBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(imagePath))
+        {
+            encoder.Save(fs);
+        }
+
+        // Act: 該当回転角度でレンダリング
+        var bitmap = await _renderer.RenderPageAsync(imagePath, 0, expectedWidth, expectedHeight, rotation);
+
+        // Assert: スレッドセーフにフリーズされており、指定通りの寸法であること
+        Assert.NotNull(bitmap);
+        Assert.True(bitmap.IsFrozen);
+        Assert.Equal(expectedWidth, bitmap.PixelWidth);
+        Assert.Equal(expectedHeight, bitmap.PixelHeight);
+
+        // 別スレッドからさらに TransformedBitmap.Freeze() を行っても例外が発生しないこと
+        BitmapSource? furtherRotated = null;
+        var thread = new Thread(() =>
+        {
+            furtherRotated = BitmapTransformHelper.CreateRotatedBitmap(bitmap, 90);
+        });
+        thread.Start();
+        thread.Join();
+
+        Assert.NotNull(furtherRotated);
+        Assert.True(furtherRotated.IsFrozen);
     }
 }

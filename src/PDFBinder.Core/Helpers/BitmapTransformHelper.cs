@@ -31,4 +31,42 @@ public static class BitmapTransformHelper
         rotated.Freeze();
         return rotated;
     }
+
+    /// <summary>
+    /// 元のビットマップ画像からピクセルデータをメモリに抽出し、デコーダーや生成スレッドへの依存を持たない
+    /// 独立したフリーズ済みのビットマップ画像を生成します。
+    /// </summary>
+    /// <param name="source">複製元のビットマップ画像</param>
+    /// <returns>スレッド非依存でフリーズ済みの新しいビットマップ画像。sourceがnullの場合はnullを返却します。</returns>
+    public static BitmapSource? CreateDetachedBitmap(BitmapSource? source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        int width = source.PixelWidth;
+        int height = source.PixelHeight;
+        if (width <= 0 || height <= 0)
+        {
+            return source;
+        }
+
+        int stride = (width * source.Format.BitsPerPixel + 7) / 8;
+        byte[] pixels = new byte[stride * height];
+        source.CopyPixels(pixels, stride, 0);
+
+        var detached = BitmapSource.Create(
+            width,
+            height,
+            source.DpiX,
+            source.DpiY,
+            source.Format,
+            source.Palette,
+            pixels,
+            stride);
+
+        detached.Freeze();
+        return detached;
+    }
 }

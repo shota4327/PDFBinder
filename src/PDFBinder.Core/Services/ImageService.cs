@@ -115,7 +115,7 @@ public class ImageService : IImageService
         byte[] sourceBytes = File.ReadAllBytes(readPath);
         using var ms = new MemoryStream(sourceBytes);
         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-        BitmapSource baseBitmap = decoder.Frames[0];
+        BitmapSource baseBitmap = BitmapTransformHelper.CreateDetachedBitmap(decoder.Frames[0]) ?? decoder.Frames[0];
 
         if (page.Rotation != PageRotation.Rotate0)
         {
@@ -210,7 +210,7 @@ public class ImageService : IImageService
         byte[] sourceBytes = File.ReadAllBytes(readPath);
         using var ms = new MemoryStream(sourceBytes);
         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-        BitmapSource baseBitmap = decoder.Frames[0];
+        BitmapSource baseBitmap = BitmapTransformHelper.CreateDetachedBitmap(decoder.Frames[0]) ?? decoder.Frames[0];
 
         if (page.Rotation != PageRotation.Rotate0)
         {

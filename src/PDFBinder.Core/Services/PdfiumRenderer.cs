@@ -491,7 +491,11 @@ public class PdfiumRenderer : IPdfRenderer
 
         using var ms = new MemoryStream(bytes);
         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-        BitmapSource bitmap = decoder.Frames[0];
+        BitmapSource? bitmap = BitmapTransformHelper.CreateDetachedBitmap(decoder.Frames[0]);
+        if (bitmap == null)
+        {
+            return null;
+        }
 
         if (rotation != PageRotation.Rotate0)
         {
@@ -508,7 +512,10 @@ public class PdfiumRenderer : IPdfRenderer
             return scaled;
         }
 
-        bitmap.Freeze();
+        if (!bitmap.IsFrozen && bitmap.CanFreeze)
+        {
+            bitmap.Freeze();
+        }
         return bitmap;
     }
 
