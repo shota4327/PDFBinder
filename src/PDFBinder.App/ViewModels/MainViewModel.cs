@@ -195,6 +195,11 @@ public partial class MainViewModel : ObservableObject
     public const int ThumbnailRenderHeight = 1008;
 
     /// <summary>
+    /// ドキュメント初期読み込み時に先行生成する先頭ページ数（先頭50ページ）
+    /// </summary>
+    public const int InitialPreloadThumbnailPageCount = 50;
+
+    /// <summary>
     /// 詳細エディタ表示中に先行生成するサムネイルの前後ページ半径（前後10ページ）
     /// </summary>
     public const int DetailViewThumbnailWindowRadius = 10;
@@ -604,7 +609,7 @@ public partial class MainViewModel : ObservableObject
 
             if (IsDetailViewActive)
             {
-                _ = ScheduleDetailViewThumbnailsAsync();
+                _ = ScheduleInitialThumbnailsAsync();
             }
         }
         else
@@ -1824,6 +1829,57 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// ドキュメント初期読み込み時に先行生成する先頭50ページのサムネイル生成対象を取得します。
+    /// </summary>
+    /// <returns>先頭から最大50ページのうち、未生成またはダーティなページのリスト</returns>
+    public List<PdfPageModel> GetInitialPreloadTargetPages()
+    {
+        var targets = new List<PdfPageModel>();
+        if (Document.Pages.Count == 0) return targets;
+
+        int count = Math.Min(Document.Pages.Count, InitialPreloadThumbnailPageCount);
+        for (int i = 0; i < count; i++)
+        {
+            var page = Document.Pages[i];
+            if (page.Thumbnail == null || page.IsThumbnailDirty)
+            {
+                targets.Add(page);
+            }
+        }
+
+        return targets;
+    }
+
+    /// <summary>
+    /// ドキュメント初期読み込み時に、先頭50ページのサムネイルをバックグラウンドで先行生成します。
+    /// </summary>
+    /// <param name="debounceMs">デバウンス待機時間（ミリ秒）</param>
+    public Task ScheduleInitialThumbnailsAsync(int debounceMs = 250)
+    {
+        if (!IsDetailViewActive || Document.Pages.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var oldCts = _thumbnailCts;
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 既に破棄されている場合は無視
+        }
+
+        var newCts = new CancellationTokenSource();
+        _thumbnailCts = newCts;
+
+        var task = RunSilentThumbnailGenerationAsync(GetInitialPreloadTargetPages, newCts, debounceMs);
+        _thumbnailTask = task;
+        return task;
+    }
+
+    /// <summary>
     /// 詳細エディタ表示中に、現在ページの前後10ページのサムネイルを距離優先順でバックグラウンド生成します。
     /// </summary>
     /// <param name="debounceMs">デバウンス待機時間（ミリ秒）</param>
@@ -1847,7 +1903,11 @@ public partial class MainViewModel : ObservableObject
         var newCts = new CancellationTokenSource();
         _thumbnailCts = newCts;
 
-        var task = RunDetailViewThumbnailsAsync(newCts, debounceMs);
+        var task = RunSilentThumbnailGenerationAsync(() =>
+        {
+            int currentIdx = DetailEditor?.CurrentPageIndex ?? 0;
+            return GetDetailViewTargetPages(currentIdx);
+        }, newCts, debounceMs);
         _thumbnailTask = task;
         return task;
     }
@@ -1855,7 +1915,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// 詳細エディタ表示中用のサムネイル生成ループを実行します（UIに干渉しないサイレント実行）。
     /// </summary>
-    private async Task RunDetailViewThumbnailsAsync(CancellationTokenSource cts, int debounceMs)
+    private async Task RunSilentThumbnailGenerationAsync(Func<List<PdfPageModel>> targetsProvider, CancellationTokenSource cts, int debounceMs)
     {
         var token = cts.Token;
         try
@@ -1868,8 +1928,7 @@ public partial class MainViewModel : ObservableObject
             token.ThrowIfCancellationRequested();
             if (!IsDetailViewActive || Document.Pages.Count == 0) return;
 
-            int currentIdx = DetailEditor?.CurrentPageIndex ?? 0;
-            var targets = GetDetailViewTargetPages(currentIdx);
+            var targets = targetsProvider();
             if (targets.Count == 0) return;
 
             foreach (var page in targets)
