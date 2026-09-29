@@ -98,6 +98,82 @@ public class DetailViewThumbnailsTests
     }
 
     [Fact]
+    public void GetInitialPreloadTargetPages_EmptyDocument_ReturnsEmptyList()
+    {
+        // Arrange
+        var vm = new MainViewModel();
+
+        // Act
+        var targets = vm.GetInitialPreloadTargetPages();
+
+        // Assert
+        Assert.Empty(targets);
+    }
+
+    [Fact]
+    public void GetInitialPreloadTargetPages_LargeDocument_ReturnsFirst50PagesInOrder()
+    {
+        // Arrange (100ページ)
+        var vm = CreateTestViewModel(100);
+
+        // Act
+        var targets = vm.GetInitialPreloadTargetPages();
+
+        // Assert (先頭50ページが昇順で取得されること)
+        Assert.Equal(50, targets.Count);
+        for (int i = 0; i < 50; i++)
+        {
+            Assert.Equal(i + 1, targets[i].PageNumber);
+        }
+    }
+
+    [Fact]
+    public void GetInitialPreloadTargetPages_SmallDocument_ReturnsAllPagesInOrder()
+    {
+        // Arrange (30ページ)
+        var vm = CreateTestViewModel(30);
+
+        // Act
+        var targets = vm.GetInitialPreloadTargetPages();
+
+        // Assert (上限50に達しないため、全30ページが取得されること)
+        Assert.Equal(30, targets.Count);
+        for (int i = 0; i < 30; i++)
+        {
+            Assert.Equal(i + 1, targets[i].PageNumber);
+        }
+    }
+
+    [Fact]
+    public void GetInitialPreloadTargetPages_SkipsPagesWithExistingCleanThumbnails()
+    {
+        // Arrange (60ページ)
+        var vm = CreateTestViewModel(60);
+        var dummyBitmap = BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4);
+        dummyBitmap.Freeze();
+
+        // ページ1（0-based 0）とページ3（0-based 2）に既にサムネイルを設定
+        vm.Document.Pages[0].Thumbnail = dummyBitmap;
+        vm.Document.Pages[0].IsThumbnailDirty = false;
+
+        vm.Document.Pages[2].Thumbnail = dummyBitmap;
+        vm.Document.Pages[2].IsThumbnailDirty = false;
+
+        // ページ2（0-based 1）はサムネイルありだがダーティ
+        vm.Document.Pages[1].Thumbnail = dummyBitmap;
+        vm.Document.Pages[1].IsThumbnailDirty = true;
+
+        // Act
+        var targets = vm.GetInitialPreloadTargetPages();
+
+        // Assert: ページ1と3は除外され、ダーティなページ2は含まれること
+        Assert.DoesNotContain(vm.Document.Pages[0], targets);
+        Assert.DoesNotContain(vm.Document.Pages[2], targets);
+        Assert.Contains(vm.Document.Pages[1], targets);
+        Assert.Equal(48, targets.Count); // 50件中2件除外
+    }
+
+    [Fact]
     public void GetDetailViewTargetPages_EmptyDocument_ReturnsEmptyList()
     {
         // Arrange
