@@ -285,6 +285,35 @@ public class PenCursorHelperTests
         Assert.True(pixels[offsetAdjacentRight + 3] > 0, "hotspot+1 にアンチエイリアスピクセルが存在すること");
     }
 
+    [Fact]
+    public void DrawCrosshairLines_RendersSelectedColorPixels()
+    {
+        int size = 64;
+        int hotspot = 32;
+        double radius = 10.0;
+        double gap = 3.5;
+        double lineLen = 7.0;
+        byte[] pixels = new byte[size * size * 4];
+
+        // 赤色の十字線を描画
+        PenCursorHelper.DrawCrosshairLines(pixels, size, hotspot, radius, gap, lineLen, thickness: 2.0, lineColor: Colors.Red);
+
+        // 上方向のピクセルに赤色（R=255, G=0, B=0）が存在することを検証
+        bool hasRedPixel = false;
+        for (int y = 12; y <= 18; y++)
+        {
+            int dibRow = size - 1 - y;
+            int offset = (dibRow * size + hotspot) * 4;
+            if (pixels[offset + 3] > 0 && pixels[offset + 2] == 255 && pixels[offset + 1] == 0 && pixels[offset] == 0)
+            {
+                hasRedPixel = true;
+                break;
+            }
+        }
+
+        Assert.True(hasRedPixel, "指定した選択色（赤色）の十字線ピクセルが存在すること");
+    }
+
     [Theory]
     [InlineData(3.0, 7.0)]
     [InlineData(6.0, 7.0)]

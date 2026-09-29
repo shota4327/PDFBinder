@@ -132,7 +132,7 @@ public static class PenCursorHelper
 
         byte[] bgraPixels = RenderCirclePixels(size, hotspot, diameter, color, isHollow: false, isHighlighter: isHighlighter);
 
-        DrawCrosshairLines(bgraPixels, size, hotspot, radius, gap, lineLen, lineThickness);
+        DrawCrosshairLines(bgraPixels, size, hotspot, radius, gap, lineLen, lineThickness, color);
 
         byte[] curBytes = BuildCurBytes(size, size, hotspot, hotspot, bgraPixels);
         using var stream = new MemoryStream(curBytes);
@@ -143,27 +143,28 @@ public static class PenCursorHelper
     /// 直線モード用の十字線（クロスヘア）を円形プレビューの上下左右に描画します。
     /// </summary>
     internal static void DrawCrosshairLines(
-        byte[] pixels, int canvasSize, int hotspot, double radius, double gap, double lineLen, double thickness = 2.0)
+        byte[] pixels, int canvasSize, int hotspot, double radius, double gap, double lineLen, double thickness = 2.0, Color? lineColor = null)
     {
+        Color col = lineColor ?? Colors.Black;
         double cx = hotspot + 0.5;
         double cy = hotspot + 0.5;
         double halfThick = thickness / 2.0;
 
         // 上
-        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy - radius - gap - lineLen, cy - radius - gap);
+        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy - radius - gap - lineLen, cy - radius - gap, col);
         // 下
-        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy + radius + gap, cy + radius + gap + lineLen);
+        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy + radius + gap, cy + radius + gap + lineLen, col);
         // 左
-        DrawLineRect(pixels, canvasSize, cx - radius - gap - lineLen, cx - radius - gap, cy - halfThick, cy + halfThick);
+        DrawLineRect(pixels, canvasSize, cx - radius - gap - lineLen, cx - radius - gap, cy - halfThick, cy + halfThick, col);
         // 右
-        DrawLineRect(pixels, canvasSize, cx + radius + gap, cx + radius + gap + lineLen, cy - halfThick, cy + halfThick);
+        DrawLineRect(pixels, canvasSize, cx + radius + gap, cx + radius + gap + lineLen, cy - halfThick, cy + halfThick, col);
     }
 
     /// <summary>
-    /// 指定された矩形範囲を黒色の直線として描画（サブピクセルカバレッジ計算によるアンチエイリアス）します。
+    /// 指定された矩形範囲を指定色の直線として描画（サブピクセルカバレッジ計算によるアンチエイリアス）します。
     /// </summary>
     private static void DrawLineRect(
-        byte[] pixels, int canvasSize, double minX, double maxX, double minY, double maxY)
+        byte[] pixels, int canvasSize, double minX, double maxX, double minY, double maxY, Color color)
     {
         int xStart = Math.Max(0, (int)Math.Floor(minX));
         int xEnd = Math.Min(canvasSize - 1, (int)Math.Ceiling(maxX));
@@ -191,16 +192,16 @@ public static class PenCursorHelper
                 if (coverage > 0.0)
                 {
                     int pixelOffset = rowOffset + x * 4;
-                    ApplyBlackLinePixel(pixels, pixelOffset, coverage);
+                    ApplyLinePixel(pixels, pixelOffset, coverage, color);
                 }
             }
         }
     }
 
     /// <summary>
-    /// 黒色ラインのピクセルを下地へアルファ合成します。
+    /// 指定色ラインのピクセルを下地へアルファ合成します。
     /// </summary>
-    private static void ApplyBlackLinePixel(byte[] pixels, int pixelOffset, double coverage)
+    private static void ApplyLinePixel(byte[] pixels, int pixelOffset, double coverage, Color color)
     {
         byte alpha = (byte)Math.Clamp(Math.Round(255.0 * coverage), 0, 255);
         if (alpha == 0) return;
@@ -211,10 +212,9 @@ public static class PenCursorHelper
 
         if (outA <= 0.0) return;
 
-        // 黒色（R=0, G=0, B=0）
-        double outB = (0.0 + pixels[pixelOffset + 0] * dA * (1.0 - sA)) / outA;
-        double outG = (0.0 + pixels[pixelOffset + 1] * dA * (1.0 - sA)) / outA;
-        double outR = (0.0 + pixels[pixelOffset + 2] * dA * (1.0 - sA)) / outA;
+        double outB = (color.B * sA + pixels[pixelOffset + 0] * dA * (1.0 - sA)) / outA;
+        double outG = (color.G * sA + pixels[pixelOffset + 1] * dA * (1.0 - sA)) / outA;
+        double outR = (color.R * sA + pixels[pixelOffset + 2] * dA * (1.0 - sA)) / outA;
 
         pixels[pixelOffset + 0] = (byte)Math.Clamp(Math.Round(outB), 0, 255);
         pixels[pixelOffset + 1] = (byte)Math.Clamp(Math.Round(outG), 0, 255);
