@@ -193,23 +193,20 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// サブピクセル座標における定規の色（SDF：符号付き距離関数に基づく輪郭・白フチ・目盛り・本体）をサンプリングします。
+    /// サブピクセル座標における水平定規の色（SDF：符号付き距離関数に基づく輪郭・白フチ・目盛り・本体）をサンプリングします。
     /// </summary>
     private static void SampleRulerColor(double u, double v, out byte r, out byte g, out byte b, out byte a)
     {
-        double du = u - 11.5;
-        double dv = v - 11.5;
-        double len = (du - dv) * 0.70710678;
-        double perp = (du + dv) * 0.70710678;
+        const double x0 = 11.5;
+        const double y0 = 11.5;
+        const double wHalf = 9.5; // 水平方向の半幅（全長 19px）
+        const double hHalf = 4.2; // 垂直方向の半高（全高 8.4px）
+        const double cornerRadius = 1.5;
 
-        const double lHalf = 10.0;
-        const double wHalf = 3.0;
-        const double cornerRadius = 1.2;
-
-        double qx = Math.Max(Math.Abs(len) - (lHalf - cornerRadius), 0.0);
-        double qy = Math.Max(Math.Abs(perp) - (wHalf - cornerRadius), 0.0);
+        double qx = Math.Max(Math.Abs(u - x0) - (wHalf - cornerRadius), 0.0);
+        double qy = Math.Max(Math.Abs(v - y0) - (hHalf - cornerRadius), 0.0);
         double dOut = Math.Sqrt(qx * qx + qy * qy) - cornerRadius;
-        double dIn = Math.Min(Math.Max(Math.Abs(len) - lHalf, Math.Abs(perp) - wHalf), 0.0);
+        double dIn = Math.Min(Math.Max(Math.Abs(u - x0) - wHalf, Math.Abs(v - y0) - hHalf), 0.0);
         double sdf = dOut > 0 ? dOut : dIn;
 
         if (sdf > 1.2)
@@ -225,7 +222,7 @@ public static class PenCursorHelper
             return;
         }
 
-        if (sdf > -1.0 || IsOnTickMark(len, perp, wHalf))
+        if (sdf > -1.0 || IsOnTickMark(u, v, y0, hHalf))
         {
             r = g = b = a = 255; // 白フチ・目盛り
             return;
@@ -239,22 +236,24 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 指定された座標が定規の目盛り位置上にあるかを判定します。
+    /// 指定された座標が水平定規の目盛り位置上にあるかを判定します。
     /// </summary>
-    private static bool IsOnTickMark(double len, double perp, double wHalf)
+    private static bool IsOnTickMark(double u, double v, double y0, double hHalf)
     {
-        double depth = perp + wHalf;
-        double tickIndex = Math.Round(len / 2.0);
-        double nearestTickLen = tickIndex * 2.0;
+        double topEdge = y0 - hHalf;
+        double depth = v - topEdge;
 
-        if (Math.Abs(nearestTickLen) > 8.5)
+        double tickIndex = Math.Round((u - 11.5) / 2.0);
+        double tickX = 11.5 + tickIndex * 2.0;
+
+        if (Math.Abs(tickIndex) > 4.0)
         {
             return false;
         }
 
-        double distToTick = Math.Abs(len - nearestTickLen);
+        double distToTick = Math.Abs(u - tickX);
         bool isMajor = Math.Abs(tickIndex % 2.0) < 0.1;
-        double maxDepth = isMajor ? 2.5 : 1.6;
+        double maxDepth = isMajor ? 4.0 : 2.5;
 
         return distToTick <= 0.55 && depth >= 0.0 && depth <= maxDepth;
     }
