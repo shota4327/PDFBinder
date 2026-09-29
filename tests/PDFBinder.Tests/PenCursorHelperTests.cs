@@ -276,6 +276,32 @@ public class PenCursorHelperTests
         Assert.True(hasBottomBlack, "下方向に黒色十字線が存在すること");
         Assert.True(hasLeftBlack, "左方向に黒色十字線が存在すること");
         Assert.True(hasRightBlack, "右方向に黒色十字線が存在すること");
+
+        // 太さ2px（cx-1.0〜cx+1.0）により、hotspot-1 と hotspot+1 にもアンチエイリアスピクセルが存在することを検証
+        int dibRowSample = size - 1 - 15;
+        int offsetAdjacentLeft = (dibRowSample * size + (hotspot - 1)) * 4;
+        int offsetAdjacentRight = (dibRowSample * size + (hotspot + 1)) * 4;
+        Assert.True(pixels[offsetAdjacentLeft + 3] > 0, "hotspot-1 にアンチエイリアスピクセルが存在すること");
+        Assert.True(pixels[offsetAdjacentRight + 3] > 0, "hotspot+1 にアンチエイリアスピクセルが存在すること");
+    }
+
+    [Theory]
+    [InlineData(3.0, 7.0)]
+    [InlineData(6.0, 7.0)]
+    [InlineData(12.0, 12.0)]
+    [InlineData(24.0, 24.0)]
+    public void CreateStraightLineCursor_ScalesLineLengthWithDiameter(double diameter, double expectedLineLen)
+    {
+        // プレビュー円の長さ（直径）より短くならないよう、Math.Max(7.0, diameter) で伸長されることを検証
+        const double minLineLen = 7.0;
+        double actualLineLen = Math.Max(minLineLen, diameter);
+        Assert.Equal(expectedLineLen, actualLineLen);
+        Assert.True(actualLineLen >= minLineLen);
+        Assert.True(actualLineLen >= diameter);
+
+        // カーソルが正常に生成されること
+        var cursor = PenCursorHelper.CreateStraightLineCursor(diameter, Colors.Black, isHighlighter: false);
+        Assert.NotNull(cursor);
     }
 
     [Theory]

@@ -116,17 +116,18 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 直線モード用の定規アイコン付き円形プレビューカーソルを生成します。
+    /// 直線モード用の十字線付き円形プレビューカーソルを生成します。
     /// </summary>
     public static Cursor CreateStraightLineCursor(double diameter, Color color, bool isHighlighter)
     {
         const double gap = 3.5;
-        const double lineLen = 7.0;
-        const double lineThickness = 1.0;
+        const double minLineLen = 7.0;
+        const double lineThickness = 2.0;
 
+        double lineLen = Math.Max(minLineLen, diameter);
         double radius = diameter / 2.0;
         int needed = (int)Math.Ceiling(radius + gap + lineLen) + 2;
-        int hotspot = Math.Max(needed, 6);
+        int hotspot = Math.Clamp(needed, 6, 128);
         int size = hotspot * 2;
 
         byte[] bgraPixels = RenderCirclePixels(size, hotspot, diameter, color, isHollow: false, isHighlighter: isHighlighter);
@@ -142,7 +143,7 @@ public static class PenCursorHelper
     /// 直線モード用の十字線（クロスヘア）を円形プレビューの上下左右に描画します。
     /// </summary>
     internal static void DrawCrosshairLines(
-        byte[] pixels, int canvasSize, int hotspot, double radius, double gap, double lineLen, double thickness = 1.0)
+        byte[] pixels, int canvasSize, int hotspot, double radius, double gap, double lineLen, double thickness = 2.0)
     {
         double cx = hotspot + 0.5;
         double cy = hotspot + 0.5;
