@@ -286,7 +286,8 @@ public class EditorInkCanvas : InkCanvas
                 break;
             case EditorToolMode.StraightLine:
                 EditingMode = InkCanvasEditingMode.None;
-                Cursor = Cursors.Cross;
+                double lineThickness = StrokeThickness * GetStrokeScale();
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, lineThickness, Zoom, isStraightLine: true) ?? Cursors.Pen;
                 break;
             case EditorToolMode.Hand:
                 EditingMode = InkCanvasEditingMode.None;
@@ -350,17 +351,9 @@ public class EditorInkCanvas : InkCanvas
     /// </summary>
     private void ApplyDrawingOrStraightLineMode()
     {
-        if (IsStraightLine)
-        {
-            EditingMode = InkCanvasEditingMode.None;
-            Cursor = Cursors.Cross;
-        }
-        else
-        {
-            EditingMode = InkCanvasEditingMode.Ink;
-            double effectiveThickness = StrokeThickness * GetStrokeScale();
-            Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Pen;
-        }
+        EditingMode = IsStraightLine ? InkCanvasEditingMode.None : InkCanvasEditingMode.Ink;
+        double effectiveThickness = StrokeThickness * GetStrokeScale();
+        Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom, IsStraightLine) ?? Cursors.Pen;
     }
 
     /// <summary>
@@ -368,16 +361,16 @@ public class EditorInkCanvas : InkCanvas
     /// </summary>
     public void UpdateCursor()
     {
-        if (PenCursorHelper.IsCircleCursorTool(ToolMode))
+        if (PenCursorHelper.IsCircleCursorTool(ToolMode, IsStraightLineActive))
         {
             double effectiveThickness = StrokeThickness * GetStrokeScale();
             if (ToolMode == EditorToolMode.EraserPoint)
             {
                 Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Cross;
             }
-            else if (!IsStraightLine)
+            else
             {
-                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom) ?? Cursors.Pen;
+                Cursor = PenCursorHelper.GetCursor(ToolMode, DrawingColor, effectiveThickness, Zoom, IsStraightLineActive) ?? Cursors.Pen;
             }
         }
     }
