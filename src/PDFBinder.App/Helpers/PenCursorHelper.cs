@@ -120,7 +120,7 @@ public static class PenCursorHelper
     /// </summary>
     public static Cursor CreateStraightLineCursor(double diameter, Color color, bool isHighlighter)
     {
-        const int badgeSize = 16;
+        const int badgeSize = 32;
         const double margin = 3.0;
 
         double radius = diameter / 2.0;
@@ -167,26 +167,41 @@ public static class PenCursorHelper
     ];
 
     /// <summary>
-    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します。
+    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（2倍拡大: 32x32px）。
     /// </summary>
     internal static void DrawRulerBadge(byte[] pixels, int canvasSize, int startX, int startY)
     {
+        const int scale = 2;
         for (int r = 0; r < RulerBadgePattern.Length; r++)
         {
-            int screenY = startY + r;
+            string rowStr = RulerBadgePattern[r];
+            for (int c = 0; c < rowStr.Length; c++)
+            {
+                char ch = rowStr[c];
+                if (ch == '.') continue;
+
+                DrawBadgePixelBlock(pixels, canvasSize, startX + c * scale, startY + r * scale, scale, ch);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 指定されたスケール倍率（2x2ピクセルブロック等）でバッジピクセルを描画します。
+    /// </summary>
+    private static void DrawBadgePixelBlock(byte[] pixels, int canvasSize, int blockX, int blockY, int scale, char ch)
+    {
+        for (int dy = 0; dy < scale; dy++)
+        {
+            int screenY = blockY + dy;
             if (screenY < 0 || screenY >= canvasSize) continue;
 
             int dibRow = canvasSize - 1 - screenY;
             int rowOffset = dibRow * canvasSize * 4;
-            string rowStr = RulerBadgePattern[r];
 
-            for (int c = 0; c < rowStr.Length; c++)
+            for (int dx = 0; dx < scale; dx++)
             {
-                int screenX = startX + c;
+                int screenX = blockX + dx;
                 if (screenX < 0 || screenX >= canvasSize) continue;
-
-                char ch = rowStr[c];
-                if (ch == '.') continue;
 
                 int pixelOffset = rowOffset + screenX * 4;
                 ApplyBadgePixel(pixels, pixelOffset, ch);
