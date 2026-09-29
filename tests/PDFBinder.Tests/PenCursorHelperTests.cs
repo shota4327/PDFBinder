@@ -14,15 +14,16 @@ public class PenCursorHelperTests
     [Fact]
     public void IsCircleCursorTool_IdentifiesTargetToolsCorrectly()
     {
-        // 円形カーソル対象ツール
+        // 円形カーソル対象ツール（直線ツールを含む）
         Assert.True(PenCursorHelper.IsCircleCursorTool(EditorToolMode.Pen));
         Assert.True(PenCursorHelper.IsCircleCursorTool(EditorToolMode.Highlighter));
         Assert.True(PenCursorHelper.IsCircleCursorTool(EditorToolMode.EraserPoint));
+        Assert.True(PenCursorHelper.IsCircleCursorTool(EditorToolMode.StraightLine));
+        Assert.True(PenCursorHelper.IsCircleCursorTool(EditorToolMode.Pen, isStraightLine: true));
 
         // 円形カーソル対象外ツール
         Assert.False(PenCursorHelper.IsCircleCursorTool(EditorToolMode.Select));
         Assert.False(PenCursorHelper.IsCircleCursorTool(EditorToolMode.EraserStroke));
-        Assert.False(PenCursorHelper.IsCircleCursorTool(EditorToolMode.StraightLine));
         Assert.False(PenCursorHelper.IsCircleCursorTool(EditorToolMode.Hand));
         Assert.False(PenCursorHelper.IsCircleCursorTool(EditorToolMode.TextSelect));
     }
@@ -33,9 +34,6 @@ public class PenCursorHelperTests
         var cursor = PenCursorHelper.GetCursor(EditorToolMode.Select, Colors.Black, 2.0, 1.0);
         Assert.Null(cursor);
 
-        cursor = PenCursorHelper.GetCursor(EditorToolMode.StraightLine, Colors.Black, 2.0, 1.0);
-        Assert.Null(cursor);
-
         cursor = PenCursorHelper.GetCursor(EditorToolMode.Hand, Colors.Black, 2.0, 1.0);
         Assert.Null(cursor);
     }
@@ -44,6 +42,7 @@ public class PenCursorHelperTests
     [InlineData(EditorToolMode.Pen)]
     [InlineData(EditorToolMode.Highlighter)]
     [InlineData(EditorToolMode.EraserPoint)]
+    [InlineData(EditorToolMode.StraightLine)]
     public void GetCursor_CircleTools_ReturnsNonNullCursor(EditorToolMode tool)
     {
         var cursor = PenCursorHelper.GetCursor(tool, Colors.Blue, 3.0, 1.5);
@@ -174,7 +173,20 @@ public class PenCursorHelperTests
     }
 
     [Fact]
-    public void EditorInkCanvas_StraightLineMode_KeepsCrossCursor()
+    public void GetCursor_StraightLine_ReturnsRulerCursorDifferentFromNormal()
+    {
+        PenCursorHelper.ClearCache();
+
+        var normalCursor = PenCursorHelper.GetCursor(EditorToolMode.Pen, Colors.Red, 4.0, 1.0, isStraightLine: false);
+        var straightCursor = PenCursorHelper.GetCursor(EditorToolMode.Pen, Colors.Red, 4.0, 1.0, isStraightLine: true);
+
+        Assert.NotNull(normalCursor);
+        Assert.NotNull(straightCursor);
+        Assert.NotSame(normalCursor, straightCursor);
+    }
+
+    [Fact]
+    public void EditorInkCanvas_StraightLineMode_UsesRulerCursor()
     {
         RunOnStaThread(() =>
         {
@@ -186,8 +198,108 @@ public class PenCursorHelperTests
                 Zoom = 2.0
             };
 
-            // 直線トグル有効時は十字カーソルであること
-            Assert.Equal(Cursors.Cross, canvas.Cursor);
+            // 直線トグル有効時は十字カーソルではなく、定規アイコン付きプレビューカーソルであること
+            Assert.NotNull(canvas.Cursor);
+            Assert.NotEqual(Cursors.Cross, canvas.Cursor);
+
+            // 直線OFF時は通常のプレビューカーソルに切り替わること
+            canvas.IsStraightLine = false;
+            Assert.NotNull(canvas.Cursor);
+            Assert.NotEqual(Cursors.Cross, canvas.Cursor);
+        });
+    }
+
+    [Fact]
+    public void DrawRulerBadge_RendersExpectedPixels()
+    {
+        int size = 32;
+        byte[] pixels = new byte[size * size * 4];
+
+        // (10, 5) に定規バッジを描画
+        PenCursorHelper.DrawRulerBadge(pixels, size, 10, 5);
+
+        // バッジ領域内に不透明ピクセル（白フチ・目盛り・スレート本体）が描画されたことを検証
+        bool hasWhitePixel = false;
+        bool hasSlatePixel = false;
+
+        for (int i = 0; i < pixels.Length; i += 4)
+        {
+            byte b = pixels[i];
+            byte g = pixels[i + 1];
+            byte r = pixels[i + 2];
+            byte a = pixels[i + 3];
+
+            if (a == 255 && r == 255 && g == 255 && b == 255)
+            {
+                hasWhitePixel = true;
+            }
+            if (a == 255 && r == 30 && g == 41 && b == 59)
+            {
+                hasSlatePixel = true;
+            }
+        }
+
+        Assert.True(hasWhitePixel, "定規バッジの白フチ/目盛りピクセルが存在すること");
+        Assert.True(hasSlatePixel, "定規バッジの本体ピクセルが存在すること");
+    }
+
+    [Theory]
+    [InlineData(3.0, false)]
+    [InlineData(10.0, false)]
+    [InlineData(50.0, true)]
+    [InlineData(128.0, false)]
+    public void CreateStraightLineCursor_ProducesValidCursor_ForVariousSizes(double diameter, bool isHighlighter)
+    {
+        var cursor = PenCursorHelper.CreateStraightLineCursor(diameter, Colors.Blue, isHighlighter);
+        Assert.NotNull(cursor);
+    }
+
+    [Fact]
+    public void EditorInkCanvas_StraightLineMode_Highlighter_UsesRulerCursor()
+    {
+        RunOnStaThread(() =>
+        {
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Highlighter,
+                IsStraightLine = true,
+                StrokeThickness = 8.0,
+                Zoom = 1.0
+            };
+
+            Assert.NotNull(canvas.Cursor);
+            Assert.NotEqual(Cursors.Cross, canvas.Cursor);
+        });
+    }
+
+    [Fact]
+    public void EditorInkCanvas_StraightLineMode_ColorAndThicknessChanges_UpdatesCursor()
+    {
+        RunOnStaThread(() =>
+        {
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                StrokeThickness = 4.0,
+                DrawingColor = Colors.Black,
+                Zoom = 1.0
+            };
+
+            var cursor1 = canvas.Cursor;
+            Assert.NotNull(cursor1);
+
+            // 太さ変更
+            canvas.StrokeThickness = 10.0;
+            var cursor2 = canvas.Cursor;
+            Assert.NotNull(cursor2);
+            Assert.NotSame(cursor1, cursor2);
+
+            // 色変更
+            canvas.DrawingColor = Colors.Red;
+            var cursor3 = canvas.Cursor;
+            Assert.NotNull(cursor3);
+            Assert.NotSame(cursor2, cursor3);
         });
     }
 

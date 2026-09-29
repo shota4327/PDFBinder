@@ -152,16 +152,18 @@ public class DetailEditorStraightLineTests
                 Assert.NotEqual(Cursors.Cross, canvas.Cursor);
                 Assert.False(canvas.IsStraightLineActive);
 
-                // 通常ペン（直線オン）: Noneモード & 十字カーソル
+                // 通常ペン（直線オン）: Noneモード & 定規付きプレビューカーソル（十字以外）
                 canvas.IsStraightLine = true;
                 Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
-                Assert.Equal(Cursors.Cross, canvas.Cursor);
+                Assert.NotNull(canvas.Cursor);
+                Assert.NotEqual(Cursors.Cross, canvas.Cursor);
                 Assert.True(canvas.IsStraightLineActive);
 
-                // 蛍光ペン（直線オン）: Noneモード & 十字カーソル & IsHighlighter=false（Issue #108: 半透明Alpha=120で重なり順を保持）
+                // 蛍光ペン（直線オン）: Noneモード & 定規付きプレビューカーソル（十字以外） & IsHighlighter=false（Issue #108: 半透明Alpha=120で重なり順を保持）
                 canvas.ToolMode = EditorToolMode.Highlighter;
                 Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
-                Assert.Equal(Cursors.Cross, canvas.Cursor);
+                Assert.NotNull(canvas.Cursor);
+                Assert.NotEqual(Cursors.Cross, canvas.Cursor);
                 Assert.False(canvas.DefaultDrawingAttributes.IsHighlighter);
                 Assert.Equal(120, canvas.DefaultDrawingAttributes.Color.A);
                 Assert.True(canvas.IsStraightLineActive);

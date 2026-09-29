@@ -21,12 +21,14 @@ public static class PenCursorHelper
     private static readonly ConcurrentDictionary<string, Cursor> CursorCache = new();
 
     /// <summary>
-    /// 指定されたツール・描画色・太さ・ズーム倍率に応じたカーソルを取得します。
+    /// 指定されたツール・描画色・太さ・ズーム倍率・直線モード設定に応じたカーソルを取得します。
     /// 円形カーソル対象外ツールの場合は null を返します。
     /// </summary>
-    public static Cursor? GetCursor(EditorToolMode toolMode, Color color, double strokeThickness, double zoom)
+    public static Cursor? GetCursor(
+        EditorToolMode toolMode, Color color, double strokeThickness, double zoom, bool isStraightLine = false)
     {
-        if (!IsCircleCursorTool(toolMode))
+        bool isStraight = isStraightLine || toolMode == EditorToolMode.StraightLine;
+        if (!IsCircleCursorTool(toolMode, isStraight))
         {
             return null;
         }
@@ -35,15 +37,16 @@ public static class PenCursorHelper
         double clampedDiameter = Math.Clamp(scaledDiameter, MinCursorSize, MaxCursorSize);
         int roundedDiameterHalfPx = (int)Math.Round(clampedDiameter * 2.0);
 
-        string cacheKey = $"{toolMode}_{color.A}_{color.R}_{color.G}_{color.B}_{roundedDiameterHalfPx}";
-        return CursorCache.GetOrAdd(cacheKey, _ => CreateCursor(toolMode, color, clampedDiameter));
+        string cacheKey = $"{toolMode}_{color.A}_{color.R}_{color.G}_{color.B}_{roundedDiameterHalfPx}_{(isStraight ? "SL" : "NORM")}";
+        return CursorCache.GetOrAdd(cacheKey, _ => CreateCursor(toolMode, color, clampedDiameter, isStraight));
     }
 
     /// <summary>
     /// 対象ツールが円形プレビューカーソルを適用するツールであるかを判定します。
     /// </summary>
-    public static bool IsCircleCursorTool(EditorToolMode toolMode) =>
-        toolMode is EditorToolMode.Pen or EditorToolMode.Highlighter or EditorToolMode.EraserPoint;
+    public static bool IsCircleCursorTool(EditorToolMode toolMode, bool isStraightLine = false) =>
+        toolMode is EditorToolMode.Pen or EditorToolMode.Highlighter or EditorToolMode.EraserPoint or EditorToolMode.StraightLine
+        || (isStraightLine && toolMode is EditorToolMode.Pen or EditorToolMode.Highlighter);
 
     /// <summary>キャッシュされたWPF標準ストローク消しゴム形状カーソル</summary>
     private static Cursor? _strokeEraserCursor;
@@ -82,20 +85,26 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// ツール種別に応じた円形カーソルを生成します。
+    /// ツール種別および直線モード設定に応じた円形カーソルを生成します。
     /// </summary>
-    private static Cursor CreateCursor(EditorToolMode toolMode, Color color, double diameter)
+    private static Cursor CreateCursor(EditorToolMode toolMode, Color color, double diameter, bool isStraightLine)
     {
         bool isHollow = toolMode == EditorToolMode.EraserPoint;
         bool isHighlighter = toolMode == EditorToolMode.Highlighter;
-        return CreateCircleCursor(diameter, color, isHollow, isHighlighter);
+        return CreateCircleCursor(diameter, color, isHollow, isHighlighter, isStraightLine);
     }
 
     /// <summary>
     /// 直径・色・塗りつぶし設定から32-bit ARGB DIBカーソルストリームを構築し、WPF Cursorを生成します。
     /// </summary>
-    public static Cursor CreateCircleCursor(double diameter, Color color, bool isHollow, bool isHighlighter)
+    public static Cursor CreateCircleCursor(
+        double diameter, Color color, bool isHollow, bool isHighlighter, bool isStraightLine = false)
     {
+        if (isStraightLine)
+        {
+            return CreateStraightLineCursor(diameter, color, isHighlighter);
+        }
+
         int size = Math.Max((int)Math.Ceiling(diameter) + 4, 6);
         int hotspot = size / 2;
 
@@ -104,6 +113,113 @@ public static class PenCursorHelper
 
         using var stream = new MemoryStream(curBytes);
         return new Cursor(stream);
+    }
+
+    /// <summary>
+    /// 直線モード用の定規アイコン付き円形プレビューカーソルを生成します。
+    /// </summary>
+    public static Cursor CreateStraightLineCursor(double diameter, Color color, bool isHighlighter)
+    {
+        const int badgeSize = 16;
+        const double margin = 3.0;
+
+        double radius = diameter / 2.0;
+        double offset = (radius + margin) * 0.7071;
+
+        int needed = (int)Math.Ceiling(Math.Max(radius, offset + badgeSize)) + 2;
+        int hotspot = Math.Max(needed, 6);
+        int size = hotspot * 2;
+
+        byte[] bgraPixels = RenderCirclePixels(size, hotspot, diameter, color, isHollow: false, isHighlighter: isHighlighter);
+
+        int badgeLeft = (int)Math.Round(hotspot + 0.5 + offset);
+        int badgeTop = (int)Math.Round(hotspot + 0.5 - offset - badgeSize);
+
+        DrawRulerBadge(bgraPixels, size, badgeLeft, badgeTop);
+
+        byte[] curBytes = BuildCurBytes(size, size, hotspot, hotspot, bgraPixels);
+        using var stream = new MemoryStream(curBytes);
+        return new Cursor(stream);
+    }
+
+    /// <summary>
+    /// 定規バッジ（16x16）のピクセルパターン定義
+    /// '.' = 透過, 'W' = 白フチ・目盛り, 'D' = 定規本体（濃色）, 'B' = 外側輪郭（黒色シャドウ）
+    /// </summary>
+    private static readonly string[] RulerBadgePattern =
+    [
+        "..........BBB...",
+        ".........BWWWB..",
+        "........BWWWDB..",
+        ".......BWDDDB...",
+        ".......BWDDDB...",
+        "......BWWWDB....",
+        ".....BWDDDB.....",
+        ".....BWDDDB.....",
+        "....BWWWDB......",
+        "...BWDDDB.......",
+        "...BWDDDB.......",
+        "..BWWWDB........",
+        ".BWDDDB.........",
+        ".BWWWB..........",
+        "BBB.............",
+        "................"
+    ];
+
+    /// <summary>
+    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します。
+    /// </summary>
+    internal static void DrawRulerBadge(byte[] pixels, int canvasSize, int startX, int startY)
+    {
+        for (int r = 0; r < RulerBadgePattern.Length; r++)
+        {
+            int screenY = startY + r;
+            if (screenY < 0 || screenY >= canvasSize) continue;
+
+            int dibRow = canvasSize - 1 - screenY;
+            int rowOffset = dibRow * canvasSize * 4;
+            string rowStr = RulerBadgePattern[r];
+
+            for (int c = 0; c < rowStr.Length; c++)
+            {
+                int screenX = startX + c;
+                if (screenX < 0 || screenX >= canvasSize) continue;
+
+                char ch = rowStr[c];
+                if (ch == '.') continue;
+
+                int pixelOffset = rowOffset + screenX * 4;
+                ApplyBadgePixel(pixels, pixelOffset, ch);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 定規バッジパターンの文字に応じたピクセル色（BGRA）を適用します。
+    /// </summary>
+    private static void ApplyBadgePixel(byte[] pixels, int pixelOffset, char patternChar)
+    {
+        switch (patternChar)
+        {
+            case 'W': // 白フチ・目盛り
+                pixels[pixelOffset + 0] = 255;
+                pixels[pixelOffset + 1] = 255;
+                pixels[pixelOffset + 2] = 255;
+                pixels[pixelOffset + 3] = 255;
+                break;
+            case 'D': // 定規本体（濃いスレート: #1E293B）
+                pixels[pixelOffset + 0] = 59;
+                pixels[pixelOffset + 1] = 41;
+                pixels[pixelOffset + 2] = 30;
+                pixels[pixelOffset + 3] = 255;
+                break;
+            case 'B': // 外側アウトライン（75%半透明黒）
+                pixels[pixelOffset + 0] = 0;
+                pixels[pixelOffset + 1] = 0;
+                pixels[pixelOffset + 2] = 0;
+                pixels[pixelOffset + 3] = 192;
+                break;
+        }
     }
 
     /// <summary>
