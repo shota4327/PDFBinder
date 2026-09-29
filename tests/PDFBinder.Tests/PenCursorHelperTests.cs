@@ -288,16 +288,16 @@ public class PenCursorHelperTests
     [Theory]
     [InlineData(3.0, 7.0)]
     [InlineData(6.0, 7.0)]
-    [InlineData(12.0, 12.0)]
-    [InlineData(24.0, 24.0)]
+    [InlineData(12.0, 8.0)]
+    [InlineData(24.0, 16.0)]
+    [InlineData(48.0, 32.0)]
     public void CreateStraightLineCursor_ScalesLineLengthWithDiameter(double diameter, double expectedLineLen)
     {
-        // プレビュー円の長さ（直径）より短くならないよう、Math.Max(7.0, diameter) で伸長されることを検証
+        // プレビュー円の2/3倍（最低長7.0px保証）で伸長されることを検証
         const double minLineLen = 7.0;
-        double actualLineLen = Math.Max(minLineLen, diameter);
-        Assert.Equal(expectedLineLen, actualLineLen);
+        double actualLineLen = Math.Max(minLineLen, diameter * (2.0 / 3.0));
+        Assert.Equal(expectedLineLen, actualLineLen, 1);
         Assert.True(actualLineLen >= minLineLen);
-        Assert.True(actualLineLen >= diameter);
 
         // カーソルが正常に生成されること
         var cursor = PenCursorHelper.CreateStraightLineCursor(diameter, Colors.Black, isHighlighter: false);

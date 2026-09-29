@@ -124,7 +124,7 @@ public static class PenCursorHelper
         const double minLineLen = 7.0;
         const double lineThickness = 2.0;
 
-        double lineLen = Math.Max(minLineLen, diameter);
+        double lineLen = Math.Max(minLineLen, diameter * (2.0 / 3.0));
         double radius = diameter / 2.0;
         int needed = (int)Math.Ceiling(radius + gap + lineLen) + 2;
         int hotspot = Math.Clamp(needed, 6, 128);
