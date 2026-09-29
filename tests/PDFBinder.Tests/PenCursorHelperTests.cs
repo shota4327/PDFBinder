@@ -210,37 +210,72 @@ public class PenCursorHelperTests
     }
 
     [Fact]
-    public void DrawRulerBadge_RendersExpectedPixels()
+    public void DrawCrosshairLines_RendersExpectedPixels()
     {
         int size = 64;
+        int hotspot = 32;
+        double radius = 10.0;
+        double gap = 3.5;
+        double lineLen = 7.0;
         byte[] pixels = new byte[size * size * 4];
 
-        // (10, 5) に定規バッジを描画（24x24px）
-        PenCursorHelper.DrawRulerBadge(pixels, size, 10, 5);
+        // 十字線を描画
+        PenCursorHelper.DrawCrosshairLines(pixels, size, hotspot, radius, gap, lineLen);
 
-        // バッジ領域内に不透明ピクセル（白フチ・目盛り・スレート本体）が描画されたことを検証
-        bool hasWhitePixel = false;
-        bool hasSlatePixel = false;
+        // 上下左右の4方向に黒色ピクセルが存在することを検証
+        bool hasTopBlack = false;
+        bool hasBottomBlack = false;
+        bool hasLeftBlack = false;
+        bool hasRightBlack = false;
 
-        for (int i = 0; i < pixels.Length; i += 4)
+        // 上方向のピクセルチェック
+        for (int y = 12; y <= 18; y++)
         {
-            byte b = pixels[i];
-            byte g = pixels[i + 1];
-            byte r = pixels[i + 2];
-            byte a = pixels[i + 3];
-
-            if (a == 255 && r == 255 && g == 255 && b == 255)
+            int dibRow = size - 1 - y;
+            int offset = (dibRow * size + hotspot) * 4;
+            if (pixels[offset + 3] > 0 && pixels[offset] == 0 && pixels[offset + 1] == 0 && pixels[offset + 2] == 0)
             {
-                hasWhitePixel = true;
-            }
-            if (a == 255 && r == 30 && g == 41 && b == 59)
-            {
-                hasSlatePixel = true;
+                hasTopBlack = true;
             }
         }
 
-        Assert.True(hasWhitePixel, "定規バッジの白フチ/目盛りピクセルが存在すること");
-        Assert.True(hasSlatePixel, "定規バッジの本体ピクセルが存在すること");
+        // 下方向のピクセルチェック
+        for (int y = 47; y <= 53; y++)
+        {
+            int dibRow = size - 1 - y;
+            int offset = (dibRow * size + hotspot) * 4;
+            if (pixels[offset + 3] > 0 && pixels[offset] == 0 && pixels[offset + 1] == 0 && pixels[offset + 2] == 0)
+            {
+                hasBottomBlack = true;
+            }
+        }
+
+        // 左方向のピクセルチェック
+        for (int x = 12; x <= 18; x++)
+        {
+            int dibRow = size - 1 - hotspot;
+            int offset = (dibRow * size + x) * 4;
+            if (pixels[offset + 3] > 0 && pixels[offset] == 0 && pixels[offset + 1] == 0 && pixels[offset + 2] == 0)
+            {
+                hasLeftBlack = true;
+            }
+        }
+
+        // 右方向のピクセルチェック
+        for (int x = 47; x <= 53; x++)
+        {
+            int dibRow = size - 1 - hotspot;
+            int offset = (dibRow * size + x) * 4;
+            if (pixels[offset + 3] > 0 && pixels[offset] == 0 && pixels[offset + 1] == 0 && pixels[offset + 2] == 0)
+            {
+                hasRightBlack = true;
+            }
+        }
+
+        Assert.True(hasTopBlack, "上方向に黒色十字線が存在すること");
+        Assert.True(hasBottomBlack, "下方向に黒色十字線が存在すること");
+        Assert.True(hasLeftBlack, "左方向に黒色十字線が存在すること");
+        Assert.True(hasRightBlack, "右方向に黒色十字線が存在すること");
     }
 
     [Theory]

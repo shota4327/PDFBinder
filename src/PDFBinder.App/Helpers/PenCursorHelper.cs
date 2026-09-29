@@ -120,22 +120,18 @@ public static class PenCursorHelper
     /// </summary>
     public static Cursor CreateStraightLineCursor(double diameter, Color color, bool isHighlighter)
     {
-        const int badgeSize = 24;
-        const double margin = 3.0;
+        const double gap = 3.5;
+        const double lineLen = 7.0;
+        const double lineThickness = 1.0;
 
         double radius = diameter / 2.0;
-        double offset = (radius + margin) * 0.7071;
-
-        int needed = (int)Math.Ceiling(Math.Max(radius, offset + badgeSize)) + 2;
+        int needed = (int)Math.Ceiling(radius + gap + lineLen) + 2;
         int hotspot = Math.Max(needed, 6);
         int size = hotspot * 2;
 
         byte[] bgraPixels = RenderCirclePixels(size, hotspot, diameter, color, isHollow: false, isHighlighter: isHighlighter);
 
-        int badgeLeft = (int)Math.Round(hotspot + 0.5 + offset);
-        int badgeTop = (int)Math.Round(hotspot + 0.5 - offset - badgeSize);
-
-        DrawRulerBadge(bgraPixels, size, badgeLeft, badgeTop);
+        DrawCrosshairLines(bgraPixels, size, hotspot, radius, gap, lineLen, lineThickness);
 
         byte[] curBytes = BuildCurBytes(size, size, hotspot, hotspot, bgraPixels);
         using var stream = new MemoryStream(curBytes);
@@ -143,119 +139,86 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（24x24px、4x4スーパーサンプリング）。
+    /// 直線モード用の十字線（クロスヘア）を円形プレビューの上下左右に描画します。
     /// </summary>
-    internal static void DrawRulerBadge(byte[] pixels, int canvasSize, int startX, int startY)
+    internal static void DrawCrosshairLines(
+        byte[] pixels, int canvasSize, int hotspot, double radius, double gap, double lineLen, double thickness = 1.0)
     {
-        const int badgeSize = 24;
-        for (int y = 0; y < badgeSize; y++)
+        double cx = hotspot + 0.5;
+        double cy = hotspot + 0.5;
+        double halfThick = thickness / 2.0;
+
+        // 上
+        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy - radius - gap - lineLen, cy - radius - gap);
+        // 下
+        DrawLineRect(pixels, canvasSize, cx - halfThick, cx + halfThick, cy + radius + gap, cy + radius + gap + lineLen);
+        // 左
+        DrawLineRect(pixels, canvasSize, cx - radius - gap - lineLen, cx - radius - gap, cy - halfThick, cy + halfThick);
+        // 右
+        DrawLineRect(pixels, canvasSize, cx + radius + gap, cx + radius + gap + lineLen, cy - halfThick, cy + halfThick);
+    }
+
+    /// <summary>
+    /// 指定された矩形範囲を黒色の直線として描画（サブピクセルカバレッジ計算によるアンチエイリアス）します。
+    /// </summary>
+    private static void DrawLineRect(
+        byte[] pixels, int canvasSize, double minX, double maxX, double minY, double maxY)
+    {
+        int xStart = Math.Max(0, (int)Math.Floor(minX));
+        int xEnd = Math.Min(canvasSize - 1, (int)Math.Ceiling(maxX));
+        int yStart = Math.Max(0, (int)Math.Floor(minY));
+        int yEnd = Math.Min(canvasSize - 1, (int)Math.Ceiling(maxY));
+
+        for (int y = yStart; y <= yEnd; y++)
         {
-            for (int x = 0; x < badgeSize; x++)
+            double py0 = y;
+            double py1 = y + 1.0;
+            double yOverlap = Math.Max(0.0, Math.Min(py1, maxY) - Math.Max(py0, minY));
+            if (yOverlap <= 0.0) continue;
+
+            int dibRow = canvasSize - 1 - y;
+            int rowOffset = dibRow * canvasSize * 4;
+
+            for (int x = xStart; x <= xEnd; x++)
             {
-                RenderBadgePixel(pixels, canvasSize, startX + x, startY + y, x, y);
+                double px0 = x;
+                double px1 = x + 1.0;
+                double xOverlap = Math.Max(0.0, Math.Min(px1, maxX) - Math.Max(px0, minX));
+                if (xOverlap <= 0.0) continue;
+
+                double coverage = xOverlap * yOverlap;
+                if (coverage > 0.0)
+                {
+                    int pixelOffset = rowOffset + x * 4;
+                    ApplyBlackLinePixel(pixels, pixelOffset, coverage);
+                }
             }
         }
     }
 
     /// <summary>
-    /// 4x4スーパーサンプリング（16サンプル）により単一ピクセルのアンチエイリアス色を計算し、下地へブレンド描画します。
+    /// 黒色ラインのピクセルを下地へアルファ合成します。
     /// </summary>
-    private static void RenderBadgePixel(byte[] pixels, int canvasSize, int screenX, int screenY, int bx, int by)
+    private static void ApplyBlackLinePixel(byte[] pixels, int pixelOffset, double coverage)
     {
-        if (screenX < 0 || screenX >= canvasSize || screenY < 0 || screenY >= canvasSize) return;
+        byte alpha = (byte)Math.Clamp(Math.Round(255.0 * coverage), 0, 255);
+        if (alpha == 0) return;
 
-        double sumR = 0, sumG = 0, sumB = 0, sumA = 0;
-        for (int sy = 0; sy < 4; sy++)
-        {
-            double v = by + (sy + 0.5) / 4.0;
-            for (int sx = 0; sx < 4; sx++)
-            {
-                double u = bx + (sx + 0.5) / 4.0;
-                SampleRulerColor(u, v, out byte sr, out byte sg, out byte sb, out byte sa);
-                sumR += sr * (sa / 255.0);
-                sumG += sg * (sa / 255.0);
-                sumB += sb * (sa / 255.0);
-                sumA += sa;
-            }
-        }
+        double sA = alpha / 255.0;
+        double dA = pixels[pixelOffset + 3] / 255.0;
+        double outA = sA + dA * (1.0 - sA);
 
-        if (sumA <= 0.0) return;
+        if (outA <= 0.0) return;
 
-        double avgA = sumA / 16.0;
-        byte finalA = (byte)Math.Clamp(Math.Round(avgA), 0, 255);
-        byte finalR = (byte)Math.Clamp(Math.Round(sumR / (sumA / 255.0)), 0, 255);
-        byte finalG = (byte)Math.Clamp(Math.Round(sumG / (sumA / 255.0)), 0, 255);
-        byte finalB = (byte)Math.Clamp(Math.Round(sumB / (sumA / 255.0)), 0, 255);
+        // 黒色（R=0, G=0, B=0）
+        double outB = (0.0 + pixels[pixelOffset + 0] * dA * (1.0 - sA)) / outA;
+        double outG = (0.0 + pixels[pixelOffset + 1] * dA * (1.0 - sA)) / outA;
+        double outR = (0.0 + pixels[pixelOffset + 2] * dA * (1.0 - sA)) / outA;
 
-        int dibRow = canvasSize - 1 - screenY;
-        int pixelOffset = (dibRow * canvasSize + screenX) * 4;
-        BlendBadgePixel(pixels, pixelOffset, finalR, finalG, finalB, finalA);
-    }
-
-    /// <summary>
-    /// サブピクセル座標における水平定規の色（SDF：符号付き距離関数に基づく輪郭・白フチ・目盛り・本体）をサンプリングします。
-    /// </summary>
-    private static void SampleRulerColor(double u, double v, out byte r, out byte g, out byte b, out byte a)
-    {
-        const double x0 = 11.5;
-        const double y0 = 11.5;
-        const double wHalf = 9.5; // 水平方向の半幅（全長 19px）
-        const double hHalf = 4.2; // 垂直方向の半高（全高 8.4px）
-        const double cornerRadius = 1.5;
-
-        double qx = Math.Max(Math.Abs(u - x0) - (wHalf - cornerRadius), 0.0);
-        double qy = Math.Max(Math.Abs(v - y0) - (hHalf - cornerRadius), 0.0);
-        double dOut = Math.Sqrt(qx * qx + qy * qy) - cornerRadius;
-        double dIn = Math.Min(Math.Max(Math.Abs(u - x0) - wHalf, Math.Abs(v - y0) - hHalf), 0.0);
-        double sdf = dOut > 0 ? dOut : dIn;
-
-        if (sdf > 1.2)
-        {
-            r = g = b = a = 0;
-            return;
-        }
-
-        if (sdf > 0.0)
-        {
-            r = g = b = 0;
-            a = (byte)Math.Clamp(Math.Round(180.0 * (1.0 - (sdf / 1.2))), 0, 180);
-            return;
-        }
-
-        if (sdf > -1.0 || IsOnTickMark(u, v, y0, hHalf))
-        {
-            r = g = b = a = 255; // 白フチ・目盛り
-            return;
-        }
-
-        // 定規本体（スレートダーク: #1E293B）
-        r = 30;
-        g = 41;
-        b = 59;
-        a = 255;
-    }
-
-    /// <summary>
-    /// 指定された座標が水平定規の目盛り位置上にあるかを判定します。
-    /// </summary>
-    private static bool IsOnTickMark(double u, double v, double y0, double hHalf)
-    {
-        double topEdge = y0 - hHalf;
-        double depth = v - topEdge;
-
-        double tickIndex = Math.Round((u - 11.5) / 2.0);
-        double tickX = 11.5 + tickIndex * 2.0;
-
-        if (Math.Abs(tickIndex) > 4.0)
-        {
-            return false;
-        }
-
-        double distToTick = Math.Abs(u - tickX);
-        bool isMajor = Math.Abs(tickIndex % 2.0) < 0.1;
-        double maxDepth = isMajor ? 4.0 : 2.5;
-
-        return distToTick <= 0.55 && depth >= 0.0 && depth <= maxDepth;
+        pixels[pixelOffset + 0] = (byte)Math.Clamp(Math.Round(outB), 0, 255);
+        pixels[pixelOffset + 1] = (byte)Math.Clamp(Math.Round(outG), 0, 255);
+        pixels[pixelOffset + 2] = (byte)Math.Clamp(Math.Round(outR), 0, 255);
+        pixels[pixelOffset + 3] = (byte)Math.Clamp(Math.Round(outA * 255.0), 0, 255);
     }
 
     /// <summary>
