@@ -194,6 +194,11 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public const int ThumbnailRenderHeight = 1008;
 
+    /// <summary>
+    /// 詳細エディタ表示中に先行生成するサムネイルの前後ページ半径（前後10ページ）
+    /// </summary>
+    public const int DetailViewThumbnailWindowRadius = 10;
+
     [ObservableProperty]
     private double _thumbnailSize = DefaultThumbnailSize;
 
@@ -247,6 +252,9 @@ public partial class MainViewModel : ObservableObject
             {
                 DetailEditor.ApplyFitMode();
             }
+
+            // 詳細ビューへ切り替わった場合、現在ページの前後10ページのサムネイル生成をスケジュール
+            _ = ScheduleDetailViewThumbnailsAsync();
         }
 
         OnPropertyChanged(nameof(CurrentZoomText));
@@ -544,6 +552,10 @@ public partial class MainViewModel : ObservableObject
         else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPageNumber))
         {
             OnPropertyChanged(nameof(CurrentPageNumber));
+            if (IsDetailViewActive)
+            {
+                _ = ScheduleDetailViewThumbnailsAsync();
+            }
         }
     }
 
@@ -588,6 +600,11 @@ public partial class MainViewModel : ObservableObject
                     DetailEditor.Zoom = newValue.ZoomFactor;
                 }
                 DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+            }
+
+            if (IsDetailViewActive)
+            {
+                _ = ScheduleDetailViewThumbnailsAsync();
             }
         }
         else
@@ -1063,12 +1080,13 @@ public partial class MainViewModel : ObservableObject
                 if (!IsDetailViewActive)
                 {
                     MarkDetailEditorDirty();
+                    _ = EnsureThumbnailsGeneratedAsync();
                 }
                 else
                 {
                     DetailEditor?.InitializeDocument(targetDoc);
+                    _ = ScheduleDetailViewThumbnailsAsync();
                 }
-                _ = EnsureThumbnailsGeneratedAsync();
             }
             StatusMessage = $"{pdfFiles.Count} 件のファイルから {pagesToInsert.Count} ページを挿入しました。";
             if (ActiveSession == targetSession)
@@ -1394,6 +1412,7 @@ public partial class MainViewModel : ObservableObject
             {
                 DetailEditor?.OnPageDimensionsChanged();
                 _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+                _ = ScheduleDetailViewThumbnailsAsync();
             }
             StatusMessage = $"{targets.Count} ページを回転しました。";
         }
@@ -1761,6 +1780,126 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 詳細エディタでの現在ページを中心とした前後10ページのサムネイル生成対象（距離優先順）を取得します。
+    /// </summary>
+    /// <param name="currentIndex">現在表示中のページインデックス（0始まり）</param>
+    /// <returns>現在ページから近い順（0, +1, -1, +2, -2...）で未生成またはダーティなページリスト</returns>
+    public List<PdfPageModel> GetDetailViewTargetPages(int currentIndex)
+    {
+        var targets = new List<PdfPageModel>();
+        if (Document.Pages.Count == 0) return targets;
+
+        int clampedIndex = Math.Clamp(currentIndex, 0, Document.Pages.Count - 1);
+
+        for (int distance = 0; distance <= DetailViewThumbnailWindowRadius; distance++)
+        {
+            // 前方（+distance）
+            int nextIdx = clampedIndex + distance;
+            if (nextIdx < Document.Pages.Count)
+            {
+                var page = Document.Pages[nextIdx];
+                if (page.Thumbnail == null || page.IsThumbnailDirty)
+                {
+                    targets.Add(page);
+                }
+            }
+
+            // 後方（-distance）: distance == 0 のときは重複するためスキップ
+            if (distance > 0)
+            {
+                int prevIdx = clampedIndex - distance;
+                if (prevIdx >= 0)
+                {
+                    var page = Document.Pages[prevIdx];
+                    if (page.Thumbnail == null || page.IsThumbnailDirty)
+                    {
+                        targets.Add(page);
+                    }
+                }
+            }
+        }
+
+        return targets;
+    }
+
+    /// <summary>
+    /// 詳細エディタ表示中に、現在ページの前後10ページのサムネイルを距離優先順でバックグラウンド生成します。
+    /// </summary>
+    /// <param name="debounceMs">デバウンス待機時間（ミリ秒）</param>
+    public Task ScheduleDetailViewThumbnailsAsync(int debounceMs = 250)
+    {
+        if (!IsDetailViewActive || Document.Pages.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var oldCts = _thumbnailCts;
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 既に破棄されている場合は無視
+        }
+
+        var newCts = new CancellationTokenSource();
+        _thumbnailCts = newCts;
+
+        var task = RunDetailViewThumbnailsAsync(newCts, debounceMs);
+        _thumbnailTask = task;
+        return task;
+    }
+
+    /// <summary>
+    /// 詳細エディタ表示中用のサムネイル生成ループを実行します（UIに干渉しないサイレント実行）。
+    /// </summary>
+    private async Task RunDetailViewThumbnailsAsync(CancellationTokenSource cts, int debounceMs)
+    {
+        var token = cts.Token;
+        try
+        {
+            if (debounceMs > 0)
+            {
+                await Task.Delay(debounceMs, token);
+            }
+
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive || Document.Pages.Count == 0) return;
+
+            int currentIdx = DetailEditor?.CurrentPageIndex ?? 0;
+            var targets = GetDetailViewTargetPages(currentIdx);
+            if (targets.Count == 0) return;
+
+            foreach (var page in targets)
+            {
+                if (token.IsCancellationRequested || !IsDetailViewActive)
+                {
+                    break;
+                }
+
+                await UpdatePageThumbnailAsync(page, token);
+                page.IsThumbnailDirty = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 中断時はその時点で静かに終了
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"詳細エディタサムネイル生成エラー: {ex.Message}");
+        }
+        finally
+        {
+            if (ReferenceEquals(_thumbnailCts, cts))
+            {
+                _thumbnailTask = null;
+            }
+        }
+    }
+
     [RelayCommand]
     public void Undo()
     {
@@ -1775,6 +1914,7 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+            _ = ScheduleDetailViewThumbnailsAsync();
         }
         StatusMessage = "操作を取り消しました。";
     }
@@ -1793,6 +1933,7 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
+            _ = ScheduleDetailViewThumbnailsAsync();
         }
         StatusMessage = "操作をやり直しました。";
     }
