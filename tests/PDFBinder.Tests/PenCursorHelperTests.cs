@@ -215,7 +215,7 @@ public class PenCursorHelperTests
         int size = 64;
         byte[] pixels = new byte[size * size * 4];
 
-        // (10, 5) に定規バッジを描画（32x32px）
+        // (10, 5) に定規バッジを描画（24x24px）
         PenCursorHelper.DrawRulerBadge(pixels, size, 10, 5);
 
         // バッジ領域内に不透明ピクセル（白フチ・目盛り・スレート本体）が描画されたことを検証

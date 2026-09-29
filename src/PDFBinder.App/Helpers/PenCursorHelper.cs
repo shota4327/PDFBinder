@@ -120,7 +120,7 @@ public static class PenCursorHelper
     /// </summary>
     public static Cursor CreateStraightLineCursor(double diameter, Color color, bool isHighlighter)
     {
-        const int badgeSize = 32;
+        const int badgeSize = 24;
         const double margin = 3.0;
 
         double radius = diameter / 2.0;
@@ -143,11 +143,11 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（32x32px、4x4スーパーサンプリング）。
+    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（24x24px、4x4スーパーサンプリング）。
     /// </summary>
     internal static void DrawRulerBadge(byte[] pixels, int canvasSize, int startX, int startY)
     {
-        const int badgeSize = 32;
+        const int badgeSize = 24;
         for (int y = 0; y < badgeSize; y++)
         {
             for (int x = 0; x < badgeSize; x++)
@@ -197,14 +197,14 @@ public static class PenCursorHelper
     /// </summary>
     private static void SampleRulerColor(double u, double v, out byte r, out byte g, out byte b, out byte a)
     {
-        double du = u - 15.5;
-        double dv = v - 15.5;
+        double du = u - 11.5;
+        double dv = v - 11.5;
         double len = (du - dv) * 0.70710678;
         double perp = (du + dv) * 0.70710678;
 
-        const double lHalf = 13.5;
-        const double wHalf = 4.0;
-        const double cornerRadius = 1.5;
+        const double lHalf = 10.0;
+        const double wHalf = 3.0;
+        const double cornerRadius = 1.2;
 
         double qx = Math.Max(Math.Abs(len) - (lHalf - cornerRadius), 0.0);
         double qy = Math.Max(Math.Abs(perp) - (wHalf - cornerRadius), 0.0);
@@ -212,7 +212,7 @@ public static class PenCursorHelper
         double dIn = Math.Min(Math.Max(Math.Abs(len) - lHalf, Math.Abs(perp) - wHalf), 0.0);
         double sdf = dOut > 0 ? dOut : dIn;
 
-        if (sdf > 1.4)
+        if (sdf > 1.2)
         {
             r = g = b = a = 0;
             return;
@@ -221,11 +221,11 @@ public static class PenCursorHelper
         if (sdf > 0.0)
         {
             r = g = b = 0;
-            a = (byte)Math.Clamp(Math.Round(180.0 * (1.0 - (sdf / 1.4))), 0, 180);
+            a = (byte)Math.Clamp(Math.Round(180.0 * (1.0 - (sdf / 1.2))), 0, 180);
             return;
         }
 
-        if (sdf > -1.2 || IsOnTickMark(len, perp, wHalf))
+        if (sdf > -1.0 || IsOnTickMark(len, perp, wHalf))
         {
             r = g = b = a = 255; // 白フチ・目盛り
             return;
@@ -244,19 +244,19 @@ public static class PenCursorHelper
     private static bool IsOnTickMark(double len, double perp, double wHalf)
     {
         double depth = perp + wHalf;
-        double tickIndex = Math.Round(len / 2.5);
-        double nearestTickLen = tickIndex * 2.5;
+        double tickIndex = Math.Round(len / 2.0);
+        double nearestTickLen = tickIndex * 2.0;
 
-        if (Math.Abs(nearestTickLen) > 10.5)
+        if (Math.Abs(nearestTickLen) > 8.5)
         {
             return false;
         }
 
         double distToTick = Math.Abs(len - nearestTickLen);
         bool isMajor = Math.Abs(tickIndex % 2.0) < 0.1;
-        double maxDepth = isMajor ? 3.5 : 2.2;
+        double maxDepth = isMajor ? 2.5 : 1.6;
 
-        return distToTick <= 0.65 && depth >= 0.0 && depth <= maxDepth;
+        return distToTick <= 0.55 && depth >= 0.0 && depth <= maxDepth;
     }
 
     /// <summary>
