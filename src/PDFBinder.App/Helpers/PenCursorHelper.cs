@@ -143,98 +143,141 @@ public static class PenCursorHelper
     }
 
     /// <summary>
-    /// 定規バッジ（16x16）のピクセルパターン定義
-    /// '.' = 透過, 'W' = 白フチ・目盛り, 'D' = 定規本体（濃色）, 'B' = 外側輪郭（黒色シャドウ）
-    /// </summary>
-    private static readonly string[] RulerBadgePattern =
-    [
-        "..........BBB...",
-        ".........BWWWB..",
-        "........BWWWDB..",
-        ".......BWDDDB...",
-        ".......BWDDDB...",
-        "......BWWWDB....",
-        ".....BWDDDB.....",
-        ".....BWDDDB.....",
-        "....BWWWDB......",
-        "...BWDDDB.......",
-        "...BWDDDB.......",
-        "..BWWWDB........",
-        ".BWDDDB.........",
-        ".BWWWB..........",
-        "BBB.............",
-        "................"
-    ];
-
-    /// <summary>
-    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（2倍拡大: 32x32px）。
+    /// カーソルピクセル配列（32-bit BGRA、ボトムアップ行順）上の指定座標に定規バッジを合成描画します（32x32px、4x4スーパーサンプリング）。
     /// </summary>
     internal static void DrawRulerBadge(byte[] pixels, int canvasSize, int startX, int startY)
     {
-        const int scale = 2;
-        for (int r = 0; r < RulerBadgePattern.Length; r++)
+        const int badgeSize = 32;
+        for (int y = 0; y < badgeSize; y++)
         {
-            string rowStr = RulerBadgePattern[r];
-            for (int c = 0; c < rowStr.Length; c++)
+            for (int x = 0; x < badgeSize; x++)
             {
-                char ch = rowStr[c];
-                if (ch == '.') continue;
-
-                DrawBadgePixelBlock(pixels, canvasSize, startX + c * scale, startY + r * scale, scale, ch);
+                RenderBadgePixel(pixels, canvasSize, startX + x, startY + y, x, y);
             }
         }
     }
 
     /// <summary>
-    /// 指定されたスケール倍率（2x2ピクセルブロック等）でバッジピクセルを描画します。
+    /// 4x4スーパーサンプリング（16サンプル）により単一ピクセルのアンチエイリアス色を計算し、下地へブレンド描画します。
     /// </summary>
-    private static void DrawBadgePixelBlock(byte[] pixels, int canvasSize, int blockX, int blockY, int scale, char ch)
+    private static void RenderBadgePixel(byte[] pixels, int canvasSize, int screenX, int screenY, int bx, int by)
     {
-        for (int dy = 0; dy < scale; dy++)
+        if (screenX < 0 || screenX >= canvasSize || screenY < 0 || screenY >= canvasSize) return;
+
+        double sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+        for (int sy = 0; sy < 4; sy++)
         {
-            int screenY = blockY + dy;
-            if (screenY < 0 || screenY >= canvasSize) continue;
-
-            int dibRow = canvasSize - 1 - screenY;
-            int rowOffset = dibRow * canvasSize * 4;
-
-            for (int dx = 0; dx < scale; dx++)
+            double v = by + (sy + 0.5) / 4.0;
+            for (int sx = 0; sx < 4; sx++)
             {
-                int screenX = blockX + dx;
-                if (screenX < 0 || screenX >= canvasSize) continue;
-
-                int pixelOffset = rowOffset + screenX * 4;
-                ApplyBadgePixel(pixels, pixelOffset, ch);
+                double u = bx + (sx + 0.5) / 4.0;
+                SampleRulerColor(u, v, out byte sr, out byte sg, out byte sb, out byte sa);
+                sumR += sr * (sa / 255.0);
+                sumG += sg * (sa / 255.0);
+                sumB += sb * (sa / 255.0);
+                sumA += sa;
             }
         }
+
+        if (sumA <= 0.0) return;
+
+        double avgA = sumA / 16.0;
+        byte finalA = (byte)Math.Clamp(Math.Round(avgA), 0, 255);
+        byte finalR = (byte)Math.Clamp(Math.Round(sumR / (sumA / 255.0)), 0, 255);
+        byte finalG = (byte)Math.Clamp(Math.Round(sumG / (sumA / 255.0)), 0, 255);
+        byte finalB = (byte)Math.Clamp(Math.Round(sumB / (sumA / 255.0)), 0, 255);
+
+        int dibRow = canvasSize - 1 - screenY;
+        int pixelOffset = (dibRow * canvasSize + screenX) * 4;
+        BlendBadgePixel(pixels, pixelOffset, finalR, finalG, finalB, finalA);
     }
 
     /// <summary>
-    /// 定規バッジパターンの文字に応じたピクセル色（BGRA）を適用します。
+    /// サブピクセル座標における定規の色（SDF：符号付き距離関数に基づく輪郭・白フチ・目盛り・本体）をサンプリングします。
     /// </summary>
-    private static void ApplyBadgePixel(byte[] pixels, int pixelOffset, char patternChar)
+    private static void SampleRulerColor(double u, double v, out byte r, out byte g, out byte b, out byte a)
     {
-        switch (patternChar)
+        double du = u - 15.5;
+        double dv = v - 15.5;
+        double len = (du - dv) * 0.70710678;
+        double perp = (du + dv) * 0.70710678;
+
+        const double lHalf = 13.5;
+        const double wHalf = 4.0;
+        const double cornerRadius = 1.5;
+
+        double qx = Math.Max(Math.Abs(len) - (lHalf - cornerRadius), 0.0);
+        double qy = Math.Max(Math.Abs(perp) - (wHalf - cornerRadius), 0.0);
+        double dOut = Math.Sqrt(qx * qx + qy * qy) - cornerRadius;
+        double dIn = Math.Min(Math.Max(Math.Abs(len) - lHalf, Math.Abs(perp) - wHalf), 0.0);
+        double sdf = dOut > 0 ? dOut : dIn;
+
+        if (sdf > 1.4)
         {
-            case 'W': // 白フチ・目盛り
-                pixels[pixelOffset + 0] = 255;
-                pixels[pixelOffset + 1] = 255;
-                pixels[pixelOffset + 2] = 255;
-                pixels[pixelOffset + 3] = 255;
-                break;
-            case 'D': // 定規本体（濃いスレート: #1E293B）
-                pixels[pixelOffset + 0] = 59;
-                pixels[pixelOffset + 1] = 41;
-                pixels[pixelOffset + 2] = 30;
-                pixels[pixelOffset + 3] = 255;
-                break;
-            case 'B': // 外側アウトライン（75%半透明黒）
-                pixels[pixelOffset + 0] = 0;
-                pixels[pixelOffset + 1] = 0;
-                pixels[pixelOffset + 2] = 0;
-                pixels[pixelOffset + 3] = 192;
-                break;
+            r = g = b = a = 0;
+            return;
         }
+
+        if (sdf > 0.0)
+        {
+            r = g = b = 0;
+            a = (byte)Math.Clamp(Math.Round(180.0 * (1.0 - (sdf / 1.4))), 0, 180);
+            return;
+        }
+
+        if (sdf > -1.2 || IsOnTickMark(len, perp, wHalf))
+        {
+            r = g = b = a = 255; // 白フチ・目盛り
+            return;
+        }
+
+        // 定規本体（スレートダーク: #1E293B）
+        r = 30;
+        g = 41;
+        b = 59;
+        a = 255;
+    }
+
+    /// <summary>
+    /// 指定された座標が定規の目盛り位置上にあるかを判定します。
+    /// </summary>
+    private static bool IsOnTickMark(double len, double perp, double wHalf)
+    {
+        double depth = perp + wHalf;
+        double tickIndex = Math.Round(len / 2.5);
+        double nearestTickLen = tickIndex * 2.5;
+
+        if (Math.Abs(nearestTickLen) > 10.5)
+        {
+            return false;
+        }
+
+        double distToTick = Math.Abs(len - nearestTickLen);
+        bool isMajor = Math.Abs(tickIndex % 2.0) < 0.1;
+        double maxDepth = isMajor ? 3.5 : 2.2;
+
+        return distToTick <= 0.65 && depth >= 0.0 && depth <= maxDepth;
+    }
+
+    /// <summary>
+    /// アルファブレンド（Over演算）により下地ピクセルへ合成します。
+    /// </summary>
+    private static void BlendBadgePixel(byte[] pixels, int pixelOffset, byte srcR, byte srcG, byte srcB, byte srcA)
+    {
+        double sA = srcA / 255.0;
+        double dA = pixels[pixelOffset + 3] / 255.0;
+        double outA = sA + dA * (1.0 - sA);
+
+        if (outA <= 0.0) return;
+
+        double outB = (srcB * sA + pixels[pixelOffset + 0] * dA * (1.0 - sA)) / outA;
+        double outG = (srcG * sA + pixels[pixelOffset + 1] * dA * (1.0 - sA)) / outA;
+        double outR = (srcR * sA + pixels[pixelOffset + 2] * dA * (1.0 - sA)) / outA;
+
+        pixels[pixelOffset + 0] = (byte)Math.Clamp(Math.Round(outB), 0, 255);
+        pixels[pixelOffset + 1] = (byte)Math.Clamp(Math.Round(outG), 0, 255);
+        pixels[pixelOffset + 2] = (byte)Math.Clamp(Math.Round(outR), 0, 255);
+        pixels[pixelOffset + 3] = (byte)Math.Clamp(Math.Round(outA * 255.0), 0, 255);
     }
 
     /// <summary>
