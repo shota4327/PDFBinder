@@ -49,6 +49,7 @@ public partial class GridView : UserControl
         {
             _autoScroller.Stop();
             _mouseWheelHook.Dispose();
+            _initialSelection.Clear();
         };
     }
 
@@ -642,6 +643,7 @@ public partial class GridView : UserControl
         {
             _autoScroller.Stop();
             _isRubberBandActive = false;
+            _initialSelection.Clear();
             RubberBandBorder.Visibility = Visibility.Collapsed;
             GridScrollViewer.ReleaseMouseCapture();
             e.Handled = true;

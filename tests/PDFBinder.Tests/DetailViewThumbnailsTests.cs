@@ -290,8 +290,8 @@ public class DetailViewThumbnailsTests
     [Fact]
     public async Task ScheduleDetailViewThumbnailsAsync_ExecutesAndGeneratesThumbnailsForWindow()
     {
-        // Arrange (30ページ、カレント = 10)
-        var vm = CreateTestViewModel(30);
+        // Arrange (60ページ、カレント = 10)
+        var vm = CreateTestViewModel(60);
         Assert.NotNull(vm.DetailEditor);
         vm.DetailEditor.CurrentPage = vm.Document.Pages[10];
 
@@ -299,14 +299,14 @@ public class DetailViewThumbnailsTests
         var task = vm.ScheduleDetailViewThumbnailsAsync(debounceMs: 0);
         await task;
 
-        // Assert: 10を中心とした前後10ページ（0..20）のみサムネイルが生成され、21ページ以降はnullのまま
-        for (int i = 0; i <= 20; i++)
+        // Assert: 10を中心とした前後10ページ（0..20）および先頭50ページ（0..49）までサムネイルが生成され、50ページ以降はnullのまま
+        for (int i = 0; i < 50; i++)
         {
             Assert.NotNull(vm.Document.Pages[i].Thumbnail);
             Assert.False(vm.Document.Pages[i].IsThumbnailDirty);
         }
 
-        for (int i = 21; i < 30; i++)
+        for (int i = 50; i < 60; i++)
         {
             Assert.Null(vm.Document.Pages[i].Thumbnail);
         }

@@ -76,8 +76,9 @@ public class InteractiveOverlayCanvas : FrameworkElement
             {
                 oldVm.PropertyChanged -= canvas.OnPageItemPropertyChanged;
             }
-            if (e.NewValue is DetailPageItemViewModel newVm)
+            if (e.NewValue is DetailPageItemViewModel newVm && canvas.IsLoaded)
             {
+                newVm.PropertyChanged -= canvas.OnPageItemPropertyChanged;
                 newVm.PropertyChanged += canvas.OnPageItemPropertyChanged;
             }
             canvas.ClearSelection();
@@ -108,6 +109,7 @@ public class InteractiveOverlayCanvas : FrameworkElement
     {
         if (PageItem != null)
         {
+            PageItem.PropertyChanged -= OnPageItemPropertyChanged;
             PageItem.PropertyChanged += OnPageItemPropertyChanged;
         }
     }

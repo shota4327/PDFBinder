@@ -58,8 +58,9 @@ public class EditorInkCanvas : InkCanvas
             {
                 oldItem.Page.InkStrokes.StrokesChanged -= canvas.OnMasterStrokesChanged;
             }
-            if (e.NewValue is DetailPageItemViewModel newItem)
+            if (e.NewValue is DetailPageItemViewModel newItem && canvas.IsLoaded)
             {
+                newItem.Page.InkStrokes.StrokesChanged -= canvas.OnMasterStrokesChanged;
                 newItem.Page.InkStrokes.StrokesChanged += canvas.OnMasterStrokesChanged;
             }
             canvas.SyncStrokesWithCurrentMode();
@@ -204,6 +205,25 @@ public class EditorInkCanvas : InkCanvas
         UpdateEditingMode();
         AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) => e.Handled = true), true);
         Strokes.StrokesChanged += OnCanvasStrokesChanged;
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (PageItem != null)
+        {
+            PageItem.Page.InkStrokes.StrokesChanged -= OnMasterStrokesChanged;
+            PageItem.Page.InkStrokes.StrokesChanged += OnMasterStrokesChanged;
+        }
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (PageItem != null)
+        {
+            PageItem.Page.InkStrokes.StrokesChanged -= OnMasterStrokesChanged;
+        }
     }
 
     private static void OnToolModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

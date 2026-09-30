@@ -343,9 +343,9 @@ public class ViewModelsTests
     [Fact]
     public void MainViewModel_ThumbnailRenderConstants_AreConfiguredProperly()
     {
-        // Assert: 高解像度（720px）基準でレンダリング定数が設定されていること
-        Assert.Equal(720, MainViewModel.ThumbnailRenderWidth);
-        Assert.Equal(1008, MainViewModel.ThumbnailRenderHeight);
+        // Assert: 4K/高DPI品質両立・メモリ最適化基準（480×672px）でレンダリング定数が設定されていること
+        Assert.Equal(480, MainViewModel.ThumbnailRenderWidth);
+        Assert.Equal(672, MainViewModel.ThumbnailRenderHeight);
     }
 
     [Fact]

@@ -60,10 +60,31 @@ public partial class DetailPageItemViewModel : ObservableObject, IDisposable
         _lastRotation = newValue.Rotation;
     }
 
+    /// <summary>
+    /// 画面外となったページの背景ビットマップを解放し、メモリ消費を抑制します。
+    /// 手書きストロークが存在する場合、ストロークキャッシュは保持して再スクロール時の線の消失を防止します。
+    /// </summary>
+    public void UnloadBackground()
+    {
+        PageBackground = null;
+
+        if (Page.InkStrokes.Count == 0)
+        {
+            StrokeCache = null;
+        }
+
+        LastRenderedWidth = 0;
+        LastRenderedHeight = 0;
+        LastRenderedRotation = PageRotation.Rotate0;
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
         Page.PropertyChanged -= OnPagePropertyChanged;
+        UnloadBackground();
+        InteractiveData = null;
+        PageJumpRequested = null;
         GC.SuppressFinalize(this);
     }
     [ObservableProperty]
