@@ -58,38 +58,95 @@ public class WpfPrintService : IPrintService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> PrintAsync(
+    public async Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
-        PrintSettings settings,
         IReadOnlyList<PrintSheetLayout> sheets,
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (sheets.Count == 0) return false;
+        if (sheets.Count == 0) return Array.Empty<PrintPreparedSheet>();
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // 用紙サイズ（WPF論理ピクセル単位: 96 DPI）を算出 (A4: 793.70 x 1122.52, A3: 1122.52 x 1587.40)
-        var (pageWidth, pageHeight) = GetPaperDimensionsInDips(settings.PaperSize, settings.Orientation);
-
-        // FixedDocument をバックグラウンド／UI連携で構築
-        var fixedDoc = new FixedDocument();
-        fixedDoc.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
+        var preparedSheets = new List<PrintPreparedSheet>(sheets.Count);
+        var pageBitmapCache = new Dictionary<int, BitmapSource?>();
 
         for (int i = 0; i < sheets.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var sheet = sheets[i];
+            var placements = new List<PrintPreparedPlacement>(sheet.Placements.Count);
 
-            var fixedPage = await CreateFixedPageAsync(sheet, renderPageFunc, pageWidth, pageHeight, cancellationToken);
-            var pageContent = new PageContent();
-            ((System.Windows.Markup.IAddChild)pageContent).AddChild(fixedPage);
-            fixedDoc.Pages.Add(pageContent);
+            foreach (var placement in sheet.Placements)
+            {
+                if (placement.PageIndex.HasValue)
+                {
+                    int pageIdx = placement.PageIndex.Value;
+                    if (!pageBitmapCache.TryGetValue(pageIdx, out var bitmap))
+                    {
+                        bitmap = await renderPageFunc(pageIdx, cancellationToken);
+                        pageBitmapCache[pageIdx] = bitmap;
+                    }
 
+                    placements.Add(new PrintPreparedPlacement(bitmap, placement.NormalizedBounds));
+                }
+            }
+
+            preparedSheets.Add(new PrintPreparedSheet(placements, sheet.Orientation, sheet.PaperSize));
             progress?.Report((i + 1, sheets.Count));
         }
 
-        return ExecutePrintDialog(fixedDoc, settings);
+        return preparedSheets;
+    }
+
+    /// <inheritdoc/>
+    public Task<bool> SpoolDocumentAsync(
+        IReadOnlyList<PrintPreparedSheet> preparedSheets,
+        PrintSettings settings,
+        string jobName,
+        CancellationToken cancellationToken = default)
+    {
+        if (preparedSheets.Count == 0) return Task.FromResult(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var tcs = new TaskCompletionSource<bool>();
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    tcs.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
+                bool success = ExecutePrintSpool(preparedSheets, settings, jobName);
+                tcs.TrySetResult(success);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+
+        return tcs.Task;
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> PrintAsync(
+        Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        PrintSettings settings,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        string jobName = "PDFBinder",
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var preparedSheets = await PrepareSheetsAsync(renderPageFunc, sheets, progress, cancellationToken);
+        return await SpoolDocumentAsync(preparedSheets, settings, jobName, cancellationToken);
     }
 
     /// <summary>
@@ -105,50 +162,6 @@ public class WpfPrintService : IPrintService
         return orientation == PrintOrientation.Landscape
             ? (longSide, shortSide)
             : (shortSide, longSide);
-    }
-
-    /// <summary>
-    /// 1枚の用紙（シート）に対応する FixedPage 要素を非同期に作成します。
-    /// </summary>
-    private static async Task<FixedPage> CreateFixedPageAsync(
-        PrintSheetLayout sheet,
-        Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
-        double pageWidth,
-        double pageHeight,
-        CancellationToken cancellationToken)
-    {
-        var fixedPage = new FixedPage
-        {
-            Width = pageWidth,
-            Height = pageHeight,
-            Background = Brushes.White
-        };
-
-        var canvas = new Canvas
-        {
-            Width = pageWidth,
-            Height = pageHeight
-        };
-
-        foreach (var placement in sheet.Placements)
-        {
-            if (placement.PageIndex.HasValue)
-            {
-                var bitmap = await renderPageFunc(placement.PageIndex.Value, cancellationToken);
-                if (bitmap != null)
-                {
-                    var image = CreatePlacedImage(bitmap, placement.NormalizedBounds, pageWidth, pageHeight);
-                    canvas.Children.Add(image);
-                }
-            }
-        }
-
-        fixedPage.Children.Add(canvas);
-        fixedPage.Measure(new Size(pageWidth, pageHeight));
-        fixedPage.Arrange(new Rect(new Size(pageWidth, pageHeight)));
-        fixedPage.UpdateLayout();
-
-        return fixedPage;
     }
 
     /// <summary>
@@ -175,27 +188,79 @@ public class WpfPrintService : IPrintService
     }
 
     /// <summary>
+    /// 事前レンダリング済みシートから FixedDocument を構築し、印刷スプールを実行します。
+    /// </summary>
+    private static bool ExecutePrintSpool(
+        IReadOnlyList<PrintPreparedSheet> preparedSheets,
+        PrintSettings settings,
+        string jobName)
+    {
+        var (pageWidth, pageHeight) = GetPaperDimensionsInDips(settings.PaperSize, settings.Orientation);
+
+        var fixedDoc = new FixedDocument();
+        fixedDoc.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
+
+        foreach (var sheet in preparedSheets)
+        {
+            var fixedPage = CreateFixedPageFromPrepared(sheet, pageWidth, pageHeight);
+            var pageContent = new PageContent();
+            ((System.Windows.Markup.IAddChild)pageContent).AddChild(fixedPage);
+            fixedDoc.Pages.Add(pageContent);
+        }
+
+        return ExecutePrintDialog(fixedDoc, settings, jobName);
+    }
+
+    /// <summary>
+    /// 1枚の事前準備シートに対応する FixedPage 要素を作成します。
+    /// </summary>
+    private static FixedPage CreateFixedPageFromPrepared(PrintPreparedSheet sheet, double pageWidth, double pageHeight)
+    {
+        var fixedPage = new FixedPage
+        {
+            Width = pageWidth,
+            Height = pageHeight,
+            Background = Brushes.White
+        };
+
+        var canvas = new Canvas
+        {
+            Width = pageWidth,
+            Height = pageHeight
+        };
+
+        foreach (var placement in sheet.Placements)
+        {
+            if (placement.Image != null)
+            {
+                var image = CreatePlacedImage(placement.Image, placement.NormalizedBounds, pageWidth, pageHeight);
+                canvas.Children.Add(image);
+            }
+        }
+
+        fixedPage.Children.Add(canvas);
+        fixedPage.Measure(new Size(pageWidth, pageHeight));
+        fixedPage.Arrange(new Rect(new Size(pageWidth, pageHeight)));
+        fixedPage.UpdateLayout();
+
+        return fixedPage;
+    }
+
+    /// <summary>
     /// PrintDialog を構成して印刷ジョブを実行します。
     /// </summary>
-    private static bool ExecutePrintDialog(FixedDocument fixedDoc, PrintSettings settings)
+    private static bool ExecutePrintDialog(FixedDocument fixedDoc, PrintSettings settings, string jobName)
     {
-        try
-        {
-            var printDialog = new PrintDialog();
+        var printDialog = new PrintDialog();
 
-            if (!string.IsNullOrEmpty(settings.PrinterName))
-            {
-                printDialog.PrintQueue = new PrintQueue(new LocalPrintServer(), settings.PrinterName);
-            }
-
-            ConfigurePrintTicket(printDialog, settings);
-            printDialog.PrintDocument(fixedDoc.DocumentPaginator, "PDFBinder 印刷ジョブ");
-            return true;
-        }
-        catch
+        if (!string.IsNullOrEmpty(settings.PrinterName))
         {
-            return false;
+            printDialog.PrintQueue = new PrintQueue(new LocalPrintServer(), settings.PrinterName);
         }
+
+        ConfigurePrintTicket(printDialog, settings);
+        printDialog.PrintDocument(fixedDoc.DocumentPaginator, jobName);
+        return true;
     }
 
     /// <summary>

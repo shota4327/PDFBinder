@@ -31,10 +31,33 @@ public class FakePrintService : IPrintService
         return DialogResultToReturn;
     }
 
+    public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+        Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = sheets.Select(s => new PrintPreparedSheet(
+            s.Placements.Select(p => new PrintPreparedPlacement(null, p.NormalizedBounds)).ToList(),
+            s.Orientation,
+            s.PaperSize)).ToList();
+        return Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(result);
+    }
+
+    public Task<bool> SpoolDocumentAsync(
+        IReadOnlyList<PrintPreparedSheet> preparedSheets,
+        PrintSettings settings,
+        string jobName,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(PrintResult);
+    }
+
     public Task<bool> PrintAsync(
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
         PrintSettings settings,
         IReadOnlyList<PrintSheetLayout> sheets,
+        string jobName = "PDFBinder",
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -225,5 +248,48 @@ public class PrintViewModelTests
         vm.Settings.PrinterName = "Printer B";
 
         Assert.Null(vm.Settings.DriverDevMode);
+    }
+
+    [Fact]
+    public void JobName_WithDocumentTitle_GeneratesFormattedJobName()
+    {
+        var settings = new PrintSettings();
+        var vm = new PrintViewModel(
+            _fakePrintService,
+            settings,
+            5,
+            0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            (idx, ct) => Task.FromResult<BitmapSource?>(null),
+            "annual_report.pdf");
+
+        Assert.Equal("annual_report.pdf", vm.DocumentTitle);
+        Assert.Equal("annual_report - PDFBinder", vm.JobName);
+    }
+
+    [Fact]
+    public async Task ExecutePrint_WhenExecuted_PreparesSheetsTriggersSpoolRequestedAndClosesDialog()
+    {
+        var settings = new PrintSettings();
+        var vm = new PrintViewModel(
+            _fakePrintService,
+            settings,
+            3,
+            0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            (idx, ct) => Task.FromResult<BitmapSource?>(null),
+            "invoice.pdf");
+
+        PrintSpoolEventArgs? spoolArgs = null;
+        vm.SpoolRequested += (s, e) => spoolArgs = e;
+
+        bool? closeResult = null;
+        vm.RequestClose += r => closeResult = r;
+
+        await vm.ExecutePrintCommand.ExecuteAsync(null);
+
+        Assert.NotNull(spoolArgs);
+        Assert.Equal("invoice - PDFBinder", spoolArgs.JobName);
+        Assert.True(closeResult);
     }
 }

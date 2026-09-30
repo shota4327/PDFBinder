@@ -23,9 +23,11 @@ public partial class MainViewModel : ObservableObject
     private readonly IUndoRedoService _undoRedoService;
     private readonly IPrintService _printService;
     private readonly IImageService _imageService;
+    private readonly IBackgroundPrintQueueService _printQueueService;
     private readonly PrintSettings _persistentPrintSettings = new();
     private CancellationTokenSource? _thumbnailCts;
     private Task? _thumbnailTask;
+    private CancellationTokenSource? _statusResetCts;
 
     /// <summary>
     /// 現在進行中のサムネイル生成タスクを取得します（単体テスト・待機検証用）。
@@ -128,6 +130,28 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanExecutePrint))]
     private bool _isPrintDialogVisible;
+
+    /// <summary>
+    /// 印刷タスク待機ダイアログ（インアプリオーバーレイ）を表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPrintWaitDialogVisible;
+
+    /// <summary>
+    /// 印刷タスク待機ダイアログ内の進捗状況テキスト
+    /// </summary>
+    [ObservableProperty]
+    private string _printWaitTaskStatusText = string.Empty;
+
+    /// <summary>
+    /// バックグラウンドで送信中の印刷タスクが存在するかどうか
+    /// </summary>
+    public bool HasActivePrintTasks => _printQueueService.HasActiveJobs;
+
+    /// <summary>
+    /// ウィンドウ終了要求デリゲート（印刷待機完了時などの自動終了用）
+    /// </summary>
+    public Action? RequestCloseWindow { get; set; }
 
     /// <summary>
     /// バージョン情報ダイアログ（インアプリオーバーレイ）を表示するかどうか
@@ -505,13 +529,18 @@ public partial class MainViewModel : ObservableObject
         IPdfRenderer? pdfRenderer = null,
         IUndoRedoService? undoRedoService = null,
         IPrintService? printService = null,
-        IImageService? imageService = null)
+        IImageService? imageService = null,
+        IBackgroundPrintQueueService? printQueueService = null)
     {
         _pdfService = pdfService ?? new PdfService();
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _undoRedoService = undoRedoService ?? new UndoRedoService();
         _printService = printService ?? new WpfPrintService();
         _imageService = imageService ?? new ImageService();
+        _printQueueService = printQueueService ?? new BackgroundPrintQueueService(_printService);
+
+        _printQueueService.ActiveJobCountChanged += OnPrintQueueCountChanged;
+        _printQueueService.JobCompleted += OnPrintJobCompleted;
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
         _detailEditor.PipelineExecutionHandler = delayMs => ScheduleDetailViewPipelineAsync(delayMs);
@@ -2174,15 +2203,18 @@ public partial class MainViewModel : ObservableObject
             currentIdx = 0;
         }
 
+        string docTitle = ActiveSession?.Document?.FileName ?? Document.FileName;
         PrintViewModel = new PrintViewModel(
             _printService,
             _persistentPrintSettings,
             Document.Pages.Count,
             currentIdx,
             (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
-            (idx, ct) => RenderPageWithInkAsync(idx, 2480, 3508, ct));
+            (idx, ct) => RenderPageWithInkAsync(idx, 2480, 3508, ct),
+            docTitle);
 
         PrintViewModel.RequestClose += OnPrintDialogRequestClose;
+        PrintViewModel.SpoolRequested += OnPrintSpoolRequested;
         IsPrintDialogVisible = true;
     }
 
@@ -2204,13 +2236,137 @@ public partial class MainViewModel : ObservableObject
         if (PrintViewModel != null)
         {
             PrintViewModel.RequestClose -= OnPrintDialogRequestClose;
+            PrintViewModel.SpoolRequested -= OnPrintSpoolRequested;
             PrintViewModel.Cleanup();
             PrintViewModel = null;
         }
+    }
 
-        if (printed)
+    /// <summary>
+    /// 印刷プレビュー画面からのバックグラウンドスプール要求を処理します。
+    /// </summary>
+    private void OnPrintSpoolRequested(object? sender, PrintSpoolEventArgs e)
+    {
+        var job = new PrintSpoolJob(e.JobName, e.Settings, e.PreparedSheets);
+        _printQueueService.Enqueue(job);
+    }
+
+    /// <summary>
+    /// バックグラウンド印刷キューの残ジョブ数変更通知を処理します。
+    /// </summary>
+    private void OnPrintQueueCountChanged(int count)
+    {
+        RunOnUi(() =>
         {
-            StatusMessage = "印刷ジョブを送信しました。";
+            if (count > 0)
+            {
+                string text = count == 1 ? "プリンターへ送信中..." : $"プリンターへ送信中... (残り {count} 件)";
+                StatusMessage = text;
+                PrintWaitTaskStatusText = text;
+            }
+        });
+    }
+
+    /// <summary>
+    /// バックグラウンド印刷ジョブの完了通知を処理します。
+    /// </summary>
+    private void OnPrintJobCompleted(PrintSpoolJob job, bool success, string? errorMessage)
+    {
+        RunOnUi(() =>
+        {
+            if (!success)
+            {
+                ShowErrorDialog("印刷エラー", $"プリンターへの印刷データ送信中にエラーが発生しました:\n{errorMessage ?? "不明なエラー"}", "印刷に失敗しました。");
+            }
+            else if (_printQueueService.ActiveJobCount == 0)
+            {
+                StatusMessage = "印刷データを送信しました";
+                ScheduleStatusMessageReset(3000);
+            }
+
+            if (IsPrintWaitDialogVisible && _printQueueService.ActiveJobCount == 0)
+            {
+                IsPrintWaitDialogVisible = false;
+                RequestCloseWindow?.Invoke();
+            }
+        });
+    }
+
+    /// <summary>
+    /// 指定ミリ秒後にステータスバーの送信完了メッセージを自動クリアします。
+    /// </summary>
+    private void ScheduleStatusMessageReset(int delayMs)
+    {
+        _statusResetCts?.Cancel();
+        _statusResetCts?.Dispose();
+        _statusResetCts = new CancellationTokenSource();
+        var ct = _statusResetCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, ct);
+                if (!ct.IsCancellationRequested)
+                {
+                    RunOnUi(() =>
+                    {
+                        if (StatusMessage == "印刷データを送信しました")
+                        {
+                            StatusMessage = string.Empty;
+                        }
+                    });
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, ct);
+    }
+
+    /// <summary>
+    /// 印刷タスク待機ダイアログを表示します。
+    /// </summary>
+    public void ShowPrintWaitDialog()
+    {
+        int count = _printQueueService.ActiveJobCount;
+        PrintWaitTaskStatusText = count <= 1 ? "プリンターへ送信中..." : $"プリンターへ送信中... (残り {count} 件)";
+        IsPrintWaitDialogVisible = true;
+    }
+
+    /// <summary>
+    /// 印刷タスク待機ダイアログを閉じ、アプリ終了をキャンセルして通常画面へ復帰します。
+    /// </summary>
+    [RelayCommand]
+    public void CancelPrintWait()
+    {
+        IsPrintWaitDialogVisible = false;
+    }
+
+    /// <summary>
+    /// UI スレッド連携デリゲート（単体テスト等での即時実行オーバーライド用）
+    /// </summary>
+    internal Action<Action>? UiDispatcherOverride { get; set; }
+
+    /// <summary>
+    /// UI スレッド上で安全にアクションを実行します。
+    /// </summary>
+    private void RunOnUi(Action action)
+    {
+        if (UiDispatcherOverride != null)
+        {
+            UiDispatcherOverride(action);
+            return;
+        }
+
+        var app = Application.Current;
+        if (app == null || app.Dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            app.Dispatcher.InvokeAsync(action);
         }
     }
 

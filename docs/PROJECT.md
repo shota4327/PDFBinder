@@ -77,6 +77,7 @@
 | **F68** | レンダリング / 手書き詳細 | 詳細エディタ表示中の前後10ページサムネイル先行生成（距離優先順バックグラウンド直列生成、デバウンス制御、サイレント実行、仮プレビュー白飛び抑止＆グリッド復帰高速化） | **完了** | Issue #186 / MainViewModel & DetailViewThumbnailsTests |
 | **F69** | メモリ管理 / レンダリング | メモリ管理・リソース解放の最適化とリーク解消（詳細エディタ動的背景アンロード・前後3ページ保持・手書き線画保護・サムネイル480x672px適正化・ドキュメント終了時明示解放・バックグラウンドGC） | **完了** | Issue #191 / DetailEditorViewModel, DocumentSession, MainViewModel |
 | **F70** | レンダリング / 手書き詳細 | 詳細エディタ 4 段階優先順位パイプライン（現在高解像度 → 前後10サムネイル → 前後高解像度 → 先頭50サムネイル未生成分距離優先生成、順序保証・中断再開制御） | **完了** | Issue #191 追加改修-2 / DetailEditorViewModel, MainViewModel |
+| **F71** | UI・印刷 | 印刷ジョブ名へのファイル名反映（{ファイル名} - PDFBinder）＆バックグラウンドSTA非同期スプール送信によるフリーズ完全解消・ステータスバー進捗連携・多重印刷キューイング・アプリ終了待機オーバーレイダイアログ | **完了** | Issue #190 / WpfPrintService, BackgroundPrintQueueService, PrintViewModel, MainViewModel |
 
 ---
 
