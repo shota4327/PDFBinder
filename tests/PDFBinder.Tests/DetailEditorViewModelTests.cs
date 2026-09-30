@@ -900,7 +900,7 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
-    public void GetTargetPagesToRender_InitialLoad_LimitsToFirst10PagesWithCurrentFirst()
+    public void GetTargetPagesToRender_InitialLoad_LimitsToFirst4PagesWithCurrentFirst()
     {
         // Arrange: 20ページのドキュメントを作成
         var doc = new PdfDocumentModel();
@@ -918,14 +918,14 @@ public class DetailEditorViewModelTests
         // Act: 初回読み込みフラグを指定して対象ページを取得
         var targets = vm.GetTargetPagesToRender(isInitialLoad: true);
 
-        // Assert: 先頭10ページのみが対象であり、先頭はカレントページであること
-        Assert.Equal(10, targets.Count);
+        // Assert: 先頭4ページのみが対象であり、先頭はカレントページであること
+        Assert.Equal(4, targets.Count);
         Assert.Same(vm.CurrentPageItem, targets[0]);
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 4; i++)
         {
             Assert.Contains(vm.Pages[i], targets);
         }
-        for (int i = 10; i < 20; i++)
+        for (int i = 4; i < 20; i++)
         {
             Assert.DoesNotContain(vm.Pages[i], targets);
         }

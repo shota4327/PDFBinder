@@ -57,8 +57,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>選択的レンダリングを適用する拡大率の閾値（600%超で現在ページのみに限定）</summary>
     public const double SelectiveRenderZoomThreshold = 6.0;
 
-    /// <summary>ドキュメント初回読み込み時に先行レンダリングを行う最大ページ数（先頭10ページ）</summary>
-    public const int InitialLoadMaxPageCount = 10;
+    /// <summary>ドキュメント初回読み込み時に先行レンダリングを行う最大ページ数（先頭4ページ）</summary>
+    public const int InitialLoadMaxPageCount = 4;
+
+    /// <summary>画面外背景画像をアンロードする際の保持ページ半径（前後3ページ）</summary>
+    public const int BackgroundEvictionPageRadius = 3;
 
     /// <summary>連続表示モードにおいて現在画面内（ビューポート内）に見えているページを取得するプロバイダー</summary>
     public Func<IEnumerable<DetailPageItemViewModel>>? VisiblePagesProvider { get; set; }
@@ -446,6 +449,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         foreach (var item in Pages)
         {
             item.PageJumpRequested -= OnPageJumpRequested;
+            item.Dispose();
         }
         Pages.Clear();
     }
@@ -726,6 +730,97 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         return result;
     }
 
+    /// <summary>
+    /// 現在の表示範囲外となったページの背景ビットマップを解放し、メモリ消費を抑制します。
+    /// 単一ページモードではカレントページ前後3ページ、連続モードでは可視ページ群および前後3ページを保持します。
+    /// </summary>
+    internal void EvictOffscreenPageBackgrounds()
+    {
+        if (Pages.Count == 0) return;
+
+        var keepSet = GetPagesToKeepInMemory();
+        foreach (var item in Pages)
+        {
+            if (!keepSet.Contains(item) && item.PageBackground != null)
+            {
+                item.UnloadBackground();
+            }
+        }
+    }
+
+    /// <summary>
+    /// メモリ上に背景画像を保持すべき対象ページのセットを算出します。
+    /// </summary>
+    private HashSet<DetailPageItemViewModel> GetPagesToKeepInMemory()
+    {
+        var keepSet = new HashSet<DetailPageItemViewModel>();
+        if (PageViewMode == DetailPageViewMode.Continuous)
+        {
+            AddContinuousKeepPages(keepSet);
+        }
+        else
+        {
+            AddSinglePageKeepPages(keepSet);
+        }
+        return keepSet;
+    }
+
+    /// <summary>
+    /// 単一ページ表示モードにおける背景保持対象ページ（カレントページ前後3ページ）をセットに追加します。
+    /// </summary>
+    private void AddSinglePageKeepPages(HashSet<DetailPageItemViewModel> keepSet)
+    {
+        var current = CurrentPageItem;
+        if (current == null) return;
+
+        int currentIdx = Pages.IndexOf(current);
+        if (currentIdx < 0) return;
+
+        int start = Math.Max(0, currentIdx - BackgroundEvictionPageRadius);
+        int end = Math.Min(Pages.Count - 1, currentIdx + BackgroundEvictionPageRadius);
+        for (int i = start; i <= end; i++)
+        {
+            keepSet.Add(Pages[i]);
+        }
+    }
+
+    /// <summary>
+    /// 連続表示モードにおける背景保持対象ページ（可視ページ群および前後3ページ）をセットに追加します。
+    /// </summary>
+    private void AddContinuousKeepPages(HashSet<DetailPageItemViewModel> keepSet)
+    {
+        var visible = VisiblePagesProvider?.Invoke() ?? Enumerable.Empty<DetailPageItemViewModel>();
+        var visibleList = visible.Where(p => Pages.Contains(p)).ToList();
+
+        if (visibleList.Count == 0 && CurrentPageItem != null)
+        {
+            visibleList.Add(CurrentPageItem);
+        }
+
+        int minIdx = int.MaxValue;
+        int maxIdx = int.MinValue;
+
+        foreach (var item in visibleList)
+        {
+            int idx = Pages.IndexOf(item);
+            if (idx >= 0)
+            {
+                minIdx = Math.Min(minIdx, idx);
+                maxIdx = Math.Max(maxIdx, idx);
+            }
+        }
+
+        if (minIdx <= maxIdx)
+        {
+            int start = Math.Max(0, minIdx - BackgroundEvictionPageRadius);
+            int end = Math.Min(Pages.Count - 1, maxIdx + BackgroundEvictionPageRadius);
+            for (int i = start; i <= end; i++)
+            {
+                keepSet.Add(Pages[i]);
+            }
+        }
+    }
+
     private async Task PerformDynamicRenderAsync(
         long generation,
         CancellationToken token,
@@ -754,6 +849,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 await RenderPageItemAsync(item, generation, token);
             }
 
+            EvictOffscreenPageBackgrounds();
             OnPropertyChanged(nameof(PageBackground));
         }
         catch (OperationCanceledException)

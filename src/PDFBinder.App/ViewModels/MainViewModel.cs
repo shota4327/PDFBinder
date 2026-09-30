@@ -185,14 +185,14 @@ public partial class MainViewModel : ObservableObject
     public const double ThumbnailSizeStep = 20.0;
 
     /// <summary>
-    /// サムネイル生成基準幅（px）。高倍率ズームや高DPI環境でも鮮明に表示します。
+    /// サムネイル生成基準幅（px）。高倍率ズームや4K/高DPI環境でも鮮明に表示しつつメモリを抑制します。
     /// </summary>
-    public const int ThumbnailRenderWidth = 720;
+    public const int ThumbnailRenderWidth = 480;
 
     /// <summary>
     /// サムネイル生成基準高さ（px）。縦横比約1:1.4に基づきます。
     /// </summary>
-    public const int ThumbnailRenderHeight = 1008;
+    public const int ThumbnailRenderHeight = 672;
 
     /// <summary>
     /// ドキュメント初期読み込み時に先行生成する先頭ページ数（先頭50ページ）
@@ -806,6 +806,9 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
+        // 進行中のバックグラウンドサムネイルタスクを安全に中断・待機
+        await CancelAndAwaitThumbnailsAsync();
+
         int targetIndex = Documents.IndexOf(target);
         bool wasActive = (ActiveSession == target);
 
@@ -824,9 +827,20 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
+        // アクティブ参照から切り離された安全な状態で明示解放
+        target.Dispose();
+
+        if (Documents.Count == 0)
+        {
+            DetailEditor?.InitializeDocument(new PdfDocumentModel());
+        }
+
         StatusMessage = Documents.Count > 0
             ? $"{target.Document.FileName} を閉じました。"
             : "すべてのドキュメントを閉じました。";
+
+        // ファイルクローズごとにバックグラウンドで不要ヒープを回収
+        _ = Task.Run(() => GC.Collect(2, GCCollectionMode.Forced, false));
 
         return true;
     }
@@ -1698,7 +1712,8 @@ public partial class MainViewModel : ObservableObject
         {
             try
             {
-                await task;
+                // 1秒の安全タイムアウトを設けてタスク完了を待機し、無限待機・ハングを防止
+                await Task.WhenAny(task, Task.Delay(1000));
             }
             catch (OperationCanceledException)
             {

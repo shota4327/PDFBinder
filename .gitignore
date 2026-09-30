@@ -19,3 +19,7 @@ coverage.json
 
 ## Distribution
 dist/
+
+## Agent Workspace
+.agents/
+.agent/

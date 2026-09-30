@@ -8,7 +8,7 @@ namespace PDFBinder.App.Models;
 /// <summary>
 /// 1つの開いているPDFドキュメントのセッション状態（データ、Undo/Redo履歴、表示状態）を保持するモデルクラス
 /// </summary>
-public partial class DocumentSession : ObservableObject
+public partial class DocumentSession : ObservableObject, IDisposable
 {
     /// <summary>PDFドキュメントデータ</summary>
     public PdfDocumentModel Document { get; }
@@ -77,5 +77,19 @@ public partial class DocumentSession : ObservableObject
             OnPropertyChanged(nameof(FullPathOrTitle));
             OnPropertyChanged(nameof(IsImage));
         }
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        Document.PropertyChanged -= OnDocumentPropertyChanged;
+        UndoRedoService.Clear();
+
+        foreach (var page in Document.Pages)
+        {
+            page.Thumbnail = null;
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
