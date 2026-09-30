@@ -1315,5 +1315,36 @@ public class DetailEditorViewModelTests
         // Assert: ウィンドウに合わせるに遷移すること
         Assert.Equal(DetailViewFitMode.FitToWindow, vm.FitMode);
     }
+
+    [Fact]
+    public void DetailPageItemViewModel_PageBackgroundProperty_RaisesPropertyChanged()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        using var item = new DetailPageItemViewModel(page);
+        var changedProps = new List<string>();
+        item.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName != null) changedProps.Add(e.PropertyName);
+        };
+
+        // Act 1: PageBackground をセット
+        var renderer = new FakePdfRenderer();
+        var bitmap = renderer.CreateBlankPageBitmap(100, 100, PageRotation.Rotate0);
+        item.PageBackground = bitmap;
+
+        // Assert 1: プロパティ変更が通知されること
+        Assert.Contains(nameof(DetailPageItemViewModel.PageBackground), changedProps);
+        Assert.NotNull(item.PageBackground);
+
+        // Act 2: UnloadBackground を実行
+        changedProps.Clear();
+        item.UnloadBackground();
+
+        // Assert 2: PageBackground が null になり通知されること
+        Assert.Contains(nameof(DetailPageItemViewModel.PageBackground), changedProps);
+        Assert.Null(item.PageBackground);
+    }
 }
+
 
