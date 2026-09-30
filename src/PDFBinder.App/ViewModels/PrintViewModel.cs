@@ -20,6 +20,7 @@ public partial class PrintViewModel : ObservableObject
     private readonly Func<int, CancellationToken, Task<BitmapSource?>> _renderPrintPageFunc;
     private readonly int _totalPages;
     private readonly int _currentPageIndex;
+    private readonly string? _documentTitle;
     private CancellationTokenSource? _previewCts;
 
     [ObservableProperty]
@@ -72,8 +73,17 @@ public partial class PrintViewModel : ObservableObject
         new NUpOptionItem(NUpPagesPerSheet.Eight, "8 ページ")
     };
 
+    /// <summary>印刷対象ドキュメントのタイトル</summary>
+    public string DocumentTitle => _documentTitle ?? string.Empty;
+
+    /// <summary>印刷ジョブ名</summary>
+    public string JobName => PrintJobHelper.GenerateJobName(_documentTitle);
+
     /// <summary>印刷完了またはキャンセル時のコールバック</summary>
     public event Action<bool>? RequestClose;
+
+    /// <summary>印刷プレビューを閉じ、バックグラウンドでのスプール送信を要求するイベント</summary>
+    public event EventHandler<PrintSpoolEventArgs>? SpoolRequested;
 
     /// <summary>エラーが無く印刷実行が可能かどうか</summary>
     public bool CanPrint => !IsPrinting && string.IsNullOrEmpty(RangeErrorMessage) && TotalSheets > 0;
@@ -91,7 +101,8 @@ public partial class PrintViewModel : ObservableObject
         int totalPages,
         int currentPageIndex,
         Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPreviewPageFunc,
-        Func<int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc)
+        Func<int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc,
+        string? documentTitle = null)
     {
         _printService = printService;
         _settings = settings;
@@ -99,6 +110,7 @@ public partial class PrintViewModel : ObservableObject
         _currentPageIndex = currentPageIndex;
         _renderPreviewPageFunc = renderPreviewPageFunc;
         _renderPrintPageFunc = renderPrintPageFunc;
+        _documentTitle = documentTitle;
 
         InitializePrinters();
         _settings.PropertyChanged += OnSettingsPropertyChanged;
@@ -332,13 +344,21 @@ public partial class PrintViewModel : ObservableObject
 
         try
         {
-            bool success = await _printService.PrintAsync(
+            var preparedSheets = await _printService.PrepareSheetsAsync(
                 _renderPrintPageFunc,
-                Settings,
                 _currentSheets,
                 progress);
 
-            RequestClose?.Invoke(success);
+            SpoolRequested?.Invoke(this, new PrintSpoolEventArgs(
+                JobName,
+                Settings.Clone(),
+                preparedSheets));
+
+            RequestClose?.Invoke(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセルは正常終了
         }
         catch
         {
@@ -456,5 +476,28 @@ public partial class PrintViewModel : ObservableObject
         Settings.PropertyChanged -= OnSettingsPropertyChanged;
         _previewCts?.Cancel();
         _previewCts?.Dispose();
+    }
+}
+
+/// <summary>
+/// 印刷プレビュー完了後のスプール送信要求イベント引数
+/// </summary>
+public class PrintSpoolEventArgs : EventArgs
+{
+    /// <summary>印刷ジョブ名</summary>
+    public string JobName { get; }
+
+    /// <summary>印刷設定スナップショット</summary>
+    public PrintSettings Settings { get; }
+
+    /// <summary>事前レンダリング済みシート一覧</summary>
+    public IReadOnlyList<PrintPreparedSheet> PreparedSheets { get; }
+
+    /// <summary>コンストラクタ</summary>
+    public PrintSpoolEventArgs(string jobName, PrintSettings settings, IReadOnlyList<PrintPreparedSheet> preparedSheets)
+    {
+        JobName = jobName;
+        Settings = settings;
+        PreparedSheets = preparedSheets;
     }
 }

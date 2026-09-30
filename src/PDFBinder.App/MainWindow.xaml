@@ -1041,5 +1041,48 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- 印刷タスク待機ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
+              Visibility="{Binding IsPrintWaitDialogVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              Panel.ZIndex="1006">
+            <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
+            <Border Width="460"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource ModalCardBorderStyle}"
+                    Padding="24">
+                <StackPanel>
+                    <!-- ヘッダー（印刷アイコンとタイトル） -->
+                    <DockPanel LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="36" Height="36" Background="#1E3A8A" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE749;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#60A5FA"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="印刷タスクを実行中" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- メッセージ本文 -->
+                    <TextBlock Text="プリンターへの送信が完了するまで待機しています。完了後に自動的に終了します。"
+                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,12" />
+
+                    <!-- 進捗ステータス表示 -->
+                    <TextBlock Text="{Binding PrintWaitTaskStatusText}"
+                               FontSize="12" Foreground="{StaticResource AccentBrush}"
+                               Margin="48,0,0,24" />
+
+                    <!-- アクションボタンエリア（キャンセルボタン） -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Content="キャンセル"
+                                MinWidth="90"
+                                Padding="16,7"
+                                Command="{Binding CancelPrintWaitCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

@@ -46,11 +46,40 @@ public interface IPrintService
     string? GetDefaultPrinterName();
 
     /// <summary>
+    /// 面付けシート一覧から各ページのビットマップ画像を事前生成します。
+    /// </summary>
+    /// <param name="renderPageFunc">ページインデックスからビットマップ画像を生成する関数</param>
+    /// <param name="sheets">面付けシート一覧</param>
+    /// <param name="progress">進捗通知デリゲート（処理済みシート数, 総シート数）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>レンダリング済みの事前準備シート一覧</returns>
+    Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+        Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 事前レンダリング済みのシートデータを使用してプリンターへスプール送信を実行します。
+    /// </summary>
+    /// <param name="preparedSheets">レンダリング済みのシートデータ</param>
+    /// <param name="settings">印刷設定</param>
+    /// <param name="jobName">印刷ジョブ名</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>スプール送信が正常に完了したかどうか</returns>
+    Task<bool> SpoolDocumentAsync(
+        IReadOnlyList<PrintPreparedSheet> preparedSheets,
+        PrintSettings settings,
+        string jobName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 指定された印刷設定と面付けシート情報に基づいて印刷を実行します。
     /// </summary>
     /// <param name="renderPageFunc">ページインデックスからビットマップ画像を生成する関数</param>
     /// <param name="settings">印刷設定</param>
     /// <param name="sheets">面付けシート一覧</param>
+    /// <param name="jobName">印刷ジョブ名（省略時は PDFBinder）</param>
     /// <param name="progress">進捗通知デリゲート（処理済みシート数, 総シート数）</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>印刷が正常に完了したかどうか</returns>
@@ -58,6 +87,7 @@ public interface IPrintService
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
         PrintSettings settings,
         IReadOnlyList<PrintSheetLayout> sheets,
+        string jobName = "PDFBinder",
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default);
 }

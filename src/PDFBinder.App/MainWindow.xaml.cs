@@ -35,7 +35,9 @@ public partial class MainWindow : Window
         _displayProfileService = displayProfileService ?? new DisplayProfileService();
 
         InitializeComponent();
-        DataContext = new MainViewModel();
+        var vm = new MainViewModel();
+        DataContext = vm;
+        vm.RequestCloseWindow = OnViewModelRequestCloseWindow;
 
         CommandBindings.Add(new CommandBinding(SystemCommands.MinimizeWindowCommand, (s, e) => SystemCommands.MinimizeWindow(this)));
         CommandBindings.Add(new CommandBinding(SystemCommands.MaximizeWindowCommand, (s, e) => SystemCommands.MaximizeWindow(this)));
@@ -46,6 +48,16 @@ public partial class MainWindow : Window
 
         RestoreWindowSettings();
         WindowActivationHelper.RegisterWindow(this);
+    }
+
+    /// <summary>
+    /// ViewModel からのウィンドウ終了要求を受け取り、確認済みフラグを立ててウィンドウを閉じます。
+    /// </summary>
+    private void OnViewModelRequestCloseWindow()
+    {
+        _isClosingConfirmed = true;
+        SaveWindowSettings();
+        Close();
     }
 
     /// <summary>
@@ -63,10 +75,13 @@ public partial class MainWindow : Window
         // 1. 保存確認ダイアログのキー制御
         if (HandleSaveConfirmationKeyDown(vm, e)) return;
 
-        // 2. 印刷確認ダイアログのキー制御
+        // 2. 印刷タスク待機ダイアログのキー制御
+        if (HandlePrintWaitDialogKeyDown(vm, e)) return;
+
+        // 3. 印刷確認ダイアログのキー制御
         if (HandlePrintDialogKeyDown(vm, e)) return;
 
-        // 3. バージョン情報ダイアログのキー制御
+        // 4. バージョン情報ダイアログのキー制御
         if (HandleAboutDialogKeyDown(vm, e)) return;
 
         // 3. テキストボックス編集中（ページ番号入力欄等）は、文字入力・カーソル移動・削除を優先
@@ -121,6 +136,30 @@ public partial class MainWindow : Window
         }
 
         // 保存確認ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 印刷タスク待機ダイアログ表示中のキーボード操作（Escによるキャンセル等）を先行処理します。
+    /// </summary>
+    private static bool HandlePrintWaitDialogKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsPrintWaitDialogVisible) return false;
+
+        if (e.Key == Key.Escape)
+        {
+            vm.CancelPrintWaitCommand.Execute(null);
+            e.Handled = true;
+            return true;
+        }
+
+        // 印刷待機ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
         if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
         {
             e.Handled = true;
@@ -343,7 +382,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// ウィンドウ終了時に未保存の変更がある場合、確認ダイアログを表示して終了処理を制御します。
+    /// ウィンドウ終了時に未保存の変更や実行中の印刷タスクがある場合、確認・待機ダイアログを表示して終了処理を制御します。
     /// </summary>
     protected override async void OnClosing(CancelEventArgs e)
     {
@@ -355,29 +394,54 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DataContext is not MainViewModel vm || !vm.HasModifiedDocuments)
+        if (DataContext is not MainViewModel vm)
         {
             SaveWindowSettings();
             return;
         }
 
-        // 既に確認ダイアログが表示中の場合は多重呼び出しを防止
-        if (vm.IsSaveConfirmationVisible)
+        // 1. 未保存変更の確認（優先順位1）
+        if (vm.HasModifiedDocuments)
         {
+            // 既に確認ダイアログが表示中の場合は多重呼び出しを防止
+            if (vm.IsSaveConfirmationVisible)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、順次確認を実施
             e.Cancel = true;
-            return;
-        }
 
-        // 未保存変更があるため一旦ウィンドウクローズをキャンセルし、順次確認を実施
-        e.Cancel = true;
+            bool canClose = await vm.ConfirmSaveAllAsync();
+            if (!canClose)
+            {
+                return;
+            }
 
-        bool canClose = await vm.ConfirmSaveAllAsync();
-        if (canClose)
-        {
+            // 未保存変更の処理完了後、印刷タスク残存を確認
+            if (vm.HasActivePrintTasks)
+            {
+                vm.ShowPrintWaitDialog();
+                return;
+            }
+
             _isClosingConfirmed = true;
             SaveWindowSettings();
             Close();
+            return;
         }
+
+        // 2. 印刷タスク残存の確認（優先順位2）
+        if (vm.HasActivePrintTasks)
+        {
+            e.Cancel = true;
+            vm.ShowPrintWaitDialog();
+            return;
+        }
+
+        // 未保存変更も印刷タスクもない場合はそのまま自然にクローズ
+        SaveWindowSettings();
     }
 
     private void OnFileDropdownItemClick(object sender, RoutedEventArgs e)

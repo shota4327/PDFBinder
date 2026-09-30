@@ -71,4 +71,14 @@ public partial class PrintSettings : ObservableObject
         NUpCount = source.NUpCount;
         DriverDevMode = source.DriverDevMode != null ? (byte[])source.DriverDevMode.Clone() : null;
     }
+
+    /// <summary>
+    /// 設定の複製（ディープコピー）を作成します。
+    /// </summary>
+    public PrintSettings Clone()
+    {
+        var copy = new PrintSettings();
+        copy.CopyFrom(this);
+        return copy;
+    }
 }
