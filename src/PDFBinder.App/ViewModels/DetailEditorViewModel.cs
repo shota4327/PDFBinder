@@ -97,6 +97,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private double _eraserPointThickness = 12.0;
 
     /// <summary>
+    /// 詳細ビューの 4 段階優先レンダリングパイプラインを実行するための外部ハンドラー（MainViewModelとの連携用、引数はデバウンスミリ秒）。
+    /// nullの場合は DetailEditorViewModel 単体で Step 1 および Step 3 を直接レンダリングします。
+    /// </summary>
+    public Func<int, Task>? PipelineExecutionHandler { get; set; }
+
+    /// <summary>
     /// 全ページの表示状態を管理するコレクション
     /// </summary>
     public ObservableCollection<DetailPageItemViewModel> Pages { get; } = new();
@@ -633,6 +639,83 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// 現在の表示モードにおける最優先レンダリング対象ページ（Step 1: 単一表示時はカレントページ、連続表示時は可視ページ群）を取得します。
+    /// </summary>
+    public List<DetailPageItemViewModel> GetPrimaryPagesToRender()
+    {
+        if (Pages.Count == 0) return new List<DetailPageItemViewModel>();
+
+        if (PageViewMode == DetailPageViewMode.Continuous)
+        {
+            return GetContinuousModeTargetPages();
+        }
+
+        var result = new List<DetailPageItemViewModel>();
+        var current = CurrentPageItem;
+        if (current != null)
+        {
+            result.Add(current);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 現在の表示モードにおける周辺先読みレンダリング対象ページ（Step 3: 単一表示時はカレント前後1ページ、連続表示時は可視外側前後1ページ）を取得します。
+    /// </summary>
+    public List<DetailPageItemViewModel> GetSecondaryNeighborPagesToRender()
+    {
+        var result = new List<DetailPageItemViewModel>();
+        if (Pages.Count == 0) return result;
+
+        if (PageViewMode == DetailPageViewMode.Continuous)
+        {
+            var visible = VisiblePagesProvider?.Invoke() ?? Enumerable.Empty<DetailPageItemViewModel>();
+            var visibleList = visible.Where(p => Pages.Contains(p)).ToList();
+            if (visibleList.Count == 0 && CurrentPageItem != null)
+            {
+                visibleList.Add(CurrentPageItem);
+            }
+
+            int minIdx = int.MaxValue;
+            int maxIdx = int.MinValue;
+            foreach (var item in visibleList)
+            {
+                int idx = Pages.IndexOf(item);
+                if (idx >= 0)
+                {
+                    minIdx = Math.Min(minIdx, idx);
+                    maxIdx = Math.Max(maxIdx, idx);
+                }
+            }
+
+            if (minIdx <= maxIdx)
+            {
+                if (minIdx > 0) result.Add(Pages[minIdx - 1]);
+                if (maxIdx < Pages.Count - 1) result.Add(Pages[maxIdx + 1]);
+            }
+            return result;
+        }
+
+        var current = CurrentPageItem;
+        if (current == null) return result;
+
+        if (Zoom <= SelectiveRenderZoomThreshold)
+        {
+            int idx = Pages.IndexOf(current);
+            if (idx > 0)
+            {
+                result.Add(Pages[idx - 1]);
+            }
+            if (idx >= 0 && idx < Pages.Count - 1)
+            {
+                result.Add(Pages[idx + 1]);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 現在の表示モード、ズーム倍率、表示状態に基づいてレンダリング対象とすべきページ一覧を取得します。
     /// 最優先でレンダリングすべきページ（現在ページなど）を先頭に配置します。
     /// </summary>
@@ -821,6 +904,40 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Step 1: 現在の表示モードにおける最優先ページ（単一: カレントページ、連続: 可視ページ群）を高解像度レンダリングします。
+    /// </summary>
+    public async Task RenderPrimaryPagesAsync(CancellationToken token)
+    {
+        var primaryPages = GetPrimaryPagesToRender();
+        long gen = Volatile.Read(ref _renderGeneration);
+        foreach (var pageItem in primaryPages)
+        {
+            token.ThrowIfCancellationRequested();
+            if (gen != Volatile.Read(ref _renderGeneration)) return;
+            var priority = (pageItem == CurrentPageItem) ? RenderPriority.High : RenderPriority.Low;
+            await RenderPageItemAsync(pageItem, gen, token, priority);
+        }
+        OnPropertyChanged(nameof(PageBackground));
+    }
+
+    /// <summary>
+    /// Step 3: 現在の表示モードにおける周辺先読みページ（単一: カレント前後1ページ、連続: 可視外側前後1ページ）を高解像度レンダリングします。
+    /// 完了後に表示範囲外の背景画像解放（EvictOffscreenPageBackgrounds）を実施します。
+    /// </summary>
+    public async Task RenderSecondaryNeighborPagesAsync(CancellationToken token)
+    {
+        var secondaryPages = GetSecondaryNeighborPagesToRender();
+        long gen = Volatile.Read(ref _renderGeneration);
+        foreach (var pageItem in secondaryPages)
+        {
+            token.ThrowIfCancellationRequested();
+            if (gen != Volatile.Read(ref _renderGeneration)) return;
+            await RenderPageItemAsync(pageItem, gen, token, RenderPriority.Low);
+        }
+        EvictOffscreenPageBackgrounds();
+    }
+
     private async Task PerformDynamicRenderAsync(
         long generation,
         CancellationToken token,
@@ -830,8 +947,14 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            int delay = isPageSwitch ? PageSwitchDebounceDelayMs : DebounceDelayMs;
-            if (!immediate && delay > 0)
+            int delay = immediate ? 0 : (isPageSwitch ? PageSwitchDebounceDelayMs : DebounceDelayMs);
+            if (PipelineExecutionHandler != null && !isInitialLoad)
+            {
+                await PipelineExecutionHandler(delay);
+                return;
+            }
+
+            if (delay > 0)
             {
                 await Task.Delay(delay, token);
             }
@@ -839,18 +962,9 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             token.ThrowIfCancellationRequested();
             if (generation != Volatile.Read(ref _renderGeneration)) return;
 
-            var targetPages = GetTargetPagesToRender(isInitialLoad);
-
-            foreach (var item in targetPages)
-            {
-                token.ThrowIfCancellationRequested();
-                if (generation != Volatile.Read(ref _renderGeneration)) return;
-
-                await RenderPageItemAsync(item, generation, token);
-            }
-
-            EvictOffscreenPageBackgrounds();
-            OnPropertyChanged(nameof(PageBackground));
+            // ハンドラー不在時（単体テスト環境等）の直接実行フォールバック
+            await RenderPrimaryPagesAsync(token);
+            await RenderSecondaryNeighborPagesAsync(token);
         }
         catch (OperationCanceledException)
         {
@@ -868,7 +982,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private async Task RenderPageItemAsync(
         DetailPageItemViewModel item,
         long generation,
-        CancellationToken token)
+        CancellationToken token,
+        RenderPriority priority = RenderPriority.Normal)
     {
         var (targetWidth, targetHeight) = CalculateRenderDimensions(item.Page, Zoom);
 
@@ -879,8 +994,6 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             return;
         }
-
-        var priority = (item == CurrentPageItem) ? RenderPriority.High : RenderPriority.Low;
 
         var rendered = await _pdfRenderer.RenderPageAsync(
             item.Page.SourceFilePath,

@@ -236,7 +236,17 @@ public partial class MainViewModel : ObservableObject
 
         if (!value)
         {
-            // グリッドビューに切り替わった場合
+            // グリッドビューに切り替わった場合、詳細ビューパイプラインおよび動的レンダリングを即座に中断
+            try
+            {
+                _thumbnailCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // 既に破棄されている場合は無視
+            }
+            DetailEditor?.CancelDynamicRender();
+
             // 1. 手書きタブ（1）を開いていた場合は表示タブ（2）へ自動切り替え
             if (SelectedRibbonTabIndex == 1)
             {
@@ -258,8 +268,8 @@ public partial class MainViewModel : ObservableObject
                 DetailEditor.ApplyFitMode();
             }
 
-            // 詳細ビューへ切り替わった場合、現在ページの前後10ページのサムネイル生成をスケジュール
-            _ = ScheduleDetailViewThumbnailsAsync();
+            // 詳細ビューへ切り替わった場合、4段階優先レンダリングパイプラインをスケジュール
+            _ = ScheduleDetailViewPipelineAsync();
         }
 
         OnPropertyChanged(nameof(CurrentZoomText));
@@ -504,6 +514,7 @@ public partial class MainViewModel : ObservableObject
         _imageService = imageService ?? new ImageService();
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
+        _detailEditor.PipelineExecutionHandler = delayMs => ScheduleDetailViewPipelineAsync(delayMs);
         _detailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
 
         _document.PropertyChanged += OnDocumentPropertyChanged;
@@ -1804,15 +1815,16 @@ public partial class MainViewModel : ObservableObject
     /// 詳細エディタでの現在ページを中心とした前後10ページのサムネイル生成対象（距離優先順）を取得します。
     /// </summary>
     /// <param name="currentIndex">現在表示中のページインデックス（0始まり）</param>
+    /// <param name="radius">対象とする前後ページ半径（デフォルトはDetailViewThumbnailWindowRadius: 10）</param>
     /// <returns>現在ページから近い順（0, +1, -1, +2, -2...）で未生成またはダーティなページリスト</returns>
-    public List<PdfPageModel> GetDetailViewTargetPages(int currentIndex)
+    public List<PdfPageModel> GetDetailViewTargetPages(int currentIndex, int radius = DetailViewThumbnailWindowRadius)
     {
         var targets = new List<PdfPageModel>();
         if (Document.Pages.Count == 0) return targets;
 
         int clampedIndex = Math.Clamp(currentIndex, 0, Document.Pages.Count - 1);
 
-        for (int distance = 0; distance <= DetailViewThumbnailWindowRadius; distance++)
+        for (int distance = 0; distance <= radius; distance++)
         {
             // 前方（+distance）
             int nextIdx = clampedIndex + distance;
@@ -1866,71 +1878,79 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// ドキュメント初期読み込み時に、先頭50ページのサムネイルをバックグラウンドで先行生成します。
+    /// 先頭50ページのうち、現在ページの前後10ページ範囲外（または未生成のまま残った分）の
+    /// サムネイル生成対象を、現在地からの距離優先順で取得します（Step 4用）。
     /// </summary>
-    /// <param name="debounceMs">デバウンス待機時間（ミリ秒）</param>
-    public Task ScheduleInitialThumbnailsAsync(int debounceMs = 250)
+    /// <param name="currentIndex">現在表示中のページインデックス（0始まり）</param>
+    /// <param name="maxPageCount">対象とする先頭最大ページ数（デフォルト50）</param>
+    /// <returns>現在地から近い順（距離昇順、同距離は前方優先）の未生成ページリスト</returns>
+    public List<PdfPageModel> GetRemainingPreloadTargetPages(int currentIndex, int maxPageCount = 50)
     {
-        if (!IsDetailViewActive || Document.Pages.Count == 0)
+        var targets = new List<PdfPageModel>();
+        if (Document.Pages.Count == 0) return targets;
+
+        int limit = Math.Min(Document.Pages.Count, maxPageCount);
+        int clampedIndex = Math.Clamp(currentIndex, 0, Document.Pages.Count - 1);
+
+        var candidates = new List<(PdfPageModel page, int distance, int index)>();
+        for (int i = 0; i < limit; i++)
         {
-            return Task.CompletedTask;
+            var page = Document.Pages[i];
+            if (page.Thumbnail == null || page.IsThumbnailDirty)
+            {
+                int dist = Math.Abs(i - clampedIndex);
+                candidates.Add((page, dist, i));
+            }
         }
 
-        var oldCts = _thumbnailCts;
-        try
-        {
-            oldCts?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // 既に破棄されている場合は無視
-        }
-
-        var newCts = new CancellationTokenSource();
-        _thumbnailCts = newCts;
-
-        var task = RunSilentThumbnailGenerationAsync(GetInitialPreloadTargetPages, newCts, debounceMs);
-        _thumbnailTask = task;
-        return task;
+        // 距離が近い順、同距離なら前方（インデックスが大きい方）を優先
+        return candidates
+            .OrderBy(c => c.distance)
+            .ThenByDescending(c => c.index)
+            .Select(c => c.page)
+            .ToList();
     }
 
     /// <summary>
-    /// 詳細エディタ表示中に、現在ページの前後10ページのサムネイルを距離優先順でバックグラウンド生成します。
+    /// Step 2: 現在ページの前後10ページのサムネイルを距離優先順で生成します。
     /// </summary>
-    /// <param name="debounceMs">デバウンス待機時間（ミリ秒）</param>
-    public Task ScheduleDetailViewThumbnailsAsync(int debounceMs = 250)
+    public async Task GenerateWindowThumbnailsAsync(int currentIndex, int radius, CancellationToken token)
     {
-        if (!IsDetailViewActive || Document.Pages.Count == 0)
+        var targets = GetDetailViewTargetPages(currentIndex, radius);
+        foreach (var page in targets)
         {
-            return Task.CompletedTask;
-        }
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive) return;
 
-        var oldCts = _thumbnailCts;
-        try
-        {
-            oldCts?.Cancel();
+            await UpdatePageThumbnailAsync(page, token);
+            page.IsThumbnailDirty = false;
         }
-        catch (ObjectDisposedException)
-        {
-            // 既に破棄されている場合は無視
-        }
-
-        var newCts = new CancellationTokenSource();
-        _thumbnailCts = newCts;
-
-        var task = RunSilentThumbnailGenerationAsync(() =>
-        {
-            int currentIdx = DetailEditor?.CurrentPageIndex ?? 0;
-            return GetDetailViewTargetPages(currentIdx);
-        }, newCts, debounceMs);
-        _thumbnailTask = task;
-        return task;
     }
 
     /// <summary>
-    /// 詳細エディタ表示中用のサムネイル生成ループを実行します（UIに干渉しないサイレント実行）。
+    /// Step 4: 先頭50ページのうち、Step 2の対象外となった未生成サムネイルを現在地からの距離優先順で生成します。
     /// </summary>
-    private async Task RunSilentThumbnailGenerationAsync(Func<List<PdfPageModel>> targetsProvider, CancellationTokenSource cts, int debounceMs)
+    public async Task GenerateRemainingPreloadThumbnailsAsync(int currentIndex, int maxPageCount, CancellationToken token)
+    {
+        var targets = GetRemainingPreloadTargetPages(currentIndex, maxPageCount);
+        foreach (var page in targets)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive) return;
+
+            await UpdatePageThumbnailAsync(page, token);
+            page.IsThumbnailDirty = false;
+        }
+    }
+
+    /// <summary>
+    /// 詳細エディタ表示時における 4 段階優先順位パイプラインを実行します。
+    /// 1. 現在表示中ページの高解像度背景（Step 1）
+    /// 2. 前後10ページのサムネイル（Step 2）
+    /// 3. 前後ページの高解像度背景（Step 3）
+    /// 4. 先頭50ページのサムネイル未生成分（Step 4）
+    /// </summary>
+    public async Task RunDetailViewPipelineAsync(int currentIndex, CancellationTokenSource cts, int debounceMs = 0)
     {
         var token = cts.Token;
         try
@@ -1941,21 +1961,28 @@ public partial class MainViewModel : ObservableObject
             }
 
             token.ThrowIfCancellationRequested();
-            if (!IsDetailViewActive || Document.Pages.Count == 0) return;
+            if (!IsDetailViewActive || DetailEditor == null || Document.Pages.Count == 0) return;
 
-            var targets = targetsProvider();
-            if (targets.Count == 0) return;
+            // Step 1: 現在表示中ページの高解像度背景
+            await DetailEditor.RenderPrimaryPagesAsync(token);
 
-            foreach (var page in targets)
-            {
-                if (token.IsCancellationRequested || !IsDetailViewActive)
-                {
-                    break;
-                }
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive) return;
 
-                await UpdatePageThumbnailAsync(page, token);
-                page.IsThumbnailDirty = false;
-            }
+            // Step 2: 前後10ページのサムネイル
+            await GenerateWindowThumbnailsAsync(currentIndex, DetailViewThumbnailWindowRadius, token);
+
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive || DetailEditor == null) return;
+
+            // Step 3: 前後ページの高解像度背景
+            await DetailEditor.RenderSecondaryNeighborPagesAsync(token);
+
+            token.ThrowIfCancellationRequested();
+            if (!IsDetailViewActive) return;
+
+            // Step 4: 先頭50ページの未生成サムネイル
+            await GenerateRemainingPreloadThumbnailsAsync(currentIndex, InitialPreloadThumbnailPageCount, token);
         }
         catch (OperationCanceledException)
         {
@@ -1963,7 +1990,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"詳細エディタサムネイル生成エラー: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"DetailViewPipeline error: {ex.Message}");
         }
         finally
         {
@@ -1972,6 +1999,52 @@ public partial class MainViewModel : ObservableObject
                 _thumbnailTask = null;
             }
         }
+    }
+
+    /// <summary>
+    /// 詳細ビューの 4 段階優先レンダリングパイプラインをスケジュールします。
+    /// 実行中のパイプラインがあれば即座にキャンセルして新しいタスクを開始します。
+    /// </summary>
+    public Task ScheduleDetailViewPipelineAsync(int debounceMs = 0)
+    {
+        if (!IsDetailViewActive || Document.Pages.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var oldCts = _thumbnailCts;
+        try
+        {
+            oldCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 既に破棄されている場合は無視
+        }
+
+        var newCts = new CancellationTokenSource();
+        _thumbnailCts = newCts;
+
+        int currentIdx = DetailEditor?.CurrentPageIndex ?? 0;
+        var task = RunDetailViewPipelineAsync(currentIdx, newCts, debounceMs);
+        _thumbnailTask = task;
+        return task;
+    }
+
+    /// <summary>
+    /// ドキュメント初期読み込み時に、詳細ビューの 4 段階優先パイプラインをバックグラウンドで開始します。
+    /// </summary>
+    public Task ScheduleInitialThumbnailsAsync(int debounceMs = 250)
+    {
+        return ScheduleDetailViewPipelineAsync(debounceMs);
+    }
+
+    /// <summary>
+    /// 詳細エディタ表示中に、詳細ビューの 4 段階優先パイプラインをバックグラウンドで開始します。
+    /// </summary>
+    public Task ScheduleDetailViewThumbnailsAsync(int debounceMs = 250)
+    {
+        return ScheduleDetailViewPipelineAsync(debounceMs);
     }
 
     [RelayCommand]
