@@ -79,6 +79,7 @@
 | **F70** | レンダリング / 手書き詳細 | 詳細エディタ 4 段階優先順位パイプライン（現在高解像度 → 前後10サムネイル → 前後高解像度 → 先頭50サムネイル未生成分距離優先生成、順序保証・中断再開制御） | **完了** | Issue #191 追加改修-2 / DetailEditorViewModel, MainViewModel |
 | **F71** | UI・印刷 | 印刷ジョブ名へのファイル名反映（{ファイル名} - PDFBinder）＆バックグラウンドSTA非同期スプール送信によるフリーズ完全解消・ステータスバー進捗連携・多重印刷キューイング・アプリ終了待機オーバーレイダイアログ | **完了** | Issue #190 / WpfPrintService, BackgroundPrintQueueService, PrintViewModel, MainViewModel |
 | **F72** | UI・詳細手書き | 詳細エディタでの透過背景PDF文字影・滲み解消（高解像度画像読み込み完了時の仮プレビューサムネイル自動非表示・文字二重露光根絶・GPUオーバードロー削減） | **完了** | Issue #194 / DetailEditorView.xaml |
+| **F73** | UI・印刷 | バックグラウンド印刷完了時の正確な残数通知＆終了待機ダイアログ未終了バグ解消（`_currentJob` 状態管理、残数0通知是正、二重セーフティ閉塞、ステータスバー自動復帰） | **完了** | Issue #196 / BackgroundPrintQueueService, MainViewModel |
 
 ---
 

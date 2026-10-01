@@ -50,6 +50,7 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
     private readonly Queue<PrintSpoolJob> _queue = new();
     private readonly object _lock = new();
     private bool _isProcessing;
+    private PrintSpoolJob? _currentJob;
     private TaskCompletionSource<bool>? _allCompletedTcs;
 
     /// <inheritdoc/>
@@ -59,7 +60,7 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
         {
             lock (_lock)
             {
-                return _queue.Count + (_isProcessing ? 1 : 0);
+                return _queue.Count + (_currentJob != null ? 1 : 0);
             }
         }
     }
@@ -93,7 +94,7 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
         lock (_lock)
         {
             _queue.Enqueue(job);
-            count = _queue.Count + (_isProcessing ? 1 : 0);
+            count = _queue.Count + (_currentJob != null ? 1 : 0);
         }
 
         ActiveJobCountChanged?.Invoke(count);
@@ -141,6 +142,7 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
             {
                 if (_queue.Count == 0)
                 {
+                    _currentJob = null;
                     _isProcessing = false;
                     _allCompletedTcs?.TrySetResult(true);
                     _allCompletedTcs = null;
@@ -148,16 +150,10 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
                 }
 
                 job = _queue.Dequeue();
+                _currentJob = job;
             }
 
             await ExecuteSingleJobAsync(job);
-
-            int remaining;
-            lock (_lock)
-            {
-                remaining = _queue.Count + (_isProcessing ? 1 : 0);
-            }
-            ActiveJobCountChanged?.Invoke(remaining);
         }
     }
 
@@ -184,6 +180,19 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
             errorMessage = ex.Message;
         }
 
+        int remaining;
+        lock (_lock)
+        {
+            _currentJob = null;
+            remaining = _queue.Count;
+            if (remaining == 0)
+            {
+                _allCompletedTcs?.TrySetResult(true);
+                _allCompletedTcs = null;
+            }
+        }
+
         JobCompleted?.Invoke(job, success, errorMessage);
+        ActiveJobCountChanged?.Invoke(remaining);
     }
 }
