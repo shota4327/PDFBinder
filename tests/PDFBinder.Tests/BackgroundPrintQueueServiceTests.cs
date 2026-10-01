@@ -163,4 +163,47 @@ public class BackgroundPrintQueueServiceTests
         Assert.False(successReported);
         Assert.Contains("プリンタードライバーエラー", errorReported);
     }
+
+    [Fact]
+    public async Task Enqueue_JobCompleted_ActiveJobCountIsZeroAtCallback()
+    {
+        var mockService = new MockPrintService();
+        var queueService = new BackgroundPrintQueueService(mockService);
+
+        var job = new PrintSpoolJob("count-test - PDFBinder", new PrintSettings(), Array.Empty<PrintPreparedSheet>());
+        int countAtJobCompleted = -1;
+
+        queueService.JobCompleted += (j, success, err) =>
+        {
+            countAtJobCompleted = queueService.ActiveJobCount;
+        };
+
+        queueService.Enqueue(job);
+        await queueService.WaitForAllJobsAsync();
+
+        Assert.Equal(0, countAtJobCompleted);
+        Assert.Equal(0, queueService.ActiveJobCount);
+    }
+
+    [Fact]
+    public async Task Enqueue_SingleJob_FiresActiveJobCountChangedWithZero()
+    {
+        var mockService = new MockPrintService();
+        var queueService = new BackgroundPrintQueueService(mockService);
+
+        var job = new PrintSpoolJob("notify-zero - PDFBinder", new PrintSettings(), Array.Empty<PrintPreparedSheet>());
+        var recordedCounts = new List<int>();
+
+        queueService.ActiveJobCountChanged += count =>
+        {
+            recordedCounts.Add(count);
+        };
+
+        queueService.Enqueue(job);
+        await queueService.WaitForAllJobsAsync();
+
+        Assert.Contains(1, recordedCounts);
+        Assert.Contains(0, recordedCounts);
+        Assert.Equal(0, recordedCounts.Last());
+    }
 }

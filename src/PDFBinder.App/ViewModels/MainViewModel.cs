@@ -2264,6 +2264,12 @@ public partial class MainViewModel : ObservableObject
                 StatusMessage = text;
                 PrintWaitTaskStatusText = text;
             }
+            else if (IsPrintWaitDialogVisible)
+            {
+                // 残数0通知受信時における待機ダイアログ閉塞・終了要求の二重セーフティ
+                IsPrintWaitDialogVisible = false;
+                RequestCloseWindow?.Invoke();
+            }
         });
     }
 

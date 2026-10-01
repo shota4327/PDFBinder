@@ -136,4 +136,63 @@ public class MainViewModelPrintExitTests
         Assert.Equal("印刷エラー", promptTitle);
         Assert.Contains("通信エラーが発生しました", promptMessage);
     }
+
+    private class ControllablePrintService : IPrintService
+    {
+        public TaskCompletionSource<bool> SpoolTcs { get; } = new();
+
+        public Task<bool> SpoolDocumentAsync(
+            IReadOnlyList<PrintPreparedSheet> preparedSheets,
+            PrintSettings settings,
+            string jobName,
+            CancellationToken cancellationToken = default)
+        {
+            return SpoolTcs.Task;
+        }
+
+        public IReadOnlyList<string> GetInstalledPrinters() => Array.Empty<string>();
+        public string? GetDefaultPrinterName() => null;
+        public PrinterSettingsDialogResult? ShowPrinterSettingsDialog(string printerName, nint ownerHwnd, byte[]? currentDevMode = null) => null;
+        public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+            Func<int, CancellationToken, Task<System.Windows.Media.Imaging.BitmapSource?>> renderPageFunc,
+            IReadOnlyList<PrintSheetLayout> sheets,
+            IProgress<(int currentSheet, int totalSheets)>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(Array.Empty<PrintPreparedSheet>());
+        public Task<bool> PrintAsync(
+            Func<int, CancellationToken, Task<System.Windows.Media.Imaging.BitmapSource?>> renderPageFunc,
+            PrintSettings settings,
+            IReadOnlyList<PrintSheetLayout> sheets,
+            string jobName = "PDFBinder",
+            IProgress<(int currentSheet, int totalSheets)>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+    }
+
+    [Fact]
+    public async Task PrintJob_WithRealBackgroundPrintQueueService_ClosesWaitDialogAndRequestsCloseWindowOnCompletion()
+    {
+        var printService = new ControllablePrintService();
+        var realQueue = new BackgroundPrintQueueService(printService);
+        var vm = new MainViewModel(printQueueService: realQueue);
+        vm.UiDispatcherOverride = action => action();
+
+        bool closeRequested = false;
+        vm.RequestCloseWindow = () => closeRequested = true;
+
+        var job = new PrintSpoolJob("real-queue-test - PDFBinder", new PrintSettings(), Array.Empty<PrintPreparedSheet>());
+        realQueue.Enqueue(job);
+
+        // 印刷処理中にアプリ終了が試行され待機ダイアログが表示された状態をシミュレート
+        vm.ShowPrintWaitDialog();
+        Assert.True(vm.IsPrintWaitDialogVisible);
+
+        // バックグラウンド印刷スプールの完了をシグナル
+        printService.SpoolTcs.SetResult(true);
+        await realQueue.WaitForAllJobsAsync();
+
+        Assert.True(closeRequested);
+        Assert.False(vm.IsPrintWaitDialogVisible);
+        Assert.Equal("印刷データを送信しました", vm.StatusMessage);
+    }
 }
