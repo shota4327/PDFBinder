@@ -289,6 +289,12 @@
                                     <TextBlock Text="ページ分割" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
+                            <Button Command="{Binding ShowExportImagesDialogCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="ページをJPEG/PNG画像として書き出し">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="画像保存" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 
@@ -981,6 +987,161 @@
                                     Margin="0,0,8,0"
                                     Command="{Binding ExecutePrintCommand}"
                                     IsEnabled="{Binding CanPrint}" />
+
+                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="キャンセル"
+                                    MinWidth="90"
+                                    Padding="16,7"
+                                    Command="{Binding CancelCommand}" />
+                        </StackPanel>
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 画像書き出し設定・プレビュー確認ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
+              Visibility="{Binding IsExportImagesDialogVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              Panel.ZIndex="1001">
+            <Border HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center"
+                    MaxHeight="750"
+                    Margin="24,16"
+                    Style="{StaticResource ModalCardBorderStyle}"
+                    Padding="22"
+                    DataContext="{Binding ExportImagesViewModel}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- ヘッダー（アイコンとタイトル） -->
+                    <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="34" Height="34" Background="#094771" CornerRadius="17" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="{StaticResource AccentBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="画像書き出し" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- メインコンテンツ（左右2分割：左=設定パネル、右=全幅連動プレビュー） -->
+                    <Grid Grid.Row="1" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="360" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 左側：設定パネル -->
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,16,0">
+                            <StackPanel>
+                                <!-- 出力形式（フォーマット） -->
+                                <TextBlock Text="出力形式" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <RadioButton Content="PNG" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="18,6" Margin="0,0,6,0"
+                                                 IsChecked="{Binding Settings.Format, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Png}" />
+                                    <RadioButton Content="JPEG" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="18,6"
+                                                 IsChecked="{Binding Settings.Format, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Jpeg}" />
+                                </StackPanel>
+
+                                <!-- 解像度（DPI） -->
+                                <TextBlock Text="解像度 (DPI)" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <WrapPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <RadioButton Content="200 dpi" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="12,6" Margin="0,0,6,6"
+                                                 IsChecked="{Binding Settings.Dpi, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Dpi200}" />
+                                    <RadioButton Content="300 dpi" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="12,6" Margin="0,0,6,6"
+                                                 IsChecked="{Binding Settings.Dpi, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Dpi300}" />
+                                    <RadioButton Content="400 dpi" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="12,6" Margin="0,0,6,6"
+                                                 IsChecked="{Binding Settings.Dpi, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Dpi400}" />
+                                    <RadioButton Content="600 dpi" Style="{StaticResource DarkToggleRadioButtonStyle}" Padding="12,6" Margin="0,0,0,6"
+                                                 IsChecked="{Binding Settings.Dpi, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Dpi600}" />
+                                </WrapPanel>
+
+                                <!-- 書き出し範囲 -->
+                                <TextBlock Text="書き出し範囲" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,5" />
+                                <StackPanel Orientation="Vertical" Margin="0,0,0,14">
+                                    <RadioButton Content="すべて" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
+                                                 IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=AllPages}" />
+                                    <RadioButton Content="現在のページ" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" Margin="0,0,0,4" HorizontalAlignment="Left"
+                                                 IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=CurrentPage}" />
+
+                                    <!-- ページ指定行：ボタンの右横に入力欄をインライン配置 -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <RadioButton Content="ページ指定" Style="{StaticResource DarkToggleRadioButtonStyle}" Width="120" HorizontalContentAlignment="Center" x:Name="ExportCustomRangeToggle"
+                                                     IsChecked="{Binding Settings.RangeType, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Custom}" />
+
+                                        <!-- ページ指定選択時のみ右横に表示 -->
+                                        <TextBox Text="{Binding Settings.CustomRangeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource DarkTextBoxStyle}"
+                                                 ToolTip="例: 1-3, 5, 8" Width="150" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                 Visibility="{Binding IsChecked, ElementName=ExportCustomRangeToggle, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+
+                                    <!-- 入力エラーメッセージ（入力欄の下に表示） -->
+                                    <TextBlock Text="{Binding RangeErrorMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" Margin="128,3,0,0"
+                                               Visibility="{Binding RangeErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- 縦仕切り線 -->
+                        <Border Grid.Column="1" Background="{StaticResource SurfaceBorderBrush}" Margin="0,4" />
+
+                        <!-- 右側：全幅連動プレビュー領域 -->
+                        <Grid Grid.Column="2" Margin="16,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- 用紙プレビュー表示領域（ダーク背景） -->
+                            <Border Grid.Row="0" Background="#161616" BorderBrush="{StaticResource SurfaceBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="18">
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- 用紙シャドウと紙面 -->
+                                    <Border Background="White" CornerRadius="2">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="14" Color="#000000" Direction="270" Opacity="0.6" ShadowDepth="5" />
+                                        </Border.Effect>
+                                        <Image Source="{Binding PreviewImage}" Stretch="Uniform" />
+                                    </Border>
+
+                                    <!-- 読み込み中インジケータ -->
+                                    <TextBlock Text="プレビュー生成中..." FontSize="13" Foreground="{StaticResource TextMutedBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding IsLoadingPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </Grid>
+                            </Border>
+
+                            <!-- プレビュー下部ナビゲーション -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,12,0,0">
+                                <Button Command="{Binding PreviousPageCommand}" Style="{StaticResource MiniIconButtonStyle}" Content="◀" ToolTip="前のページ" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding DisplayExportPageText}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Button Command="{Binding NextPageCommand}" Style="{StaticResource MiniIconButtonStyle}" Content="▶" ToolTip="次のページ" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <!-- フッター（進捗表示とアクションボタン） -->
+                    <DockPanel Grid.Row="2" LastChildFill="True" Margin="0,6,0,0">
+                        <!-- 進捗情報 -->
+                        <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,16,0"
+                                    Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="{Binding ExportProgressText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <ProgressBar Value="{Binding ExportProgressValue}" Style="{StaticResource DarkProgressBarStyle}" Width="220" />
+                        </StackPanel>
+
+                        <!-- アクションボタンエリア -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="書き出し"
+                                    MinWidth="90"
+                                    Padding="16,7"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding ExecuteExportCommand}"
+                                    IsEnabled="{Binding CanExport}" />
 
                             <Button Style="{StaticResource SecondaryButtonStyle}"
                                     Content="キャンセル"
