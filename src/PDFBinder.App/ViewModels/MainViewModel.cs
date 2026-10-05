@@ -23,8 +23,10 @@ public partial class MainViewModel : ObservableObject
     private readonly IUndoRedoService _undoRedoService;
     private readonly IPrintService _printService;
     private readonly IImageService _imageService;
+    private readonly IImageExportService _imageExportService;
     private readonly IBackgroundPrintQueueService _printQueueService;
     private readonly PrintSettings _persistentPrintSettings = new();
+    private readonly ImageExportSettings _persistentImageExportSettings = new();
     private CancellationTokenSource? _thumbnailCts;
     private Task? _thumbnailTask;
     private CancellationTokenSource? _statusResetCts;
@@ -138,6 +140,13 @@ public partial class MainViewModel : ObservableObject
     private bool _isPrintWaitDialogVisible;
 
     /// <summary>
+    /// 画像書き出しダイアログ（インアプリオーバーレイ）を表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanExportImages))]
+    private bool _isExportImagesDialogVisible;
+
+    /// <summary>
     /// 印刷タスク待機ダイアログ内の進捗状況テキスト
     /// </summary>
     [ObservableProperty]
@@ -182,6 +191,12 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private PrintViewModel? _printViewModel;
+
+    /// <summary>
+    /// 現在表示中の画像書き出しダイアログViewModel
+    /// </summary>
+    [ObservableProperty]
+    private ExportImagesViewModel? _exportImagesViewModel;
 
     /// <summary>
     /// サムネイル基準サイズ（初期値 = 220px）
@@ -530,7 +545,8 @@ public partial class MainViewModel : ObservableObject
         IUndoRedoService? undoRedoService = null,
         IPrintService? printService = null,
         IImageService? imageService = null,
-        IBackgroundPrintQueueService? printQueueService = null)
+        IBackgroundPrintQueueService? printQueueService = null,
+        IImageExportService? imageExportService = null)
     {
         _pdfService = pdfService ?? new PdfService();
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
@@ -538,6 +554,7 @@ public partial class MainViewModel : ObservableObject
         _printService = printService ?? new WpfPrintService();
         _imageService = imageService ?? new ImageService();
         _printQueueService = printQueueService ?? new BackgroundPrintQueueService(_printService);
+        _imageExportService = imageExportService ?? new ImageExportService();
 
         _printQueueService.ActiveJobCountChanged += OnPrintQueueCountChanged;
         _printQueueService.JobCompleted += OnPrintJobCompleted;
@@ -800,9 +817,11 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CanGoToNextPage));
         OnPropertyChanged(nameof(CurrentPageNumber));
         OnPropertyChanged(nameof(CanExecutePrint));
+        OnPropertyChanged(nameof(CanExportImages));
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
         GoToNextPageCommand.NotifyCanExecuteChanged();
         ShowPrintDialogCommand.NotifyCanExecuteChanged();
+        ShowExportImagesDialogCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -2239,6 +2258,68 @@ public partial class MainViewModel : ObservableObject
             PrintViewModel.SpoolRequested -= OnPrintSpoolRequested;
             PrintViewModel.Cleanup();
             PrintViewModel = null;
+        }
+    }
+
+    /// <summary>
+    /// 画像書き出しコマンドが実行可能かどうかを取得します。
+    /// </summary>
+    public bool CanExportImages => Document.Pages.Count > 0 && !IsExportImagesDialogVisible;
+
+    /// <summary>
+    /// 画像書き出しダイアログ（インアプリオーバーレイ）を表示します。
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanExportImages))]
+    public void ShowExportImagesDialog()
+    {
+        if (Document.Pages.Count == 0) return;
+
+        int currentIdx = DetailEditor != null ? DetailEditor.CurrentPageIndex : 0;
+        if (currentIdx < 0 || currentIdx >= Document.Pages.Count)
+        {
+            currentIdx = 0;
+        }
+
+        string docTitle = ActiveSession?.Document?.FileName ?? Document.FileName;
+        ExportImagesViewModel = new ExportImagesViewModel(
+            _imageExportService,
+            _persistentImageExportSettings,
+            Document.Pages.Count,
+            currentIdx,
+            (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
+            (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
+            idx => (Document.Pages[idx].DisplayWidth, Document.Pages[idx].DisplayHeight),
+            docTitle);
+
+        ExportImagesViewModel.RequestClose += OnExportImagesDialogRequestClose;
+        IsExportImagesDialogVisible = true;
+    }
+
+    /// <summary>
+    /// 画像書き出しダイアログを閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void CloseExportImagesDialog()
+    {
+        ExportImagesViewModel?.CancelCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// 画像書き出しダイアログからの終了通知を処理します。
+    /// </summary>
+    private void OnExportImagesDialogRequestClose(bool success, int count, string? path)
+    {
+        IsExportImagesDialogVisible = false;
+        if (ExportImagesViewModel != null)
+        {
+            ExportImagesViewModel.RequestClose -= OnExportImagesDialogRequestClose;
+            ExportImagesViewModel.Cleanup();
+            ExportImagesViewModel = null;
+        }
+
+        if (success && !string.IsNullOrEmpty(path))
+        {
+            StatusMessage = $"{count} 件の画像を書き出しました: {path}";
         }
     }
 
