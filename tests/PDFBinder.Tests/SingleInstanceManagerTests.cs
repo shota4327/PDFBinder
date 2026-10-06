@@ -23,6 +23,25 @@ public class SingleInstanceManagerTests
     }
 
     [Fact]
+    public void TryAcquireOwnership_SecondInstanceRetriesAfterFirstDisposed_AcquiresOwnership()
+    {
+        var manager1 = new SingleInstanceManager();
+        Assert.True(manager1.TryAcquireOwnership());
+
+        using var manager2 = new SingleInstanceManager();
+        // 1回目: manager1 が所有しているため失敗
+        Assert.False(manager2.TryAcquireOwnership());
+        // 2回目（再試行）: 依然として manager1 が所有しているため失敗（既存の未所有ミューテックスが安全に破棄される）
+        Assert.False(manager2.TryAcquireOwnership());
+
+        // manager1 を解放
+        manager1.Dispose();
+
+        // 3回目: manager1 解放後は所有権を取得できること
+        Assert.True(manager2.TryAcquireOwnership());
+    }
+
+    [Fact]
     public async Task IPC_Communication_SendsAndReceivesPayload()
     {
         using var serverManager = new SingleInstanceManager();

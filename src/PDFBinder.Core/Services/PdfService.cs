@@ -24,6 +24,14 @@ public class PdfService : IPdfService
         }
 
         byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
+        return await Task.Run(() => ParseDocumentModel(filePath, fileBytes));
+    }
+
+    /// <summary>
+    /// PDFバイト列からドキュメントモデルを解析・構築します（バックグラウンド処理用）。
+    /// </summary>
+    private static PdfDocumentModel ParseDocumentModel(string filePath, byte[] fileBytes)
+    {
         using var stream = new MemoryStream(fileBytes);
         using var pdfDoc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
 
@@ -47,6 +55,11 @@ public class PdfService : IPdfService
                 Rotation = pageRotation
             };
             RestoreInkStrokesIfPresent(pdfPage, pageModel);
+            if (pageModel.InkStrokes.Count > 0)
+            {
+                pageModel.HasSourceBinderInkAnnotation = true;
+                model.HasBinderInkAnnotations = true;
+            }
             model.AddPage(pageModel);
         }
 

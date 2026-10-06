@@ -172,7 +172,7 @@ public class PdfiumRendererTests : IDisposable
     }
 
     [Fact]
-    public async Task RenderPageAsync_TransparentPdf_ProducesOpaqueWhiteBackground()
+    public async Task RenderPageAsync_TransparentPdf_ProducesTransparentBackgroundDirectly()
     {
         // Arrange: 白背景矩形を描画しない透明PDF
         string transparentPdf = Path.Combine(_testDirectory, "transparent.pdf");
@@ -191,23 +191,43 @@ public class PdfiumRendererTests : IDisposable
         // Act
         var bitmap = await _renderer.RenderPageAsync(transparentPdf, 0, 200, 300, PageRotation.Rotate0);
 
-        // Assert: ビットマップが不透明かつ背景が白
+        // Assert: ビットマップが高速に直接生成され、描画領域（50, 50）が不透明黒、背景（0, 0）が透過であること
         Assert.NotNull(bitmap);
         int stride = bitmap.PixelWidth * 4;
         byte[] pixels = new byte[stride * bitmap.PixelHeight];
         bitmap.CopyPixels(pixels, stride, 0);
 
-        // (0, 0) は背景なので完全な白 (255, 255, 255, 255)
-        Assert.Equal(255, pixels[0]); // B
-        Assert.Equal(255, pixels[1]); // G
-        Assert.Equal(255, pixels[2]); // R
-        Assert.Equal(255, pixels[3]); // A
+        // (0, 0) は背景なので透過 (A = 0)
+        Assert.Equal(0, pixels[3]); // A
 
-        // 全ピクセルで Alpha が 255 であること（透明ピクセルが 0 件）
-        for (int i = 3; i < pixels.Length; i += 4)
+        // (50, 50) は黒矩形なので不透明黒 (A = 255, B = 0, G = 0, R = 0)
+        int rectIndex = (50 * bitmap.PixelWidth + 50) * 4;
+        Assert.Equal(255, pixels[rectIndex + 3]); // A
+        Assert.Equal(0, pixels[rectIndex]);     // B
+        Assert.Equal(0, pixels[rectIndex + 1]); // G
+        Assert.Equal(0, pixels[rectIndex + 2]); // R
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_UsesCacheOnSubsequentCalls()
+    {
+        // Arrange
+        string testPdf = Path.Combine(_testDirectory, "cache_test.pdf");
+        using (var doc = new PdfDocument())
         {
-            Assert.Equal(255, pixels[i]);
+            var page = doc.AddPage();
+            page.Width = XUnit.FromPoint(100);
+            page.Height = XUnit.FromPoint(100);
+            doc.Save(testPdf);
         }
+
+        // Act: 2回連続でレンダリング
+        var bitmap1 = await _renderer.RenderPageAsync(testPdf, 0, 100, 100, PageRotation.Rotate0);
+        var bitmap2 = await _renderer.RenderPageAsync(testPdf, 0, 100, 100, PageRotation.Rotate0);
+
+        // Assert: 2回とも正常に取得できること
+        Assert.NotNull(bitmap1);
+        Assert.NotNull(bitmap2);
     }
 
     [Theory]

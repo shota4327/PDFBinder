@@ -25,6 +25,9 @@ public partial class PdfPageModel : ObservableObject
     /// <summary>元PDF読み込み時の初期回転角度</summary>
     public PageRotation OriginalRotation { get; set; } = PageRotation.Rotate0;
 
+    /// <summary>読み込み元のPDFページにPDF Binder専用手書き注釈が含まれていたかどうか</summary>
+    public bool HasSourceBinderInkAnnotation { get; set; }
+
     /// <summary>ドキュメント種別（PDFまたは画像）</summary>
     public DocumentKind DocumentKind { get; set; } = DocumentKind.Pdf;
 

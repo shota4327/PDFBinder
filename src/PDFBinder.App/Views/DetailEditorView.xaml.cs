@@ -37,7 +37,24 @@ public partial class DetailEditorView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        UpdateDpiToViewModel();
         UpdateViewportToViewModel();
+    }
+
+    /// <inheritdoc/>
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        UpdateDpiToViewModel();
+    }
+
+    private void UpdateDpiToViewModel()
+    {
+        if (ViewModel != null)
+        {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            ViewModel.DpiScale = dpi.DpiScaleX;
+        }
     }
 
     private void OnDetailScrollViewerSizeChanged(object sender, SizeChangedEventArgs e)

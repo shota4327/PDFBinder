@@ -163,6 +163,17 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private bool _isPenPressureEnabled;
 
     /// <summary>
+    /// 現在のモニターのDPIスケール倍率（100%=1.0, 150%=1.5, 200%=2.0等）
+    /// </summary>
+    [ObservableProperty]
+    private double _dpiScale = 1.0;
+
+    partial void OnDpiScaleChanged(double value)
+    {
+        _ = ScheduleDynamicRender(immediate: false);
+    }
+
+    /// <summary>
     /// 直線トグルボタンを有効化できるか（ペンまたは蛍光ペン選択時のみtrue）
     /// </summary>
     public bool CanToggleStraightLine => SelectedTool == EditorToolMode.Pen || SelectedTool == EditorToolMode.Highlighter;
@@ -570,7 +581,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public (int width, int height) CalculateRenderDimensions(PdfPageModel page, double zoom)
     {
-        double scale = PtToDipScale * zoom;
+        double effectiveDpi = DpiScale > 0 ? DpiScale : 1.0;
+        double scale = PtToDipScale * zoom * effectiveDpi;
         int targetWidth = Math.Clamp((int)Math.Round(page.DisplayWidth * scale), MinRenderDimension, MaxRenderDimension);
         int targetHeight = Math.Clamp((int)Math.Round(page.DisplayHeight * scale), MinRenderDimension, MaxRenderDimension);
         return (targetWidth, targetHeight);

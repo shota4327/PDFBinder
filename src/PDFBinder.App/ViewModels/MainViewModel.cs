@@ -645,7 +645,6 @@ public partial class MainViewModel : ObservableObject
             IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
             SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
 
-            DetailEditor?.InitializeDocument(newValue.Document);
             if (DetailEditor != null)
             {
                 if (newValue.IsImage)
@@ -672,7 +671,6 @@ public partial class MainViewModel : ObservableObject
         else
         {
             Document = new PdfDocumentModel();
-            DetailEditor?.InitializeDocument(Document);
             IsDetailViewActive = true;
             SelectedRibbonTabIndex = 0;
         }
@@ -1833,8 +1831,10 @@ public partial class MainViewModel : ObservableObject
                     break;
                 }
 
-                await UpdatePageThumbnailAsync(page, token);
-                page.IsThumbnailDirty = false;
+                if (await UpdatePageThumbnailAsync(page, token))
+                {
+                    page.IsThumbnailDirty = false;
+                }
             }
 
             if (!token.IsCancellationRequested && StatusMessage == "サムネイルを生成しています...")
@@ -1968,10 +1968,10 @@ public partial class MainViewModel : ObservableObject
         foreach (var page in targets)
         {
             token.ThrowIfCancellationRequested();
-            if (!IsDetailViewActive) return;
-
-            await UpdatePageThumbnailAsync(page, token);
-            page.IsThumbnailDirty = false;
+            if (await UpdatePageThumbnailAsync(page, token))
+            {
+                page.IsThumbnailDirty = false;
+            }
         }
     }
 
@@ -1986,8 +1986,10 @@ public partial class MainViewModel : ObservableObject
             token.ThrowIfCancellationRequested();
             if (!IsDetailViewActive) return;
 
-            await UpdatePageThumbnailAsync(page, token);
-            page.IsThumbnailDirty = false;
+            if (await UpdatePageThumbnailAsync(page, token))
+            {
+                page.IsThumbnailDirty = false;
+            }
         }
     }
 
@@ -2155,16 +2157,19 @@ public partial class MainViewModel : ObservableObject
     {
         foreach (var page in pages)
         {
-            await UpdatePageThumbnailAsync(page);
+            if (await UpdatePageThumbnailAsync(page))
+            {
+                page.IsThumbnailDirty = false;
+            }
         }
     }
 
     /// <summary>
     /// 単一ページのサムネイル画像をレンダリングし、手書きストロークが存在する場合は合成して設定します。
     /// </summary>
-    private async Task UpdatePageThumbnailAsync(PdfPageModel page, CancellationToken cancellationToken = default)
+    private async Task<bool> UpdatePageThumbnailAsync(PdfPageModel page, CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested) return;
+        if (cancellationToken.IsCancellationRequested) return false;
 
         BitmapSource? baseBitmap;
         if (string.IsNullOrEmpty(page.SourceFilePath))
@@ -2186,21 +2191,22 @@ public partial class MainViewModel : ObservableObject
                 RenderPriority.Low);
         }
 
-        if (cancellationToken.IsCancellationRequested || baseBitmap == null) return;
+        if (cancellationToken.IsCancellationRequested || baseBitmap == null) return false;
+
+        if (page.InkStrokes.Count > 0)
         {
-            if (page.InkStrokes.Count > 0)
-            {
-                page.Thumbnail = _pdfRenderer.CompositeStrokes(
-                    baseBitmap,
-                    page.InkStrokes,
-                    page.DisplayWidth,
-                    page.DisplayHeight);
-            }
-            else
-            {
-                page.Thumbnail = baseBitmap;
-            }
+            page.Thumbnail = _pdfRenderer.CompositeStrokes(
+                baseBitmap,
+                page.InkStrokes,
+                page.DisplayWidth,
+                page.DisplayHeight);
         }
+        else
+        {
+            page.Thumbnail = baseBitmap;
+        }
+
+        return true;
     }
 
     /// <summary>

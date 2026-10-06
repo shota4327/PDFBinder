@@ -16,11 +16,17 @@ namespace PDFBinder.Core.Services;
 public class PdfiumRenderer : IPdfRenderer
 {
     private readonly PriorityAsyncLock _renderLock = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, byte[] Bytes)> _fileBytesCache = new();
 
     /// <summary>
     /// 現在のレンダリング排他ロックインスタンスを取得します（単体テスト検証用）。
     /// </summary>
     internal PriorityAsyncLock RenderLock => _renderLock;
+
+    /// <summary>
+    /// レンダリング用ファイルキャッシュをクリアします（単体テスト検証・リフレッシュ用）。
+    /// </summary>
+    internal void ClearCache() => _fileBytesCache.Clear();
 
     /// <inheritdoc/>
     public Task<BitmapSource?> RenderPageAsync(
@@ -62,9 +68,7 @@ public class PdfiumRenderer : IPdfRenderer
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                byte[] bytes = File.ReadAllBytes(filePath);
-                cancellationToken.ThrowIfCancellationRequested();
-                byte[] renderBytes = SanitizeForRendering(bytes, pageIndex);
+                byte[] renderBytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
@@ -210,7 +214,7 @@ public class PdfiumRenderer : IPdfRenderer
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                byte[] bytes = File.ReadAllBytes(filePath);
+                byte[] bytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var characters = ExtractCharacters(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
@@ -519,29 +523,53 @@ public class PdfiumRenderer : IPdfRenderer
         return bitmap;
     }
 
-    private static byte[] SanitizeForRendering(byte[] pdfBytes, int pageIndex)
+    /// <summary>
+    /// 指定されたファイルパスのPDFバイト列を取得し、自前手書き注釈がある場合のみ除去したバイト列を返却します（キャッシュ対応）。
+    /// </summary>
+    private byte[] GetRenderBytes(string filePath, CancellationToken cancellationToken)
+    {
+        var fileInfo = new FileInfo(filePath);
+        var lastWrite = fileInfo.LastWriteTimeUtc;
+
+        if (_fileBytesCache.TryGetValue(filePath, out var cached) && cached.LastWriteTimeUtc == lastWrite)
+        {
+            return cached.Bytes;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        byte[] rawBytes = File.ReadAllBytes(filePath);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        byte[] processedBytes = RemoveBinderInkAnnotationsIfPresent(rawBytes);
+        _fileBytesCache[filePath] = (lastWrite, processedBytes);
+        return processedBytes;
+    }
+
+    /// <summary>
+    /// PDFバイト列内に自前手書き注釈が存在する場合のみ、それらを除去したバイト列を生成して返却します。
+    /// 自前手書き注釈が存在しない場合は、無駄な再シリアライズ（doc.Save）を行わず元のバイト列をそのまま返却します。
+    /// </summary>
+    private static byte[] RemoveBinderInkAnnotationsIfPresent(byte[] pdfBytes)
     {
         try
         {
             using var msIn = new MemoryStream(pdfBytes);
             using var doc = PdfSharp.Pdf.IO.PdfReader.Open(msIn, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
 
-            if (pageIndex < 0 || pageIndex >= doc.PageCount)
+            bool hasAnyBinderInk = false;
+            for (int i = 0; i < doc.PageCount; i++)
+            {
+                var page = doc.Pages[i];
+                if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
+                {
+                    hasAnyBinderInk = true;
+                    PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
+                }
+            }
+
+            if (!hasAnyBinderInk)
             {
                 return pdfBytes;
-            }
-
-            var page = doc.Pages[pageIndex];
-
-            // ページ最下層（既存コンテンツの背後）に白色の背景矩形を描画し、用紙の地色を白色として保証
-            using (var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Prepend))
-            {
-                gfx.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
-            }
-
-            if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
-            {
-                PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
             }
 
             using var msOut = new MemoryStream();
