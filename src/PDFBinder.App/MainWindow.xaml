@@ -291,7 +291,7 @@
                             </Button>
                             <Button Command="{Binding ShowExportImagesDialogCommand}" Style="{StaticResource RibbonToolbarButtonStyle}" ToolTip="ページをJPEG/PNG画像として書き出し">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="&#xE413;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
                                     <TextBlock Text="画像保存" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Button>
@@ -1021,7 +1021,7 @@
                     <!-- ヘッダー（アイコンとタイトル） -->
                     <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,14">
                         <Border Width="34" Height="34" Background="#094771" CornerRadius="17" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <TextBlock Text="&#xEB9F;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="{StaticResource AccentBrush}"
+                            <TextBlock Text="&#xE413;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="{StaticResource AccentBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <TextBlock Text="画像書き出し" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
