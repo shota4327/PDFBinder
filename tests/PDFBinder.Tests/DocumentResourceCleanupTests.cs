@@ -96,4 +96,51 @@ public class DocumentResourceCleanupTests
         Assert.Null(vm.ActiveSession);
         Assert.Null(page.Thumbnail);
     }
+
+    [Fact(Timeout = 5000)]
+    public async Task MainViewModel_CloseDocumentAsync_InvalidatesRendererCache()
+    {
+        // Arrange
+        var testRenderer = new TestPdfRenderer();
+        var vm = new MainViewModel(pdfRenderer: testRenderer);
+
+        var doc = new PdfDocumentModel { FilePath = @"C:\dummy\sample.pdf" };
+        var page = new PdfPageModel { PageNumber = 1 };
+        doc.Pages.Add(page);
+        doc.IsModified = false;
+
+        var session = new DocumentSession(doc);
+        vm.Documents.Add(session);
+        vm.ActiveSession = session;
+
+        // Act
+        bool closed = await vm.CloseDocumentAsync(session);
+
+        // Assert: 閉じたファイルのパスおよび全解放（ドキュメント数0時）のキャッシュ無効化が呼ばれていること
+        Assert.True(closed);
+        Assert.Contains(@"C:\dummy\sample.pdf", testRenderer.InvalidatedPaths);
+        Assert.Contains(null, testRenderer.InvalidatedPaths);
+    }
+
+    private class TestPdfRenderer : IPdfRenderer
+    {
+        public List<string?> InvalidatedPaths { get; } = new();
+
+        public Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default)
+            => Task.FromResult<BitmapSource?>(null);
+
+        public BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)
+            => CreateDummyBitmap(targetWidth, targetHeight);
+
+        public BitmapSource CompositeStrokes(BitmapSource baseImage, System.Windows.Ink.StrokeCollection strokes, double originalPageWidth, double originalPageHeight)
+            => baseImage;
+
+        public Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default)
+            => Task.FromResult(PageInteractiveData.Empty);
+
+        public void InvalidateCache(string? filePath = null)
+        {
+            InvalidatedPaths.Add(filePath);
+        }
+    }
 }

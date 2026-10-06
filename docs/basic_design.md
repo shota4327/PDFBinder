@@ -151,6 +151,8 @@ PDFファイルの入出力、構造操作を担当。
 
 ### 5.2 `IPdfRenderer`
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。PDFiumネイティブAPI（Docnet.Core）の非スレッドセーフ性を回避するため、`PriorityAsyncLock` による排他・優先度制御（High: カレントページ詳細表示、Low: バックグラウンドサムネイル・先読み）を備え、多重実行によるクラッシュやフリーズを完全に防止。
+また、用紙背景はUI側（`PageBorder` の白背景）で提供するため、レンダラー内部での不要な白矩形描画および再シリアライズ（`doc.Save`）を撤廃し、自前手書き注釈を持たない通常の外部PDFはディスク上のバイト列からPDFiumへ直接渡して描画することで、読み込み直後の1ページ目表示ラグおよびサムネイル生成オーバーヘッドを完全撤廃。自前手書き注釈が存在するPDFのみ、初回レンダリング時に注釈を除去したバイト列を生成してメモリキャッシュ（ファイル更新日時検証付き）し、詳細画面での手書き線の多重焼き込みを防止。
+さらに詳細エディタ（`DetailEditorViewModel`）では、接続ディスプレイの `DpiScale` とズーム倍率を乗算してレンダリング解像度を算出（最大寸法 8192px）することで、4Kや高DPI環境での拡大・等倍表示時にも文字や図面がボケず、本来のシャープな精細度で描画。
 - `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal)`: サムネイル/詳細画面用レンダリング（優先度指定対応）
 - `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）

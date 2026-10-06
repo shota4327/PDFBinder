@@ -69,4 +69,11 @@ public interface IPdfRenderer
         CancellationToken cancellationToken,
         RenderPriority priority)
         => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+
+    /// <summary>
+    /// キャッシュされたファイルバイト列を解放します。
+    /// 特定のファイルパスを指定した場合はそのファイルのみ、null を指定した場合は全キャッシュを解放します。
+    /// </summary>
+    /// <param name="filePath">解放対象のファイルパス（null時は全解放）</param>
+    void InvalidateCache(string? filePath = null) { }
 }

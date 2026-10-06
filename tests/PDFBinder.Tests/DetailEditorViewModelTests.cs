@@ -130,6 +130,23 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
+    public void CalculateRenderDimensions_TakesDpiScaleIntoAccount()
+    {
+        // Arrange
+        var page = CreateSamplePage(600, 800);
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+        vm.DpiScale = 1.5;
+
+        // Act
+        var (w, h) = vm.CalculateRenderDimensions(1.0);
+
+        // Assert: 600 * (96/72) * 1.5 = 1200, 800 * (96/72) * 1.5 = 1600
+        Assert.Equal(1200, w);
+        Assert.Equal(1600, h);
+    }
+
+    [Fact]
     public void CalculateRenderDimensions_ClampsToMinAndMaxDimensions()
     {
         // Arrange

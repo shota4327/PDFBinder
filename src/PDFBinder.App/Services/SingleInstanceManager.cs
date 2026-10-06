@@ -59,10 +59,21 @@ public sealed class SingleInstanceManager : IDisposable
     {
         if (_hasMutexOwnership) return true;
 
+        if (_mutex != null)
+        {
+            _mutex.Dispose();
+            _mutex = null;
+        }
+
         try
         {
             _mutex = new Mutex(true, _mutexName, out bool createdNew);
             _hasMutexOwnership = createdNew;
+            if (!createdNew)
+            {
+                _mutex.Dispose();
+                _mutex = null;
+            }
             return createdNew;
         }
         catch (AbandonedMutexException)
@@ -73,6 +84,8 @@ public sealed class SingleInstanceManager : IDisposable
         }
         catch (Exception)
         {
+            _mutex?.Dispose();
+            _mutex = null;
             _hasMutexOwnership = false;
             return false;
         }

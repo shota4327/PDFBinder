@@ -88,7 +88,9 @@ public partial class DocumentSession : ObservableObject, IDisposable
         foreach (var page in Document.Pages)
         {
             page.Thumbnail = null;
+            page.InkStrokes.Clear();
         }
+        Document.Pages.Clear();
 
         GC.SuppressFinalize(this);
     }

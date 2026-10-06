@@ -191,7 +191,8 @@ public class ReEditableInkAnnotationTests : IDisposable
         byte[] pixels = new byte[stride * bitmap.PixelHeight];
         bitmap.CopyPixels(pixels, stride, 0);
 
-        // 手書きストローク（黒）が除外され、背景全体が純白（すべてのバイトが255）であること
-        Assert.All(pixels, b => Assert.Equal(255, b));
+        // Issue #204: レンダラー側での白矩形注入撤廃に伴い、白紙ページ背景は透明（すべてのバイトが0）となり、
+        // かつ手書きストローク（黒）が除外されて焼き込まれていないこと
+        Assert.All(pixels, b => Assert.Equal(0, b));
     }
 }

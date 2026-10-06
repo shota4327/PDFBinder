@@ -49,7 +49,7 @@ if ($Target -eq "all" -or $Target -eq "self-contained") {
         --self-contained true `
         -p:PublishSingleFile=true `
         -p:IncludeNativeLibrariesForSelfExtract=true `
-        -p:EnableCompressionInSingleFile=true `
+        -p:EnableCompressionInSingleFile=false `
         -p:PublishReadyToRun=true `
         -p:DebugType=embedded `
         -o $selfContainedDir
