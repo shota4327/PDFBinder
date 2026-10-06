@@ -53,6 +53,14 @@ Issue #204 において、PDF Binder のアプリケーション起動時間、P
    - **問題**: `SingleInstanceManager.TryAcquireOwnership` の再試行時、所有権を取得できなかった既存の `_mutex` インスタンスが破棄されずに上書きされ、OSハンドルがリークする問題。
    - **修正**: 新規 `Mutex` 生成前に既存の `_mutex` を明示的に `Dispose()` / `null` 化する安全策を追加。
 
+4. **ファイルクローズ時・保存時のレンダラーキャッシュ解放（B4 / メモリリーク防止）**
+   - **問題**: `PdfiumRenderer` のメモリ内キャッシュ（`_fileBytesCache`）に保持されたファイルバイト列（`byte[]`）が、ファイル終了（`CloseDocumentAsync`）後も解放されずにプロセス終了まで残留し、複数ファイル開閉時にメモリリークとなる問題。
+   - **修正**:
+     - `IPdfRenderer` に `InvalidateCache(string? filePath = null)` を追加し、`PdfiumRenderer` で該当ファイルのキャッシュエントリー削除（`TryRemove`）および全クリア（`Clear`）を実装。
+     - `MainViewModel.CloseDocumentAsync` において、対象ファイルが他のタブで開かれていない場合にキャッシュを明示的に即時解放。全ドキュメントが閉じられた場合は全キャッシュをクリア。
+     - `ExecuteSaveForDocumentAsync` においても保存先パスのキャッシュを無効化。
+     - `DocumentSession.Dispose` において、各ページの `InkStrokes` および `Document.Pages` をクリアして参照を確実に切断。
+
 ---
 
 ## 3. 変更ファイル一覧
@@ -62,16 +70,20 @@ Issue #204 において、PDF Binder のアプリケーション起動時間、P
 | `src/PDFBinder.Core/Models/PdfDocumentModel.cs` | 変更 | `HasBinderInkAnnotations` プロパティの追加 |
 | `src/PDFBinder.Core/Models/PdfPageModel.cs` | 変更 | `HasSourceBinderInkAnnotation` プロパティの追加 |
 | `src/PDFBinder.Core/Services/PdfService.cs` | 変更 | 読み込みループの `Task.Run` 委譲、注釈フラグ設定 |
-| `src/PDFBinder.Core/Services/PdfiumRenderer.cs` | 変更 | 白矩形挿入撤廃、キャッシュ付き `GetRenderBytes` 導入 |
+| `src/PDFBinder.Core/Services/IPdfRenderer.cs` | 変更 | `InvalidateCache` メソッドの追加 |
+| `src/PDFBinder.Core/Services/PdfiumRenderer.cs` | 変更 | 白矩形挿入撤廃、キャッシュ付き `GetRenderBytes`、`InvalidateCache` 導入 |
+| `src/PDFBinder.Core/PDFBinder.Core.csproj` | 変更 | テスト向け `InternalsVisibleTo` の追加 |
+| `src/PDFBinder.App/Models/DocumentSession.cs` | 変更 | `Dispose` でのストローク・ページコレクション明示クリア |
 | `src/PDFBinder.App/ViewModels/DetailEditorViewModel.cs` | 変更 | `DpiScale` プロパティ追加と寸法計算への乗算 |
 | `src/PDFBinder.App/Views/DetailEditorView.xaml.cs` | 変更 | `Loaded` および `OnDpiChanged` による `DpiScale` 更新 |
-| `src/PDFBinder.App/ViewModels/MainViewModel.cs` | 変更 | 重複初期化削除、サムネイル更新成否ハンドリング |
+| `src/PDFBinder.App/ViewModels/MainViewModel.cs` | 変更 | 重複初期化削除、サムネイル更新成否ハンドリング、クローズ時キャッシュ解放 |
 | `src/PDFBinder.App/Services/SingleInstanceManager.cs` | 変更 | ミューテックス再試行時の明示的破棄・リーク防止 |
 | `build.ps1` | 変更 | `EnableCompressionInSingleFile=false` の指定 |
-| `tests/PDFBinder.Tests/PdfiumRendererTests.cs` | 変更 | 白矩形撤廃テスト、キャッシュ動作検証テストの更新・追加 |
+| `tests/PDFBinder.Tests/PdfiumRendererTests.cs` | 変更 | 白矩形撤廃テスト、キャッシュ動作・無効化検証テストの更新・追加 |
 | `tests/PDFBinder.Tests/DetailEditorViewModelTests.cs` | 変更 | `DpiScale` 連動解像度計算の単体テスト追加 |
 | `tests/PDFBinder.Tests/SingleInstanceManagerTests.cs` | 変更 | ミューテックス再取得・破棄の単体テスト追加 |
 | `tests/PDFBinder.Tests/ReEditableInkAnnotationTests.cs` | 変更 | 白矩形撤廃に伴う背景透過期待値（0）への更新 |
+| `tests/PDFBinder.Tests/DocumentResourceCleanupTests.cs` | 変更 | クローズ時キャッシュ無効化検証テストの追加 |
 | `Directory.Build.props` | 変更 | バージョンを `0.11.2` にインクリメント |
 | `CHANGELOG.md` | 変更 | エンドユーザー向けリリースノートの追記 |
 | `docs/basic_design.md` | 変更 | 直描画化、キャッシュ仕様、DpiScale対応の仕様追記 |
@@ -82,10 +94,10 @@ Issue #204 において、PDF Binder のアプリケーション起動時間、P
 ## 4. 検証結果
 
 ### 4.1 単体テスト実行 (`dotnet test`)
-- 全 598 件のテストが 100% 成功（PASS）。
+- 全 600 件のテストが 100% 成功（PASS）。
 
 ```text
-成功!   -失敗:     0、合格:   598、スキップ:     0、合計:   598、期間: 8 s - PDFBinder.Tests.dll (net10.0)
+成功!   -失敗:     0、合格:   600、スキップ:     0、合計:   600、期間: 7 s - PDFBinder.Tests.dll (net10.0)
 ```
 
 ### 4.2 ビルド検証 (`dotnet build`)

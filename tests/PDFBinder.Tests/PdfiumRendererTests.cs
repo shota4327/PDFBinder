@@ -230,6 +230,28 @@ public class PdfiumRendererTests : IDisposable
         Assert.NotNull(bitmap2);
     }
 
+    [Fact]
+    public async Task InvalidateCache_SpecificFile_RemovesOnlyTargetFromCache()
+    {
+        // Arrange
+        string pdf1 = CreateSamplePdf("cache_file1.pdf");
+        string pdf2 = CreateSamplePdf("cache_file2.pdf");
+
+        await _renderer.RenderPageAsync(pdf1, 0, 100, 100, PageRotation.Rotate0);
+        await _renderer.RenderPageAsync(pdf2, 0, 100, 100, PageRotation.Rotate0);
+        Assert.Equal(2, _renderer.CachedFileCount);
+
+        // Act: pdf1 のみ解放
+        _renderer.InvalidateCache(pdf1);
+
+        // Assert: pdf1 が削除され、pdf2 は維持される
+        Assert.Equal(1, _renderer.CachedFileCount);
+
+        // Act: null で全解放
+        _renderer.InvalidateCache(null);
+        Assert.Equal(0, _renderer.CachedFileCount);
+    }
+
     [Theory]
     [InlineData("test.png", true, PageRotation.Rotate0, 200, 100)]
     [InlineData("test.png", true, PageRotation.Rotate90, 100, 200)]

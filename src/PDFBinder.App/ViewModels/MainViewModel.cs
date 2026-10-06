@@ -887,8 +887,32 @@ public partial class MainViewModel : ObservableObject
         // アクティブ参照から切り離された安全な状態で明示解放
         target.Dispose();
 
+        // 閉じたファイルのレンダラーキャッシュを解放（他のドキュメントで参照されていない場合）
+        if (!string.IsNullOrEmpty(target.Document.FilePath))
+        {
+            string targetFullPath;
+            try
+            {
+                targetFullPath = Path.GetFullPath(target.Document.FilePath);
+            }
+            catch
+            {
+                targetFullPath = target.Document.FilePath;
+            }
+
+            bool isReferencedByOther = Documents.Any(d =>
+                !string.IsNullOrEmpty(d.Document.FilePath) &&
+                string.Equals(Path.GetFullPath(d.Document.FilePath), targetFullPath, StringComparison.OrdinalIgnoreCase));
+
+            if (!isReferencedByOther)
+            {
+                _pdfRenderer.InvalidateCache(target.Document.FilePath);
+            }
+        }
+
         if (Documents.Count == 0)
         {
+            _pdfRenderer.InvalidateCache(null);
             DetailEditor?.InitializeDocument(new PdfDocumentModel());
         }
 
@@ -1383,6 +1407,7 @@ public partial class MainViewModel : ObservableObject
 
             doc.FilePath = targetPath;
             doc.IsModified = false;
+            _pdfRenderer.InvalidateCache(targetPath);
             StatusMessage = $"保存しました: {targetPath}";
             NotifySessionStateChanged();
             return true;

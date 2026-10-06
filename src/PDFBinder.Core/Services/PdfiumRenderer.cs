@@ -24,9 +24,27 @@ public class PdfiumRenderer : IPdfRenderer
     internal PriorityAsyncLock RenderLock => _renderLock;
 
     /// <summary>
-    /// レンダリング用ファイルキャッシュをクリアします（単体テスト検証・リフレッシュ用）。
+    /// キャッシュされているファイル数を取得します（単体テスト検証用）。
     /// </summary>
-    internal void ClearCache() => _fileBytesCache.Clear();
+    internal int CachedFileCount => _fileBytesCache.Count;
+
+    /// <inheritdoc/>
+    public void InvalidateCache(string? filePath = null)
+    {
+        if (filePath == null)
+        {
+            _fileBytesCache.Clear();
+        }
+        else
+        {
+            _fileBytesCache.TryRemove(filePath, out _);
+        }
+    }
+
+    /// <summary>
+    /// レンダリング用ファイルキャッシュをクリアします（後方互換・単体テスト用）。
+    /// </summary>
+    internal void ClearCache() => InvalidateCache();
 
     /// <inheritdoc/>
     public Task<BitmapSource?> RenderPageAsync(
