@@ -78,65 +78,72 @@ public class PdfiumRenderer : IPdfRenderer
             return await Task.Run(() => RenderImagePage(filePath, targetWidth, targetHeight, rotation, cancellationToken), cancellationToken);
         }
 
-        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return await Task.Run(() =>
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            return await Task.Run(() =>
             {
-                byte[] renderBytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    byte[] renderBytes = GetRenderBytes(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
-                int minDim = Math.Min(targetWidth, targetHeight);
-                int maxDim = Math.Max(targetWidth, targetHeight);
-                var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
+                    // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
+                    int minDim = Math.Min(targetWidth, targetHeight);
+                    int maxDim = Math.Max(targetWidth, targetHeight);
+                    var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
 
-                using var docReader = DocLib.Instance.GetDocReader(renderBytes, dimensions);
-                if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
+                    using var docReader = DocLib.Instance.GetDocReader(renderBytes, dimensions);
+                    if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
+                    {
+                        return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var pageReader = docReader.GetPageReader(pageIndex);
+                    int actualWidth = pageReader.GetPageWidth();
+                    int actualHeight = pageReader.GetPageHeight();
+                    byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var bitmap = BitmapSource.Create(
+                        actualWidth,
+                        actualHeight,
+                        96,
+                        96,
+                        PixelFormats.Bgra32,
+                        null,
+                        rawBytes,
+                        actualWidth * 4);
+
+                    bitmap.Freeze();
+
+                    if (rotation != PageRotation.Rotate0)
+                    {
+                        var rotated = new TransformedBitmap(bitmap, new RotateTransform((int)rotation));
+                        rotated.Freeze();
+                        return rotated;
+                    }
+
+                    return bitmap;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
                 {
                     return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                using var pageReader = docReader.GetPageReader(pageIndex);
-                int actualWidth = pageReader.GetPageWidth();
-                int actualHeight = pageReader.GetPageHeight();
-                byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
-
-                cancellationToken.ThrowIfCancellationRequested();
-                var bitmap = BitmapSource.Create(
-                    actualWidth,
-                    actualHeight,
-                    96,
-                    96,
-                    PixelFormats.Bgra32,
-                    null,
-                    rawBytes,
-                    actualWidth * 4);
-
-                bitmap.Freeze();
-
-                if (rotation != PageRotation.Rotate0)
-                {
-                    var rotated = new TransformedBitmap(bitmap, new RotateTransform((int)rotation));
-                    rotated.Freeze();
-                    return rotated;
-                }
-
-                return bitmap;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
-            }
-        }, cancellationToken);
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
     }
 
     /// <inheritdoc/>
@@ -224,31 +231,38 @@ public class PdfiumRenderer : IPdfRenderer
             return PageInteractiveData.Empty;
         }
 
-        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return await Task.Run(() =>
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            return await Task.Run(() =>
             {
-                byte[] bytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    byte[] bytes = GetRenderBytes(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                var characters = ExtractCharacters(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
-                var links = ExtractLinks(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+                    var characters = ExtractCharacters(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+                    var links = ExtractLinks(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
 
-                return new PageInteractiveData(characters, links, rotation);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return PageInteractiveData.Empty;
-            }
-        }, cancellationToken);
+                    return new PageInteractiveData(characters, links, rotation);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    return PageInteractiveData.Empty;
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
     }
 
     /// <summary>

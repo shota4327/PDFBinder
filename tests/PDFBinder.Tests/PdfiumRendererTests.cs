@@ -296,4 +296,54 @@ public class PdfiumRendererTests : IDisposable
         Assert.NotNull(furtherRotated);
         Assert.True(furtherRotated.IsFrozen);
     }
+
+    [Fact]
+    public async Task RenderPageAsync_WhenCancelled_ReleasesLockSafelyForSubsequentRender()
+    {
+        // Arrange
+        string samplePdf = CreateSamplePdf("cancel_lock_test.pdf");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act 1: キャンセル済みトークンでの実行
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await _renderer.RenderPageAsync(samplePdf, 0, 100, 100, PageRotation.Rotate0, cts.Token);
+        });
+
+        // Act 2: 直後に正常トークンでレンダリング
+        var bitmap = await _renderer.RenderPageAsync(samplePdf, 0, 100, 100, PageRotation.Rotate0);
+
+        // Assert: ロックが正常に解放されており、後続のレンダリングが成功すること
+        Assert.NotNull(bitmap);
+        Assert.False(_renderer.RenderLock.IsLocked);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_ConcurrentRendersWithCancellation_DoesNotCorruptLockState()
+    {
+        // Arrange
+        string samplePdf = CreateSamplePdf("concurrent_cancel_test.pdf");
+        using var cts = new CancellationTokenSource();
+
+        // Act: 並行でレンダリングを呼び出しつつ、1つ目を早期キャンセル
+        var task1 = _renderer.RenderPageAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0, cts.Token);
+        cts.CancelAfter(5);
+        var task2 = _renderer.RenderPageAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0);
+
+        try
+        {
+            await task1;
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセル例外は正常
+        }
+
+        var bitmap2 = await task2;
+
+        // Assert: 2つ目のレンダリングが競合せず正常完了し、ロックが解放されていること
+        Assert.NotNull(bitmap2);
+        Assert.False(_renderer.RenderLock.IsLocked);
+    }
 }

@@ -660,7 +660,10 @@ public partial class MainViewModel : ObservableObject
                 {
                     DetailEditor.Zoom = newValue.ZoomFactor;
                 }
-                DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+                if (DetailEditor.CurrentPageNumber != newValue.CurrentPageNumber)
+                {
+                    DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+                }
             }
 
             if (IsDetailViewActive)
@@ -757,7 +760,10 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        DetailEditor?.InitializeDocument(newValue);
+        var preferredPage = (ActiveSession != null && ActiveSession.Document == newValue)
+            ? newValue.Pages.FirstOrDefault(p => p.PageNumber == ActiveSession.CurrentPageNumber)
+            : null;
+        DetailEditor?.InitializeDocument(newValue, preferredPage);
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HasOpenDocuments));
