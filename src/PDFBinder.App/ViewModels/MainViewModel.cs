@@ -871,6 +871,7 @@ public partial class MainViewModel : ObservableObject
 
         // 進行中のバックグラウンドサムネイルタスクを安全に中断・待機
         await CancelAndAwaitThumbnailsAsync();
+        DetailEditor?.CancelDynamicRender();
 
         int targetIndex = Documents.IndexOf(target);
         bool wasActive = (ActiveSession == target);
@@ -925,9 +926,6 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = Documents.Count > 0
             ? $"{target.Document.FileName} を閉じました。"
             : "すべてのドキュメントを閉じました。";
-
-        // ファイルクローズごとにバックグラウンドで不要ヒープを回収
-        _ = Task.Run(() => GC.Collect(2, GCCollectionMode.Forced, false));
 
         return true;
     }

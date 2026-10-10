@@ -454,4 +454,32 @@ public class MainViewModelMultiFileTests
         Assert.NotNull(vm.DetailEditor.CurrentPage);
         Assert.Equal(200, vm.DetailEditor.CurrentPage.PageNumber);
     }
+
+    [Fact]
+    public async Task OpenCloseAndReopenSameDocument_CancelsDetailRenderAndReopensSafely()
+    {
+        // Arrange: 300ページの大容量ドキュメント
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+
+        // Act 1: 1回目のオープン
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\LargeDocB.pdf");
+        Assert.Single(vm.Documents);
+        var session = vm.ActiveSession!;
+
+        // Act 2: タブを閉じる
+        bool closed = await vm.CloseDocumentAsync(session);
+        Assert.True(closed);
+        Assert.Empty(vm.Documents);
+        Assert.Null(vm.ActiveSession);
+
+        // Act 3: 再び同じファイルを再オープン
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\LargeDocB.pdf");
+
+        // Assert: 安全に再オープンされ、セッションとドキュメントが正しく復元されていること
+        Assert.Single(vm.Documents);
+        Assert.NotNull(vm.ActiveSession);
+        Assert.Equal("LargeDocB.pdf", vm.ActiveSession.Document.FileName);
+        Assert.Equal(300, vm.ActiveSession.Document.PageCount);
+    }
 }

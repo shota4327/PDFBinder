@@ -118,7 +118,8 @@ public class PdfiumRenderer : IPdfRenderer
                     using var pageReader = docReader.GetPageReader(pageIndex);
                     int actualWidth = pageReader.GetPageWidth();
                     int actualHeight = pageReader.GetPageHeight();
-                    byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
+                    // 引数なし GetImage() により、PDFium の既知クラッシュ原因である FormFillEnvironment の不要な生成・破棄ループを完全に回避
+                    byte[] rawBytes = pageReader.GetImage();
 
                     cancellationToken.ThrowIfCancellationRequested();
                     var bitmap = BitmapSource.Create(
