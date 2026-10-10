@@ -27,7 +27,7 @@ public sealed class SingleInstancePayload
 /// </summary>
 public sealed class SingleInstanceManager : IDisposable
 {
-    private const int ConnectionTimeoutMs = 800;
+    private const int ConnectionTimeoutMs = 5000;
     private const string AckResponse = "ACK";
 
     private readonly string _mutexName;

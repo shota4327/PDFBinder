@@ -233,23 +233,26 @@ public class PdfiumRendererTests : IDisposable
     [Fact]
     public async Task InvalidateCache_SpecificFile_RemovesOnlyTargetFromCache()
     {
-        // Arrange
-        string pdf1 = CreateSamplePdf("cache_file1.pdf");
-        string pdf2 = CreateSamplePdf("cache_file2.pdf");
+        // Arrange: 手書き注釈付きPDF（バイト列キャッシュとマーカーキャッシュの両方に保持される）
+        string pdf1 = CreatePdfWithBinderInkMarker("cache_file1.pdf");
+        string pdf2 = CreatePdfWithBinderInkMarker("cache_file2.pdf");
 
         await _renderer.RenderPageAsync(pdf1, 0, 100, 100, PageRotation.Rotate0);
         await _renderer.RenderPageAsync(pdf2, 0, 100, 100, PageRotation.Rotate0);
         Assert.Equal(2, _renderer.CachedFileCount);
+        Assert.Equal(2, _renderer.CachedMarkerCount);
 
         // Act: pdf1 のみ解放
         _renderer.InvalidateCache(pdf1);
 
         // Assert: pdf1 が削除され、pdf2 は維持される
         Assert.Equal(1, _renderer.CachedFileCount);
+        Assert.Equal(1, _renderer.CachedMarkerCount);
 
         // Act: null で全解放
         _renderer.InvalidateCache(null);
         Assert.Equal(0, _renderer.CachedFileCount);
+        Assert.Equal(0, _renderer.CachedMarkerCount);
     }
 
     [Theory]
@@ -296,4 +299,168 @@ public class PdfiumRendererTests : IDisposable
         Assert.NotNull(furtherRotated);
         Assert.True(furtherRotated.IsFrozen);
     }
+
+    [Fact]
+    public async Task RenderPageAsync_WhenCancelled_ReleasesLockSafelyForSubsequentRender()
+    {
+        // Arrange
+        string samplePdf = CreateSamplePdf("cancel_lock_test.pdf");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act 1: キャンセル済みトークンでの実行
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await _renderer.RenderPageAsync(samplePdf, 0, 100, 100, PageRotation.Rotate0, cts.Token);
+        });
+
+        // Act 2: 直後に正常トークンでレンダリング
+        var bitmap = await _renderer.RenderPageAsync(samplePdf, 0, 100, 100, PageRotation.Rotate0);
+
+        // Assert: ロックが正常に解放されており、後続のレンダリングが成功すること
+        Assert.NotNull(bitmap);
+        Assert.False(_renderer.RenderLock.IsLocked);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_ConcurrentRendersWithCancellation_DoesNotCorruptLockState()
+    {
+        // Arrange
+        string samplePdf = CreateSamplePdf("concurrent_cancel_test.pdf");
+        using var cts = new CancellationTokenSource();
+
+        // Act: 並行でレンダリングを呼び出しつつ、1つ目を早期キャンセル
+        var task1 = _renderer.RenderPageAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0, cts.Token);
+        cts.CancelAfter(5);
+        var task2 = _renderer.RenderPageAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0);
+
+        try
+        {
+            await task1;
+        }
+        catch (OperationCanceledException)
+        {
+            // キャンセル例外は正常
+        }
+
+        var bitmap2 = await task2;
+
+        // Assert: 2つ目のレンダリングが競合せず正常完了し、ロックが解放されていること
+        Assert.NotNull(bitmap2);
+        Assert.False(_renderer.RenderLock.IsLocked);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_NormalPdfWithoutBinderInkMarker_RendersDirectlyWithoutCachingBytes()
+    {
+        // Arrange: 手書き注釈のない通常のPDF
+        string samplePdf = CreateSamplePdf("normal_no_marker.pdf");
+
+        // Act
+        var bitmap = await _renderer.RenderPageAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0);
+
+        // Assert: ビットマップが正常に生成され、全バイト列キャッシュには格納されない（ファイルパス直接読み込み）
+        Assert.NotNull(bitmap);
+        Assert.Equal(0, _renderer.CachedFileCount);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_PdfWithBinderInkMarker_RemovesAnnotationsAndCachesBytes()
+    {
+        // Arrange: 自前手書き注釈マーカーを持つPDF
+        string inkPdf = CreatePdfWithBinderInkMarker("has_marker.pdf");
+
+        // Act
+        var bitmap = await _renderer.RenderPageAsync(inkPdf, 0, 200, 200, PageRotation.Rotate0);
+
+        // Assert: ビットマップが正常に生成され、注釈除去済みバイト列がキャッシュされる
+        Assert.NotNull(bitmap);
+        Assert.Equal(1, _renderer.CachedFileCount);
+    }
+
+    [Fact]
+    public async Task ExtractInteractiveDataAsync_NormalPdfWithoutBinderInkMarker_ExtractsSuccessfully()
+    {
+        // Arrange: 手書き注釈のない通常のPDF
+        string samplePdf = CreateSamplePdf("interactive_normal.pdf");
+
+        // Act
+        var data = await _renderer.ExtractInteractiveDataAsync(samplePdf, 0, 200, 200, PageRotation.Rotate0);
+
+        // Assert: エラーなく正常に完了し、バイト列キャッシュは増えない
+        Assert.NotNull(data);
+        Assert.Equal(0, _renderer.CachedFileCount);
+    }
+
+    [Fact]
+    public async Task InvalidateCache_ClearsBothByteCacheAndMarkerCache()
+    {
+        // Arrange
+        string inkPdf = CreatePdfWithBinderInkMarker("invalidate_test.pdf");
+        await _renderer.RenderPageAsync(inkPdf, 0, 200, 200, PageRotation.Rotate0);
+        Assert.Equal(1, _renderer.CachedFileCount);
+
+        // Act
+        _renderer.InvalidateCache(inkPdf);
+
+        // Assert
+        Assert.Equal(0, _renderer.CachedFileCount);
+    }
+
+    [Fact]
+    public async Task RenderPageAsync_MultiplePagesInNormalPdf_RendersAllPagesWithoutCachingBytes()
+    {
+        // Arrange: 10ページの通常PDFを作成
+        string multiPagePdf = Path.Combine(_testDirectory, "multi_page_test.pdf");
+        using (var doc = new PdfDocument())
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                var page = doc.AddPage();
+                page.Width = XUnit.FromPoint(400);
+                page.Height = XUnit.FromPoint(600);
+                using var gfx = XGraphics.FromPdfPage(page);
+                gfx.DrawRectangle(XBrushes.LightBlue, 10 + i * 5, 10 + i * 5, 200, 200);
+            }
+            doc.Save(multiPagePdf);
+        }
+
+        // Act: 全10ページを連続レンダリング
+        for (int i = 0; i < 10; i++)
+        {
+            var bmp = await _renderer.RenderPageAsync(multiPagePdf, i, 150, 150, PageRotation.Rotate0);
+            Assert.NotNull(bmp);
+        }
+
+        // Assert: バイト列キャッシュは一切蓄積されない（ファイルパス直接読み込み）
+        Assert.Equal(0, _renderer.CachedFileCount);
+        // マーカー判定キャッシュは1件のみ（同一ファイル）
+        Assert.Equal(1, _renderer.CachedMarkerCount);
+    }
+
+    private string CreatePdfWithBinderInkMarker(string fileName)
+    {
+        string filePath = Path.Combine(_testDirectory, fileName);
+        using var doc = new PdfDocument();
+        var page = doc.AddPage();
+        var strokeCollection = new StrokeCollection
+        {
+            new Stroke(new StylusPointCollection { new StylusPoint(10, 10), new StylusPoint(50, 50) })
+        };
+        var annot = new PdfBinderInkAnnotation(doc);
+        annot.Elements.SetString(PdfBinderInkAnnotation.InkKey, PdfBinderInkAnnotation.SerializeStrokes(strokeCollection));
+        page.Annotations.Add(annot);
+        doc.Save(filePath);
+        return filePath;
+    }
 }
+
+
+
+
+
+
+
+
+
+

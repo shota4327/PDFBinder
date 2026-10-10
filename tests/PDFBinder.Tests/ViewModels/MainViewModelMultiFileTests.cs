@@ -25,7 +25,11 @@ public class MainViewModelMultiFileTests
             {
                 FilePath = filePath
             };
-            doc.AddPage(new PdfPageModel { SourceFilePath = filePath, Width = 500, Height = 700 });
+            int pageCount = filePath.Contains("Large") ? 300 : 1;
+            for (int i = 0; i < pageCount; i++)
+            {
+                doc.AddPage(new PdfPageModel { SourceFilePath = filePath, Width = 500, Height = 700 });
+            }
             doc.IsModified = false;
             return Task.FromResult(doc);
         }
@@ -415,5 +419,67 @@ public class MainViewModelMultiFileTests
         // Assert: DocA の手動ズーム（2.0）および FitMode.None が復元されること
         Assert.Equal(DetailViewFitMode.None, vm.DetailEditor.FitMode);
         Assert.Equal(2.0, vm.DetailEditor.Zoom);
+    }
+
+    [Fact]
+    public async Task SwitchDocument_WhenLargeDocumentWithCurrentPageNumber_DirectlyInitializesToTargetPage()
+    {
+        // Arrange
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+
+        // 1ページのファイルを開く
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocA.pdf");
+        var sessionA = vm.ActiveSession!;
+
+        // 300ページのファイルを開く
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\LargeDocB.pdf");
+        var sessionB = vm.ActiveSession!;
+        Assert.Equal(300, sessionB.Document.PageCount);
+
+        // 200ページ目に移動
+        sessionB.CurrentPageNumber = 200;
+        vm.DetailEditor!.CurrentPageNumber = 200;
+        Assert.Equal(200, vm.DetailEditor.CurrentPageNumber);
+
+        // Act 1: DocA に切り替え
+        vm.SwitchDocument(sessionA);
+        Assert.Equal(1, vm.DetailEditor.CurrentPageNumber);
+
+        // Act 2: LargeDocB に切り替え
+        vm.SwitchDocument(sessionB);
+
+        // Assert: 1ページ目を経由せず直接200ページ目で初期化・復元されていること
+        Assert.Equal(200, vm.DetailEditor.CurrentPageNumber);
+        Assert.NotNull(vm.DetailEditor.CurrentPage);
+        Assert.Equal(200, vm.DetailEditor.CurrentPage.PageNumber);
+    }
+
+    [Fact]
+    public async Task OpenCloseAndReopenSameDocument_CancelsDetailRenderAndReopensSafely()
+    {
+        // Arrange: 300ページの大容量ドキュメント
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+
+        // Act 1: 1回目のオープン
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\LargeDocB.pdf");
+        Assert.Single(vm.Documents);
+        var session = vm.ActiveSession!;
+
+        // Act 2: タブを閉じる
+        bool closed = await vm.CloseDocumentAsync(session);
+        Assert.True(closed);
+        Assert.Empty(vm.Documents);
+        Assert.Null(vm.ActiveSession);
+
+        // Act 3: 再び同じファイルを再オープン
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\LargeDocB.pdf");
+
+        // Assert: 安全に再オープンされ、セッションとドキュメントが正しく復元されていること
+        Assert.Single(vm.Documents);
+        Assert.NotNull(vm.ActiveSession);
+        Assert.Equal("LargeDocB.pdf", vm.ActiveSession.Document.FileName);
+        Assert.Equal(300, vm.ActiveSession.Document.PageCount);
     }
 }

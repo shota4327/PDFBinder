@@ -660,7 +660,10 @@ public partial class MainViewModel : ObservableObject
                 {
                     DetailEditor.Zoom = newValue.ZoomFactor;
                 }
-                DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+                if (DetailEditor.CurrentPageNumber != newValue.CurrentPageNumber)
+                {
+                    DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
+                }
             }
 
             if (IsDetailViewActive)
@@ -757,7 +760,10 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        DetailEditor?.InitializeDocument(newValue);
+        var preferredPage = (ActiveSession != null && ActiveSession.Document == newValue)
+            ? newValue.Pages.FirstOrDefault(p => p.PageNumber == ActiveSession.CurrentPageNumber)
+            : null;
+        DetailEditor?.InitializeDocument(newValue, preferredPage);
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HasOpenDocuments));
@@ -865,6 +871,7 @@ public partial class MainViewModel : ObservableObject
 
         // 進行中のバックグラウンドサムネイルタスクを安全に中断・待機
         await CancelAndAwaitThumbnailsAsync();
+        DetailEditor?.CancelDynamicRender();
 
         int targetIndex = Documents.IndexOf(target);
         bool wasActive = (ActiveSession == target);
@@ -919,9 +926,6 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = Documents.Count > 0
             ? $"{target.Document.FileName} を閉じました。"
             : "すべてのドキュメントを閉じました。";
-
-        // ファイルクローズごとにバックグラウンドで不要ヒープを回収
-        _ = Task.Run(() => GC.Collect(2, GCCollectionMode.Forced, false));
 
         return true;
     }

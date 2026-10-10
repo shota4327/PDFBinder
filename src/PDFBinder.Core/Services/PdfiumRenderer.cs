@@ -17,6 +17,7 @@ public class PdfiumRenderer : IPdfRenderer
 {
     private readonly PriorityAsyncLock _renderLock = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, byte[] Bytes)> _fileBytesCache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, bool HasMarker)> _hasBinderInkMarkerCache = new();
 
     /// <summary>
     /// 現在のレンダリング排他ロックインスタンスを取得します（単体テスト検証用）。
@@ -28,16 +29,23 @@ public class PdfiumRenderer : IPdfRenderer
     /// </summary>
     internal int CachedFileCount => _fileBytesCache.Count;
 
+    /// <summary>
+    /// マーカー判定がキャッシュされているファイル数を取得します（単体テスト検証用）。
+    /// </summary>
+    internal int CachedMarkerCount => _hasBinderInkMarkerCache.Count;
+
     /// <inheritdoc/>
     public void InvalidateCache(string? filePath = null)
     {
         if (filePath == null)
         {
             _fileBytesCache.Clear();
+            _hasBinderInkMarkerCache.Clear();
         }
         else
         {
             _fileBytesCache.TryRemove(filePath, out _);
+            _hasBinderInkMarkerCache.TryRemove(filePath, out _);
         }
     }
 
@@ -78,65 +86,77 @@ public class PdfiumRenderer : IPdfRenderer
             return await Task.Run(() => RenderImagePage(filePath, targetWidth, targetHeight, rotation, cancellationToken), cancellationToken);
         }
 
-        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return await Task.Run(() =>
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            return await Task.Run(() =>
             {
-                byte[] renderBytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    // 自前手書き注釈マーカーの有無をストリーム走査で高速判定（外部大容量PDFの全メモリ展開・複製を防止）
+                    bool hasBinderInk = HasBinderInkAnnotationMarker(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
-                int minDim = Math.Min(targetWidth, targetHeight);
-                int maxDim = Math.Max(targetWidth, targetHeight);
-                var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
+                    // Docnet の PageDimensions(dimOne, dimTwo) は dimOne <= dimTwo (短辺, 長辺) を厳格に要求するため正規化
+                    int minDim = Math.Min(targetWidth, targetHeight);
+                    int maxDim = Math.Max(targetWidth, targetHeight);
+                    var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
 
-                using var docReader = DocLib.Instance.GetDocReader(renderBytes, dimensions);
-                if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
+                    // マーカーが存在しない通常のPDFは直接ファイルパスを渡し、PDFiumネイティブのオンデマンド読み込みを活用（メモリ割当ゼロ）
+                    using var docReader = hasBinderInk
+                        ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), dimensions)
+                        : DocLib.Instance.GetDocReader(filePath, dimensions);
+                    if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
+                    {
+                        return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var pageReader = docReader.GetPageReader(pageIndex);
+                    int actualWidth = pageReader.GetPageWidth();
+                    int actualHeight = pageReader.GetPageHeight();
+                    // 引数なし GetImage() により、PDFium の既知クラッシュ原因である FormFillEnvironment の不要な生成・破棄ループを完全に回避
+                    byte[] rawBytes = pageReader.GetImage();
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var bitmap = BitmapSource.Create(
+                        actualWidth,
+                        actualHeight,
+                        96,
+                        96,
+                        PixelFormats.Bgra32,
+                        null,
+                        rawBytes,
+                        actualWidth * 4);
+
+                    bitmap.Freeze();
+
+                    if (rotation != PageRotation.Rotate0)
+                    {
+                        var rotated = new TransformedBitmap(bitmap, new RotateTransform((int)rotation));
+                        rotated.Freeze();
+                        return rotated;
+                    }
+
+                    return bitmap;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
                 {
                     return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                using var pageReader = docReader.GetPageReader(pageIndex);
-                int actualWidth = pageReader.GetPageWidth();
-                int actualHeight = pageReader.GetPageHeight();
-                byte[] rawBytes = pageReader.GetImage(RenderFlags.RenderAnnotations);
-
-                cancellationToken.ThrowIfCancellationRequested();
-                var bitmap = BitmapSource.Create(
-                    actualWidth,
-                    actualHeight,
-                    96,
-                    96,
-                    PixelFormats.Bgra32,
-                    null,
-                    rawBytes,
-                    actualWidth * 4);
-
-                bitmap.Freeze();
-
-                if (rotation != PageRotation.Rotate0)
-                {
-                    var rotated = new TransformedBitmap(bitmap, new RotateTransform((int)rotation));
-                    rotated.Freeze();
-                    return rotated;
-                }
-
-                return bitmap;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
-            }
-        }, cancellationToken);
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
     }
 
     /// <inheritdoc/>
@@ -224,38 +244,49 @@ public class PdfiumRenderer : IPdfRenderer
             return PageInteractiveData.Empty;
         }
 
-        using var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return await Task.Run(() =>
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            return await Task.Run(() =>
             {
-                byte[] bytes = GetRenderBytes(filePath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    bool hasBinderInk = HasBinderInkAnnotationMarker(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                var characters = ExtractCharacters(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
-                var links = ExtractLinks(bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+                    byte[]? bytes = hasBinderInk ? GetRenderBytes(filePath, cancellationToken) : null;
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                return new PageInteractiveData(characters, links, rotation);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                return PageInteractiveData.Empty;
-            }
-        }, cancellationToken);
+                    var characters = ExtractCharacters(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+                    var links = ExtractLinks(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+
+                    return new PageInteractiveData(characters, links, rotation);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    return PageInteractiveData.Empty;
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
     }
 
     /// <summary>
     /// Docnet.Core を用いて指定ページの文字および座標を抽出します。
     /// </summary>
     private List<PdfTextCharacter> ExtractCharacters(
-        byte[] pdfBytes,
+        string filePath,
+        byte[]? pdfBytes,
         int pageIndex,
         double displayWidth,
         double displayHeight,
@@ -265,7 +296,9 @@ public class PdfiumRenderer : IPdfRenderer
         var result = new List<PdfTextCharacter>();
         var dimensions = new PageDimensions(1080, 1920);
 
-        using var docReader = DocLib.Instance.GetDocReader(pdfBytes, dimensions);
+        using var docReader = pdfBytes != null
+            ? DocLib.Instance.GetDocReader(pdfBytes, dimensions)
+            : DocLib.Instance.GetDocReader(filePath, dimensions);
         if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
         {
             return result;
@@ -298,7 +331,8 @@ public class PdfiumRenderer : IPdfRenderer
     /// PdfSharp を用いて指定ページのリンク注釈を抽出します。
     /// </summary>
     private List<PdfLinkAnnotation> ExtractLinks(
-        byte[] pdfBytes,
+        string filePath,
+        byte[]? pdfBytes,
         int pageIndex,
         double displayWidth,
         double displayHeight,
@@ -306,8 +340,9 @@ public class PdfiumRenderer : IPdfRenderer
         CancellationToken cancellationToken)
     {
         var links = new List<PdfLinkAnnotation>();
-        using var ms = new MemoryStream(pdfBytes);
-        using var doc = PdfSharp.Pdf.IO.PdfReader.Open(ms, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        using var doc = pdfBytes != null
+            ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
+            : PdfSharp.Pdf.IO.PdfReader.Open(filePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
 
         if (pageIndex < 0 || pageIndex >= doc.PageCount) return links;
 
@@ -599,4 +634,93 @@ public class PdfiumRenderer : IPdfRenderer
             return pdfBytes;
         }
     }
+
+    private static readonly byte[] BinderInkMarkerBytes = System.Text.Encoding.ASCII.GetBytes(PdfBinderInkAnnotation.InkKey);
+
+    /// <summary>
+    /// PDFファイル内に本アプリ専用の手書き注釈マーカー（/PdfBinderInk）が存在するかを、
+    /// ファイル全体をメモリに展開することなくストリーム走査で高速判定します（キャッシュ対応）。
+    /// </summary>
+    private bool HasBinderInkAnnotationMarker(string filePath, CancellationToken cancellationToken)
+    {
+        var fileInfo = new FileInfo(filePath);
+        if (!fileInfo.Exists) return false;
+
+        var lastWrite = fileInfo.LastWriteTimeUtc;
+        if (_hasBinderInkMarkerCache.TryGetValue(filePath, out var cached) && cached.LastWriteTimeUtc == lastWrite)
+        {
+            return cached.HasMarker;
+        }
+
+        bool hasMarker = ScanStreamForMarker(filePath, BinderInkMarkerBytes, cancellationToken);
+        _hasBinderInkMarkerCache[filePath] = (lastWrite, hasMarker);
+        return hasMarker;
+    }
+
+    /// <summary>
+    /// ファイルストリームを固定長バッファで走査し、指定されたマーカーバイト列が含まれるかを検索します。
+    /// </summary>
+    private static bool ScanStreamForMarker(string filePath, byte[] marker, CancellationToken cancellationToken)
+    {
+        const int bufferSize = 64 * 1024;
+        byte[] buffer = new byte[bufferSize];
+        int overlap = marker.Length - 1;
+        int carryOver = 0;
+
+        try
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int bytesRead = fs.Read(buffer, carryOver, bufferSize - carryOver);
+                int totalBytes = carryOver + bytesRead;
+                if (totalBytes < marker.Length) break;
+
+                if (ContainsSubsequence(buffer, totalBytes, marker))
+                {
+                    return true;
+                }
+
+                if (bytesRead == 0) break;
+
+                Array.Copy(buffer, totalBytes - overlap, buffer, 0, overlap);
+                carryOver = overlap;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // 読み込み例外発生時は安全側に倒してマーカーあり（フル解析へフォールバック）として扱う
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// バッファ内に指定されたバイト列が含まれているかを検索します。
+    /// </summary>
+    private static bool ContainsSubsequence(byte[] buffer, int length, byte[] pattern)
+    {
+        int limit = length - pattern.Length;
+        for (int i = 0; i <= limit; i++)
+        {
+            bool match = true;
+            for (int j = 0; j < pattern.Length; j++)
+            {
+                if (buffer[i + j] != pattern[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) return true;
+        }
+        return false;
+    }
 }
+
