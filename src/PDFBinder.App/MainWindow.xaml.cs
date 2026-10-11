@@ -47,6 +47,10 @@ public partial class MainWindow : Window
         StateChanged += OnWindowStateChanged;
 
         RestoreWindowSettings();
+        if (WindowState != WindowState.Minimized)
+        {
+            PreviousWindowState = WindowState;
+        }
         WindowActivationHelper.RegisterWindow(this);
     }
 
@@ -489,10 +493,20 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 最小化される直前のウィンドウ状態（通常表示または最大化）
+    /// </summary>
+    public WindowState PreviousWindowState { get; private set; } = WindowState.Normal;
+
+    /// <summary>
     /// ウィンドウ状態の変更を検知し、最大化/復元ボタンのグリフとツールチップを更新します。
     /// </summary>
     private void OnWindowStateChanged(object? sender, EventArgs e)
     {
+        if (WindowState != WindowState.Minimized)
+        {
+            PreviousWindowState = WindowState;
+        }
+
         if (WindowState == WindowState.Maximized)
         {
             MaximizeRestoreGlyph.Text = "\uE3E0";

@@ -142,6 +142,149 @@ public class MainWindowInitializationTests
         Assert.Null(caughtException);
     }
 
+    [Fact]
+    public void MainWindow_BringToForeground_WhenMaximized_MaintainsMaximizedState()
+    {
+        Exception? caughtException = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (Application.Current == null)
+                {
+                    var app = new PDFBinder.App.App();
+                    app.InitializeComponent();
+                }
+
+                var fakeSettings = new FakeSettingsService(new PDFBinder.Core.Models.AppSettings
+                {
+                    Window = new PDFBinder.Core.Models.WindowSettings { IsMaximized = false }
+                });
+                var window = new MainWindow(fakeSettings);
+                window.Show();
+                window.WindowState = WindowState.Maximized;
+
+                // Act: 最大化中にフォアグラウンド前面化を呼び出し
+                PDFBinder.App.Helpers.WindowActivationHelper.BringToForeground(window);
+
+                // Assert: 最大化が解除されず Maximized のままであること
+                Assert.Equal(WindowState.Maximized, window.WindowState);
+
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                caughtException = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(TimeSpan.FromSeconds(10));
+
+        Assert.True(finished, "BringToForeground（最大化維持）テストがタイムアウトしました。");
+        Assert.Null(caughtException);
+    }
+
+    [Fact]
+    public void MainWindow_BringToForeground_WhenMinimizedFromMaximized_RestoresToMaximized()
+    {
+        Exception? caughtException = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (Application.Current == null)
+                {
+                    var app = new PDFBinder.App.App();
+                    app.InitializeComponent();
+                }
+
+                var fakeSettings = new FakeSettingsService(new PDFBinder.Core.Models.AppSettings
+                {
+                    Window = new PDFBinder.Core.Models.WindowSettings { IsMaximized = false }
+                });
+                var window = new MainWindow(fakeSettings);
+                window.Show();
+                window.WindowState = WindowState.Maximized;
+                Assert.Equal(WindowState.Maximized, window.PreviousWindowState);
+
+                // 最小化する
+                window.WindowState = WindowState.Minimized;
+
+                // Act: 最小化状態から BringToForeground を呼び出し
+                PDFBinder.App.Helpers.WindowActivationHelper.BringToForeground(window);
+
+                // Assert: 最小化前の Maximized に復元されること
+                Assert.Equal(WindowState.Maximized, window.WindowState);
+
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                caughtException = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(TimeSpan.FromSeconds(10));
+
+        Assert.True(finished, "BringToForeground（最大化からの最小化復元）テストがタイムアウトしました。");
+        Assert.Null(caughtException);
+    }
+
+    [Fact]
+    public void MainWindow_BringToForeground_WhenMinimizedFromNormal_RestoresToNormal()
+    {
+        Exception? caughtException = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (Application.Current == null)
+                {
+                    var app = new PDFBinder.App.App();
+                    app.InitializeComponent();
+                }
+
+                var fakeSettings = new FakeSettingsService(new PDFBinder.Core.Models.AppSettings
+                {
+                    Window = new PDFBinder.Core.Models.WindowSettings { IsMaximized = false }
+                });
+                var window = new MainWindow(fakeSettings);
+                window.Show();
+                window.WindowState = WindowState.Normal;
+                Assert.Equal(WindowState.Normal, window.PreviousWindowState);
+
+                // 最小化する
+                window.WindowState = WindowState.Minimized;
+
+                // Act: 最小化状態から BringToForeground を呼び出し
+                PDFBinder.App.Helpers.WindowActivationHelper.BringToForeground(window);
+
+                // Assert: 最小化前の Normal に復元されること
+                Assert.Equal(WindowState.Normal, window.WindowState);
+
+                window.Close();
+            }
+            catch (Exception ex)
+            {
+                caughtException = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(TimeSpan.FromSeconds(10));
+
+        Assert.True(finished, "BringToForeground（通常表示からの最小化復元）テストがタイムアウトしました。");
+        Assert.Null(caughtException);
+    }
+
     private class FakeDisplayProfileService : PDFBinder.App.Services.IDisplayProfileService
     {
         private readonly string _profileKey;

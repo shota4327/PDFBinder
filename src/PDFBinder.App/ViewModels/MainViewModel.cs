@@ -641,10 +641,6 @@ public partial class MainViewModel : ObservableObject
             newValue.UndoRedoService.StateChanged += OnSessionUndoRedoStateChanged;
             newValue.PropertyChanged += OnSessionPropertyChanged;
 
-            Document = newValue.Document;
-            IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
-            SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
-
             if (DetailEditor != null)
             {
                 if (newValue.IsImage)
@@ -652,6 +648,14 @@ public partial class MainViewModel : ObservableObject
                     DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
                 }
                 DetailEditor.FitMode = newValue.FitMode;
+            }
+
+            Document = newValue.Document;
+            IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
+            SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
+
+            if (DetailEditor != null)
+            {
                 if (newValue.FitMode != DetailViewFitMode.None)
                 {
                     DetailEditor.ApplyFitMode();
