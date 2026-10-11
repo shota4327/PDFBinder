@@ -82,37 +82,55 @@ public class ImageExportService : IImageExportService
     /// </summary>
     private static BitmapSource PrepareBitmapForExport(BitmapSource bitmap, ImageExportFormat format, int dpi)
     {
+        if (format == ImageExportFormat.Jpeg)
+        {
+            return CompositeOnWhiteBackground(bitmap, dpi);
+        }
+
+        return CreateBitmapWithDpi(bitmap, dpi);
+    }
+
+    /// <summary>
+    /// 透過ピクセルの黒ずみを防ぐため白背景へ合成し、指定DPIのBitmapSourceを生成します。
+    /// </summary>
+    private static BitmapSource CompositeOnWhiteBackground(BitmapSource bitmap, int dpi)
+    {
         int width = bitmap.PixelWidth;
         int height = bitmap.PixelHeight;
 
-        // JPEGの場合は透過ピクセルの黒ずみを防ぐため白背景へ合成
-        if (format == ImageExportFormat.Jpeg)
+        // 96 DPI (1 DIP = 1 ピクセル) で白背景上に元ビットマップを描画
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
         {
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
-                dc.DrawImage(bitmap, new Rect(0, 0, width, height));
-            }
-
-            var rtb = new RenderTargetBitmap(width, height, dpi, dpi, PixelFormats.Pbgra32);
-            rtb.Render(visual);
-            rtb.Freeze();
-            return rtb;
+            dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
+            dc.DrawImage(bitmap, new Rect(0, 0, width, height));
         }
 
-        // PNGの場合はピクセルデータを複製し指定DPIのBitmapSourceを生成
-        int stride = (width * bitmap.Format.BitsPerPixel + 7) / 8;
+        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(visual);
+        rtb.Freeze();
+
+        return CreateBitmapWithDpi(rtb, dpi);
+    }
+
+    /// <summary>
+    /// ビットマップのピクセルデータを引き継ぎ、指定DPIメタデータを設定したBitmapSourceを生成します。
+    /// </summary>
+    private static BitmapSource CreateBitmapWithDpi(BitmapSource source, int dpi)
+    {
+        int width = source.PixelWidth;
+        int height = source.PixelHeight;
+        int stride = (width * source.Format.BitsPerPixel + 7) / 8;
         byte[] pixels = new byte[stride * height];
-        bitmap.CopyPixels(pixels, stride, 0);
+        source.CopyPixels(pixels, stride, 0);
 
         var created = BitmapSource.Create(
             width,
             height,
             dpi,
             dpi,
-            bitmap.Format,
-            bitmap.Palette,
+            source.Format,
+            source.Palette,
             pixels,
             stride);
         created.Freeze();

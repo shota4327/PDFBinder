@@ -102,4 +102,79 @@ public class ImageExportServiceTests
         bitmap.Freeze();
         return bitmap;
     }
+
+    [Fact]
+    public async Task SaveImageAsync_JpegFormat_HighDpi_DoesNotClipContent()
+    {
+        // 100x100のビットマップを用意し、左上を赤、右下を青にする
+        int width = 100;
+        int height = 100;
+        int stride = width * 4;
+        byte[] pixels = new byte[stride * height];
+
+        // 全体を白で初期化
+        Array.Fill(pixels, (byte)255);
+
+        // 左上(0..19, 0..19)を赤(B=0, G=0, R=255, A=255)
+        for (int y = 0; y < 20; y++)
+        {
+            for (int x = 0; x < 20; x++)
+            {
+                int offset = y * stride + x * 4;
+                pixels[offset] = 0;       // B
+                pixels[offset + 1] = 0;   // G
+                pixels[offset + 2] = 255; // R
+                pixels[offset + 3] = 255; // A
+            }
+        }
+
+        // 右下(80..99, 80..99)を青(B=255, G=0, R=0, A=255)
+        for (int y = 80; y < 100; y++)
+        {
+            for (int x = 80; x < 100; x++)
+            {
+                int offset = y * stride + x * 4;
+                pixels[offset] = 255;     // B
+                pixels[offset + 1] = 0;   // G
+                pixels[offset + 2] = 0;   // R
+                pixels[offset + 3] = 255; // A
+            }
+        }
+
+        var sourceBitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+        sourceBitmap.Freeze();
+
+        string tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.jpg");
+        try
+        {
+            // 300 DPI でJPEG保存（修正前は300/96倍に拡大されて右下の青が切り取られていた）
+            await _service.SaveImageAsync(sourceBitmap, tempFile, ImageExportFormat.Jpeg, 300, quality: 100);
+
+            using var stream = File.OpenRead(tempFile);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            var frame = decoder.Frames[0];
+
+            Assert.Equal(width, frame.PixelWidth);
+            Assert.Equal(height, frame.PixelHeight);
+
+            // 右下(x=90, y=90)のピクセル色を取得
+            byte[] pixelData = new byte[4];
+            var cb = new CroppedBitmap(frame, new System.Windows.Int32Rect(90, 90, 1, 1));
+            cb.CopyPixels(pixelData, 4, 0);
+
+            // JPEGの非可逆圧縮を考慮しても青成分が強く、赤・緑成分が低いことを確認
+            // （切り取られていた場合は全体が白になり B/G/R すべて約255になる）
+            byte b = pixelData[0];
+            byte g = pixelData[1];
+            byte r = pixelData[2];
+
+            Assert.True(b > 180, $"青成分が十分高いこと (実際: {b})");
+            Assert.True(r < 80, $"赤成分が低いこと (実際: {r})");
+            Assert.True(g < 80, $"緑成分が低いこと (実際: {g})");
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
 }
