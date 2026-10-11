@@ -482,4 +482,70 @@ public class MainViewModelMultiFileTests
         Assert.Equal("LargeDocB.pdf", vm.ActiveSession.Document.FileName);
         Assert.Equal(300, vm.ActiveSession.Document.PageCount);
     }
+
+    [Fact]
+    public async Task SwitchDocument_WhenWindowSizeChanged_RecalculatesZoomForFitModes_AndPreservesActualSizeAndCustomZoom()
+    {
+        // Arrange
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+        vm.DetailEditor!.UpdateViewportSize(800, 600);
+
+        // DocA (FitToWindow)
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocA.pdf");
+        var sessionA = vm.ActiveSession!;
+        sessionA.FitMode = DetailViewFitMode.FitToWindow;
+        vm.DetailEditor.FitMode = DetailViewFitMode.FitToWindow;
+        vm.DetailEditor.ApplyFitMode();
+        double initialZoomA = vm.DetailEditor.Zoom;
+
+        // DocB (FitToWidth)
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocB.pdf");
+        var sessionB = vm.ActiveSession!;
+        sessionB.FitMode = DetailViewFitMode.FitToWidth;
+        vm.DetailEditor.FitMode = DetailViewFitMode.FitToWidth;
+        vm.DetailEditor.ApplyFitMode();
+        double initialZoomB = vm.DetailEditor.Zoom;
+
+        // DocC (ActualSize: 100%)
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocC.pdf");
+        var sessionC = vm.ActiveSession!;
+        sessionC.FitMode = DetailViewFitMode.ActualSize;
+        vm.DetailEditor.FitMode = DetailViewFitMode.ActualSize;
+        vm.DetailEditor.ApplyFitMode();
+        Assert.Equal(1.0, vm.DetailEditor.Zoom);
+
+        // DocD (None: 手動カスタム倍率 1.75)
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocD.pdf");
+        var sessionD = vm.ActiveSession!;
+        sessionD.FitMode = DetailViewFitMode.None;
+        sessionD.ZoomFactor = 1.75;
+        vm.DetailEditor.FitMode = DetailViewFitMode.None;
+        vm.DetailEditor.Zoom = 1.75;
+        Assert.Equal(1.75, vm.DetailEditor.Zoom);
+
+        // Act & Assert 1: ウィンドウサイズ（ビューポート）を変更 (800x600 -> 1200x900)
+        vm.DetailEditor.UpdateViewportSize(1200, 900);
+
+        // DocA (FitToWindow) に切り替え -> 変更後のウィンドウサイズで拡大率が再計算されること
+        vm.SwitchDocument(sessionA);
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+        Assert.True(vm.DetailEditor.Zoom > initialZoomA);
+
+        // DocB (FitToWidth) に切り替え -> 変更後のウィンドウサイズで幅合わせが再計算されること
+        vm.SwitchDocument(sessionB);
+        Assert.Equal(DetailViewFitMode.FitToWidth, vm.DetailEditor.FitMode);
+        Assert.True(vm.DetailEditor.Zoom > initialZoomB);
+
+        // DocC (ActualSize) に切り替え -> ウィンドウサイズ変更後も 1.0 (100%) がそのまま保持されること
+        vm.SwitchDocument(sessionC);
+        Assert.Equal(DetailViewFitMode.ActualSize, vm.DetailEditor.FitMode);
+        Assert.Equal(1.0, vm.DetailEditor.Zoom);
+
+        // DocD (None / カスタム倍率 1.75) に切り替え -> ウィンドウサイズ変更後も 1.75 がそのまま保持されること
+        vm.SwitchDocument(sessionD);
+        Assert.Equal(DetailViewFitMode.None, vm.DetailEditor.FitMode);
+        Assert.Equal(1.75, vm.DetailEditor.Zoom);
+    }
 }
+

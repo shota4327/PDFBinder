@@ -15,6 +15,8 @@ public static class WindowActivationHelper
     private static readonly Dictionary<MainWindow, DateTime> WindowActivationTimes = new();
     private static readonly object LockObject = new();
 
+    private const int SwShowMaximized = 3;
+    private const int SwShow = 5;
     private const int SwRestore = 9;
     private const int AsfwAny = -1;
 
@@ -96,14 +98,18 @@ public static class WindowActivationHelper
     }
 
     /// <summary>
-    /// 指定されたウィンドウを最小化から復元し、最前面（アクティブ状態）に表示します。
+    /// 指定されたウィンドウの表示状態（最大化・通常表示）を維持したまま、最小化時は適切に復元し、最前面（アクティブ状態）に表示します。
     /// </summary>
     /// <param name="window">対象のウィンドウ</param>
     public static void BringToForeground(Window window)
     {
-        if (window.WindowState == WindowState.Minimized)
+        bool wasMinimized = window.WindowState == WindowState.Minimized;
+        if (wasMinimized)
         {
-            window.WindowState = WindowState.Normal;
+            // 最小化前の状態（最大化または通常表示）へ復元
+            window.WindowState = (window is MainWindow mw && mw.PreviousWindowState == WindowState.Maximized)
+                ? WindowState.Maximized
+                : WindowState.Normal;
         }
 
         window.Show();
@@ -112,7 +118,22 @@ public static class WindowActivationHelper
         var hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd != IntPtr.Zero)
         {
-            ShowWindow(hwnd, SwRestore);
+            if (wasMinimized)
+            {
+                // 最小化から復元する場合は、目標のウィンドウ状態に合わせて最大化(SW_SHOWMAXIMIZED)または通常復元(SW_RESTORE)を実行
+                int showCmd = (window.WindowState == WindowState.Maximized) ? SwShowMaximized : SwRestore;
+                ShowWindow(hwnd, showCmd);
+            }
+            else if (window.WindowState == WindowState.Maximized)
+            {
+                // 既に最大化表示されている場合は、SwRestore(9)を呼ぶと通常表示に縮小復元されてしまうためSwShow(5)を実行
+                ShowWindow(hwnd, SwShow);
+            }
+            else
+            {
+                ShowWindow(hwnd, SwRestore);
+            }
+
             SetForegroundWindow(hwnd);
         }
 
