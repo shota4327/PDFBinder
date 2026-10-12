@@ -19,6 +19,9 @@ public partial class PdfPageModel : ObservableObject
     /// <summary>元PDF内でのページ番号（0始まり）</summary>
     public int OriginalPageIndex { get; set; }
 
+    /// <summary>元PDFファイルを開くためのパスワード（パスワード保護されている場合）</summary>
+    public string? SourcePassword { get; set; }
+
     /// <summary>白紙ページかどうかのフラグ</summary>
     public bool IsBlankPage => string.IsNullOrEmpty(SourceFilePath);
 

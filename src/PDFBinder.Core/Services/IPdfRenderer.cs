@@ -33,6 +33,33 @@ public interface IPdfRenderer
         => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken);
 
     /// <summary>
+    /// 指定されたパスワード付きPDFページをレンダリングし、WPFで表示可能なBitmapSourceを返します。
+    /// </summary>
+    Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        string? password)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken);
+
+    /// <summary>
+    /// 指定されたパスワード付きPDFページを実行優先度を指定してレンダリングし、WPFで表示可能なBitmapSourceを返します。
+    /// </summary>
+    Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority,
+        string? password)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, priority);
+
+    /// <summary>
     /// 白紙ページのプレビュービットマップを生成します。
     /// </summary>
     BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation);
@@ -69,6 +96,33 @@ public interface IPdfRenderer
         CancellationToken cancellationToken,
         RenderPriority priority)
         => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+
+    /// <summary>
+    /// 指定されたパスワード付きPDFページのテキスト・文字座標およびリンク注釈データを抽出します。
+    /// </summary>
+    Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        string? password)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+
+    /// <summary>
+    /// 指定されたパスワード付きPDFページのテキスト・文字座標およびリンク注釈データを優先度を指定して抽出します。
+    /// </summary>
+    Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority,
+        string? password)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, priority);
 
     /// <summary>
     /// キャッシュされたファイルバイト列を解放します。

@@ -8,6 +8,7 @@ using Microsoft.Win32;
 using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
 using PDFBinder.App.Services;
+using PDFBinder.Core.Exceptions;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 
@@ -1023,9 +1024,22 @@ public partial class MainViewModel : ObservableObject
             bool isImage = _imageService.IsSupportedImage(filePath);
             StatusMessage = isImage ? "画像を読み込んでいます..." : "PDFを読み込んでいます...";
 
-            var doc = isImage
-                ? await _imageService.LoadImageDocumentAsync(filePath)
-                : await _pdfService.LoadDocumentAsync(filePath);
+            PdfDocumentModel doc;
+            if (isImage)
+            {
+                doc = await _imageService.LoadImageDocumentAsync(filePath);
+            }
+            else
+            {
+                var loadedDoc = await LoadDocumentWithPasswordPromptAsync(filePath);
+                if (loadedDoc == null)
+                {
+                    StatusMessage = "読み込みをキャンセルしました。";
+                    return;
+                }
+                doc = loadedDoc;
+            }
+
             var session = new DocumentSession(doc);
 
             // 未編集かつ0ページの「名称未設定」セッションが存在する場合はそれを除去
@@ -1051,6 +1065,34 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// パスワード付きPDFの認証を対話的に行いながらドキュメントを読み込みます。
+    /// キャンセルされた場合は null を返します。
+    /// </summary>
+    public async Task<PdfDocumentModel?> LoadDocumentWithPasswordPromptAsync(string filePath)
+    {
+        string fileName = Path.GetFileName(filePath);
+        string? password = null;
+        string? errorMessage = null;
+
+        while (true)
+        {
+            try
+            {
+                return await _pdfService.LoadDocumentAsync(filePath, password);
+            }
+            catch (PdfPasswordRequiredException ex)
+            {
+                errorMessage = ex.IsInvalidPassword ? "パスワードが正しくありません。再度入力してください。" : null;
+                password = await PromptPasswordAsync(fileName, errorMessage);
+                if (password == null)
+                {
+                    return null;
+                }
+            }
         }
     }
 
@@ -1173,7 +1215,11 @@ public partial class MainViewModel : ObservableObject
             var pagesToInsert = new List<PdfPageModel>();
             foreach (var file in pdfFiles)
             {
-                var importedDoc = await _pdfService.LoadDocumentAsync(file);
+                var importedDoc = await LoadDocumentWithPasswordPromptAsync(file);
+                if (importedDoc == null)
+                {
+                    continue;
+                }
                 pagesToInsert.AddRange(importedDoc.Pages);
             }
 
@@ -1266,6 +1312,84 @@ public partial class MainViewModel : ObservableObject
         {
             ConfirmSave(SaveConfirmationResult.Cancel);
         }
+    }
+
+    [ObservableProperty]
+    private bool _isPasswordPromptVisible;
+
+    [ObservableProperty]
+    private string _passwordPromptFileName = string.Empty;
+
+    [ObservableProperty]
+    private string _passwordPromptInput = string.Empty;
+
+    [ObservableProperty]
+    private string? _passwordPromptErrorMessage;
+
+    [ObservableProperty]
+    private bool _isPasswordInputMasked = true;
+
+    private TaskCompletionSource<string?>? _passwordPromptTcs;
+
+    /// <summary>
+    /// パスワード付きPDFのパスワード入力ダイアログ表示用デリゲート。
+    /// 引数は (ファイル名, エラーメッセージ)、戻り値は入力パスワード（キャンセル時はnull）。
+    /// テスト時にモック可能。nullの場合はインアプリオーバーレイを表示します。
+    /// </summary>
+    public Func<string, string?, Task<string?>>? PromptPasswordCallback { get; set; }
+
+    /// <summary>
+    /// パスワード入力ダイアログ（インアプリオーバーレイ）を表示し、ユーザーの入力結果を非同期に取得します。
+    /// </summary>
+    public async Task<string?> PromptPasswordAsync(string fileName, string? errorMessage = null)
+    {
+        if (PromptPasswordCallback != null)
+        {
+            return await PromptPasswordCallback(fileName, errorMessage);
+        }
+
+        PasswordPromptFileName = fileName;
+        PasswordPromptInput = string.Empty;
+        PasswordPromptErrorMessage = errorMessage;
+        IsPasswordInputMasked = true;
+        IsPasswordPromptVisible = true;
+
+        _passwordPromptTcs = new TaskCompletionSource<string?>();
+        return await _passwordPromptTcs.Task;
+    }
+
+    /// <summary>
+    /// パスワード入力ダイアログでパスワードを確定します。
+    /// </summary>
+    [RelayCommand]
+    public void ConfirmPasswordPrompt()
+    {
+        IsPasswordPromptVisible = false;
+        _passwordPromptTcs?.TrySetResult(PasswordPromptInput);
+        _passwordPromptTcs = null;
+    }
+
+    /// <summary>
+    /// パスワード入力ダイアログをキャンセルして閉じます。
+    /// </summary>
+    [RelayCommand]
+    public void CancelPasswordPrompt()
+    {
+        if (IsPasswordPromptVisible)
+        {
+            IsPasswordPromptVisible = false;
+            _passwordPromptTcs?.TrySetResult(null);
+            _passwordPromptTcs = null;
+        }
+    }
+
+    /// <summary>
+    /// パスワード入力欄の伏せ字（マスク）表示／平文表示を切り替えます。
+    /// </summary>
+    [RelayCommand]
+    public void TogglePasswordMask()
+    {
+        IsPasswordInputMasked = !IsPasswordInputMasked;
     }
 
     /// <summary>
@@ -2221,7 +2345,8 @@ public partial class MainViewModel : ObservableObject
                 ThumbnailRenderHeight,
                 page.RenderRotation,
                 cancellationToken,
-                RenderPriority.Low);
+                RenderPriority.Low,
+                page.SourcePassword);
         }
 
         if (cancellationToken.IsCancellationRequested || baseBitmap == null) return false;
@@ -2522,7 +2647,8 @@ public partial class MainViewModel : ObservableObject
                 height,
                 page.RenderRotation,
                 ct,
-                RenderPriority.Normal);
+                RenderPriority.Normal,
+                page.SourcePassword);
         }
 
         if (baseBitmap != null && page.InkStrokes.Count > 0)

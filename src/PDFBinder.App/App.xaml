@@ -8,6 +8,7 @@
             <!-- コンバーター -->
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
             <converters:InverseCountToVisibilityConverter x:Key="InverseCountToVisibilityConverter" />
             <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter" />

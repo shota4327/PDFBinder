@@ -13,9 +13,21 @@ public interface IPdfService
     Task<PdfDocumentModel> LoadDocumentAsync(string filePath);
 
     /// <summary>
+    /// パスワード付きPDFファイルをファイルロックなしで非同期に読み込み、ドキュメントモデルを生成します。
+    /// </summary>
+    Task<PdfDocumentModel> LoadDocumentAsync(string filePath, string? password)
+        => LoadDocumentAsync(filePath);
+
+    /// <summary>
     /// 外部のPDFファイルを読み込み、指定位置に結合・挿入します。
     /// </summary>
     Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex = -1);
+
+    /// <summary>
+    /// 外部のパスワード付きPDFファイルを読み込み、指定位置に結合・挿入します。
+    /// </summary>
+    Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex, string? password)
+        => AppendDocumentAsync(targetDoc, filePath, insertIndex);
 
     /// <summary>
     /// 指定されたサイズ（または標準A4）の白紙ページモデルを作成します。
@@ -31,6 +43,12 @@ public interface IPdfService
     /// 指定されたページ群のみを別PDFファイルとして抽出・保存（分割）します。
     /// </summary>
     Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath);
+
+    /// <summary>
+    /// 指定されたページ群のみを別PDFファイルとして抽出・保存（分割）します（パスワード指定対応）。
+    /// </summary>
+    Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath, string? password)
+        => ExportPagesAsync(pages, outputPath);
 
     /// <summary>
     /// ドキュメントの全ページを1ページずつの個別PDFファイルに一括分割して出力します。

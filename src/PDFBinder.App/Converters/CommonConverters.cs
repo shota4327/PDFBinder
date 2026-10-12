@@ -23,6 +23,22 @@ public class InverseBooleanConverter : IValueConverter
 }
 
 /// <summary>
+/// boolean値を反転してVisibilityに変換するコンバーター
+/// </summary>
+public class InverseBooleanToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is true ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is Visibility.Collapsed;
+    }
+}
+
+/// <summary>
 /// nullまたは空文字の場合にVisibility.Collapsedを返すコンバーター
 /// </summary>
 public class NullToVisibilityConverter : IValueConverter

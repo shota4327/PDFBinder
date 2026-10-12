@@ -141,22 +141,23 @@ PDFBinder/
 
 ### 5.1 `IPdfService`
 PDFファイルの入出力、構造操作を担当。
-- `Task<PdfDocumentModel> LoadDocumentAsync(string filePath)`: ファイルロックを行わずメモリ読み込み
-- `Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath)`: ページ配置・回転・インク合成を行い保存（保存成功時に全ページのSourceFilePathおよびOriginalPageIndexを最新ファイル構成に合わせて再インデックス同期）
+- `Task<PdfDocumentModel> LoadDocumentAsync(string filePath, string? password = null)`: ファイルロックを行わずメモリ読み込み（パスワード保護PDFの復号対応、未指定/誤入力時は `PdfPasswordRequiredException` をスロー）
+- `Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath)`: ページ配置・回転・インク合成を行い保存（元ドキュメントがパスワード保護されている場合はパスワードを維持して再暗号化保存。保存成功時に全ページのSourceFilePath、OriginalPageIndex、SourcePasswordを最新ファイル構成に合わせて同期）
 - `PdfPageModel CreateBlankPage(double width, double height)`: 指定サイズの白紙ページ生成
-- `Task AppendPdfAsync(PdfDocumentModel doc, string filePath, int insertIndex)`: 別PDFのページ差し込み結合
-- `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)`: 選択ページの分割抽出
-- `Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName)`: 全ページを個別PDFに一括分割
+- `Task AppendDocumentAsync(PdfDocumentModel doc, string filePath, int insertIndex, string? password = null)`: 別PDFのページ差し込み結合（パスワード付きPDF対応）
+- `Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath, string? password = null)`: 選択ページの分割抽出（元ページのパスワード保護を維持して出力）
+- `Task<int> SplitAllPagesAsync(PdfDocumentModel doc, string outputDirectory, string baseFileName)`: 全ページを個別PDFに一括分割（ドキュメントのパスワード保護を維持して出力）
 - `Task<List<PdfPageModel>> SplitPagesHalfAsync(IEnumerable<PdfPageModel> pages, CancellationToken cancellationToken)`: ページの向き（表示寸法）に応じて長辺を半分に2分割（横長なら左右分割、縦長なら上下分割）
 
 ### 5.2 `IPdfRenderer`
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。PDFiumネイティブAPI（Docnet.Core）の非スレッドセーフ性を回避するため、`PriorityAsyncLock` による排他・優先度制御（High: カレントページ詳細表示、Low: バックグラウンドサムネイル・先読み）を備え、多重実行によるクラッシュやフリーズを完全に防止。
 また、用紙背景はUI側（`PageBorder` の白背景）で提供するため、レンダラー内部での不要な白矩形描画および再シリアライズ（`doc.Save`）を撤廃し、自前手書き注釈を持たない通常の外部PDFはディスク上のバイト列からPDFiumへ直接渡して描画することで、読み込み直後の1ページ目表示ラグおよびサムネイル生成オーバーヘッドを完全撤廃。自前手書き注釈が存在するPDFのみ、初回レンダリング時に注釈を除去したバイト列を生成してメモリキャッシュ（ファイル更新日時検証付き）し、詳細画面での手書き線の多重焼き込みを防止。
+パスワード保護されたPDFのレンダリングおよびインタラクティブデータ抽出時には、認証済みパスワードをDocnet.Coreへ引き渡して正常にビットマップおよび文字・リンク情報を生成。
 さらに詳細エディタ（`DetailEditorViewModel`）では、接続ディスプレイの `DpiScale` とズーム倍率を乗算してレンダリング解像度を算出（最大寸法 8192px）することで、4Kや高DPI環境での拡大・等倍表示時にも文字や図面がボケず、本来のシャープな精細度で描画。
-- `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal)`: サムネイル/詳細画面用レンダリング（優先度指定対応）
+- `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: サムネイル/詳細画面用レンダリング（優先度指定・パスワード対応）
 - `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
-- `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用）
+- `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用、パスワード対応）
 
 ### 5.3 `IUndoRedoService`
 ページ操作およびインク操作の履歴管理。
@@ -584,7 +585,9 @@ PDFドキュメントの各ページをJPEGまたはPNG形式の静止画ファ�
    - 100ページ以上のPDFでもUIフリーズなくスムーズにスクロールできる仮想化（`VirtualizingWrapPanel`）の採用。
    - サムネイル生成はバックグラウンドワーカースレッド（`Task.Run`）で非同期生成し、順次UIへ反映。
 2. **堅牢性**:
-   - 不正なPDF、破損ページ、パスワード保護PDF、無効な画像ファイルに対する適切なエラーハンドリングとダイアログ通知。
+   - 不正なPDF、破損ページ、無効な画像ファイルに対する適切なエラーハンドリングとダイアログ通知。
+   - パスワード保護PDFに対する専用インアプリダイアログでの対話的パスワード認証（伏せ字/平文切り替え、誤入力時の再試行）。
+   - パスワード保護されたPDFの編集保存時、選択ページエクスポート時、全ページ分割時における暗号化保護の確実な維持。
 3. **テスト自動化**:
    - `PDFBinder.Core` 内のページ操作、マージ、スプリット、白紙挿入、画像読み込み・合成保存の単体テスト網羅率100%（全テストPASS必須）。
 

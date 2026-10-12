@@ -1014,7 +1014,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             targetHeight,
             item.Page.RenderRotation,
             token,
-            priority);
+            priority,
+            item.Page.SourcePassword);
 
         token.ThrowIfCancellationRequested();
         if (generation != Volatile.Read(ref _renderGeneration)) return;
@@ -1040,7 +1041,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 item.Page.DisplayHeight,
                 item.Page.RenderRotation,
                 token,
-                priority);
+                priority,
+                item.Page.SourcePassword);
         }
     }
 
