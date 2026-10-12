@@ -73,10 +73,13 @@ public partial class MainWindow : Window
 
         if (DataContext is not MainViewModel vm) return;
 
-        // 0. エラー・警告通知ダイアログのキー制御
+        // 0. パスワード入力ダイアログのキー制御
+        if (HandlePasswordPromptKeyDown(vm, e)) return;
+
+        // 1. エラー・警告通知ダイアログのキー制御
         if (HandleErrorDialogKeyDown(vm, e)) return;
 
-        // 1. 保存確認ダイアログのキー制御
+        // 2. 保存確認ダイアログのキー制御
         if (HandleSaveConfirmationKeyDown(vm, e)) return;
 
         // 2. 印刷タスク待機ダイアログのキー制御
@@ -99,6 +102,37 @@ public partial class MainWindow : Window
 
         // 4. その他のグローバルショートカット（Window.InputBindings）
         HandleGlobalInputBindingsKeyDown(vm, e);
+    }
+
+    /// <summary>
+    /// パスワード入力ダイアログ表示中のキーボード操作（Enterによる決定、Escによるキャンセル等）を先行処理します。
+    /// </summary>
+    private static bool HandlePasswordPromptKeyDown(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!vm.IsPasswordPromptVisible) return false;
+
+        if (e.Key == Key.Enter)
+        {
+            vm.ConfirmPasswordPrompt();
+            e.Handled = true;
+            return true;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            vm.CancelPasswordPrompt();
+            e.Handled = true;
+            return true;
+        }
+
+        // パスワード入力ダイアログ表示中は、ダイアログ操作以外のグローバルショートカットキーを抑止
+        if (Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Delete)
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -674,5 +708,46 @@ public partial class MainWindow : Window
     private void OnAboutCardMouseDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// パスワード入力ボックス（伏せ字）のテキスト変更時にViewModelへ同期します。
+    /// </summary>
+    private void OnPasswordInputBoxPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && vm.IsPasswordInputMasked)
+        {
+            vm.PasswordPromptInput = PasswordInputBox.Password;
+        }
+    }
+
+    /// <summary>
+    /// パスワード平文テキストボックスの変更時に伏せ字入力ボックスへ同期します。
+    /// </summary>
+    private void OnPasswordPlainTextBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && !vm.IsPasswordInputMasked)
+        {
+            if (PasswordInputBox.Password != PasswordPlainTextBox.Text)
+            {
+                PasswordInputBox.Password = PasswordPlainTextBox.Text;
+            }
+        }
+    }
+
+    /// <summary>
+    /// パスワード入力ダイアログの表示状態切り替え時に初期フォーカスを設定します。
+    /// </summary>
+    private void OnPasswordPromptGridIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                PasswordInputBox.Password = string.Empty;
+                PasswordPlainTextBox.Text = string.Empty;
+                PasswordInputBox.Focus();
+            }, System.Windows.Threading.DispatcherPriority.Input);
+        }
     }
 }

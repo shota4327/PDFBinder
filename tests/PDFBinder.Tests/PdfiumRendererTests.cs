@@ -453,6 +453,33 @@ public class PdfiumRendererTests : IDisposable
         doc.Save(filePath);
         return filePath;
     }
+
+    [Fact]
+    public async Task RenderPageAsync_ProtectedPdf_RendersCorrectlyWithPassword()
+    {
+        // Arrange
+        string filePath = Path.Combine(_testDirectory, "protected_render.pdf");
+        using (var doc = new PdfDocument())
+        {
+            doc.SecuritySettings.UserPassword = "pdfiumpassword";
+            var page = doc.AddPage();
+            page.Width = XUnit.FromPoint(400);
+            page.Height = XUnit.FromPoint(600);
+            using var gfx = XGraphics.FromPdfPage(page);
+            gfx.DrawRectangle(XBrushes.Red, 10, 10, 100, 100);
+            doc.Save(filePath);
+        }
+
+        // Act: パスワードなしの場合は白紙ビットマップが返る（フォールバック）
+        var unauthBitmap = await _renderer.RenderPageAsync(filePath, 0, 200, 300, PageRotation.Rotate0);
+        Assert.NotNull(unauthBitmap);
+
+        // Act: 正しいパスワードを渡してレンダリング
+        var authBitmap = await _renderer.RenderPageAsync(filePath, 0, 200, 300, PageRotation.Rotate0, CancellationToken.None, "pdfiumpassword");
+        Assert.NotNull(authBitmap);
+        Assert.True(authBitmap.PixelWidth > 0);
+        Assert.True(authBitmap.PixelHeight > 0);
+    }
 }
 
 

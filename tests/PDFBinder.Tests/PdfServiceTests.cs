@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
+using PDFBinder.Core.Exceptions;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
 using PdfSharp.Pdf;
@@ -209,5 +210,123 @@ public class PdfServiceTests : IDisposable
                 doc.Pages[i].RenderRotation);
             Assert.NotNull(bitmap);
         }
+    }
+
+    /// <summary>
+    /// パスワード付きのテスト用PDFを生成します。
+    /// </summary>
+    private string CreateProtectedSamplePdf(string fileName, string password, int pageCount = 2)
+    {
+        string filePath = Path.Combine(_testDirectory, fileName);
+        using var doc = new PdfDocument();
+        doc.SecuritySettings.UserPassword = password;
+        for (int i = 0; i < pageCount; i++)
+        {
+            var page = doc.AddPage();
+            page.Width = PdfSharp.Drawing.XUnit.FromPoint(500);
+            page.Height = PdfSharp.Drawing.XUnit.FromPoint(700);
+        }
+        doc.Save(filePath);
+        return filePath;
+    }
+
+    [Fact]
+    public async Task LoadDocumentAsync_ProtectedPdfWithoutPassword_ThrowsPdfPasswordRequiredException()
+    {
+        // Arrange
+        string protectedPdf = CreateProtectedSamplePdf("locked.pdf", "testpass");
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<PdfPasswordRequiredException>(
+            () => _service.LoadDocumentAsync(protectedPdf));
+        Assert.False(ex.IsInvalidPassword);
+        Assert.Equal(protectedPdf, ex.FilePath);
+    }
+
+    [Fact]
+    public async Task LoadDocumentAsync_ProtectedPdfWithWrongPassword_ThrowsPdfPasswordRequiredExceptionWithIsInvalidPassword()
+    {
+        // Arrange
+        string protectedPdf = CreateProtectedSamplePdf("locked_wrong.pdf", "testpass");
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<PdfPasswordRequiredException>(
+            () => _service.LoadDocumentAsync(protectedPdf, "wrongpassword"));
+        Assert.True(ex.IsInvalidPassword);
+        Assert.Equal(protectedPdf, ex.FilePath);
+    }
+
+    [Fact]
+    public async Task LoadDocumentAsync_ProtectedPdfWithCorrectPassword_LoadsSuccessfully()
+    {
+        // Arrange
+        string protectedPdf = CreateProtectedSamplePdf("locked_correct.pdf", "mypassword", 3);
+
+        // Act
+        var doc = await _service.LoadDocumentAsync(protectedPdf, "mypassword");
+
+        // Assert
+        Assert.Equal(3, doc.PageCount);
+        Assert.Equal("mypassword", doc.DocumentPassword);
+        Assert.All(doc.Pages, p => Assert.Equal("mypassword", p.SourcePassword));
+    }
+
+    [Fact]
+    public async Task SaveDocumentAsync_ProtectedPdf_PreservesPasswordEncryption()
+    {
+        // Arrange
+        string protectedPdf = CreateProtectedSamplePdf("locked_save.pdf", "secret123", 2);
+        var doc = await _service.LoadDocumentAsync(protectedPdf, "secret123");
+        doc.Pages[0].Rotation = PageRotation.Rotate90;
+
+        string outputPath = Path.Combine(_testDirectory, "saved_output.pdf");
+
+        // Act
+        await _service.SaveDocumentAsync(doc, outputPath);
+
+        // Assert: 保存後、パスワードなしでの読み込みは例外となり、正しいパスワードで開けること
+        await Assert.ThrowsAsync<PdfPasswordRequiredException>(
+            () => _service.LoadDocumentAsync(outputPath));
+
+        var savedDoc = await _service.LoadDocumentAsync(outputPath, "secret123");
+        Assert.Equal(2, savedDoc.PageCount);
+        Assert.Equal(PageRotation.Rotate90, savedDoc.Pages[0].Rotation);
+    }
+
+    [Fact]
+    public async Task AppendDocumentAsync_ProtectedPdf_AppendsSuccessfullyWithPassword()
+    {
+        // Arrange
+        string basePdf = CreateSamplePdf("base.pdf", 2);
+        string protectedPdf = CreateProtectedSamplePdf("append_locked.pdf", "appendpass", 1);
+        var doc = await _service.LoadDocumentAsync(basePdf);
+
+        // Act
+        await _service.AppendDocumentAsync(doc, protectedPdf, -1, "appendpass");
+
+        // Assert
+        Assert.Equal(3, doc.PageCount);
+        Assert.Null(doc.Pages[0].SourcePassword);
+        Assert.Equal("appendpass", doc.Pages[2].SourcePassword);
+    }
+
+    [Fact]
+    public async Task ExportPagesAsync_ProtectedPdf_PreservesPasswordEncryption()
+    {
+        // Arrange
+        string protectedPdf = CreateProtectedSamplePdf("export_locked.pdf", "exportpass", 2);
+        var doc = await _service.LoadDocumentAsync(protectedPdf, "exportpass");
+
+        string exportPath = Path.Combine(_testDirectory, "exported.pdf");
+
+        // Act
+        await _service.ExportPagesAsync(new[] { doc.Pages[0] }, exportPath, doc.DocumentPassword);
+
+        // Assert
+        await Assert.ThrowsAsync<PdfPasswordRequiredException>(
+            () => _service.LoadDocumentAsync(exportPath));
+
+        var exportedDoc = await _service.LoadDocumentAsync(exportPath, "exportpass");
+        Assert.Equal(1, exportedDoc.PageCount);
     }
 }

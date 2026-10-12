@@ -29,6 +29,9 @@ public partial class PdfDocumentModel : ObservableObject
     /// <summary>元PDFファイル内にPDF Binder専用手書き注釈が含まれているかどうか</summary>
     public bool HasBinderInkAnnotations { get; set; }
 
+    /// <summary>ドキュメント保存時に適用するパスワード（パスワード保護されている場合）</summary>
+    public string? DocumentPassword { get; set; }
+
     /// <summary>ドキュメント内の全ページコレクション</summary>
     public ObservableCollection<PdfPageModel> Pages { get; } = new();
 

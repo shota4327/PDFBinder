@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Ink;
 using System.Windows.Input;
+using PDFBinder.Core.Exceptions;
 using PDFBinder.Core.Helpers;
 using PDFBinder.Core.Models;
 using PdfSharp.Drawing;
@@ -15,7 +16,10 @@ namespace PDFBinder.Core.Services;
 public class PdfService : IPdfService
 {
     /// <inheritdoc/>
-    public async Task<PdfDocumentModel> LoadDocumentAsync(string filePath)
+    public Task<PdfDocumentModel> LoadDocumentAsync(string filePath) => LoadDocumentAsync(filePath, null);
+
+    /// <inheritdoc/>
+    public async Task<PdfDocumentModel> LoadDocumentAsync(string filePath, string? password)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         if (!File.Exists(filePath))
@@ -24,56 +28,79 @@ public class PdfService : IPdfService
         }
 
         byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
-        return await Task.Run(() => ParseDocumentModel(filePath, fileBytes));
+        return await Task.Run(() => ParseDocumentModel(filePath, fileBytes, password));
     }
 
     /// <summary>
     /// PDFバイト列からドキュメントモデルを解析・構築します（バックグラウンド処理用）。
     /// </summary>
-    private static PdfDocumentModel ParseDocumentModel(string filePath, byte[] fileBytes)
+    private static PdfDocumentModel ParseDocumentModel(string filePath, byte[] fileBytes, string? password = null)
     {
         using var stream = new MemoryStream(fileBytes);
-        using var pdfDoc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
-
-        var model = new PdfDocumentModel
+        PdfDocument pdfDoc;
+        try
         {
-            FilePath = filePath,
-            IsModified = false
-        };
-
-        for (int i = 0; i < pdfDoc.PageCount; i++)
+            pdfDoc = string.IsNullOrEmpty(password)
+                ? PdfReader.Open(stream, PdfDocumentOpenMode.Import)
+                : PdfReader.Open(stream, password, PdfDocumentOpenMode.Import);
+        }
+        catch (PdfReaderException ex)
         {
-            var pdfPage = pdfDoc.Pages[i];
-            var pageRotation = PageRotationExtensions.FromDegrees(pdfPage.Rotate);
-            var pageModel = new PdfPageModel
-            {
-                SourceFilePath = filePath,
-                OriginalPageIndex = i,
-                Width = pdfPage.Width.Point,
-                Height = pdfPage.Height.Point,
-                OriginalRotation = pageRotation,
-                Rotation = pageRotation
-            };
-            RestoreInkStrokesIfPresent(pdfPage, pageModel);
-            if (pageModel.InkStrokes.Count > 0)
-            {
-                pageModel.HasSourceBinderInkAnnotation = true;
-                model.HasBinderInkAnnotations = true;
-            }
-            model.AddPage(pageModel);
+            throw new PdfPasswordRequiredException(
+                "パスワードで保護されたPDFです。開くにはパスワードを入力してください。",
+                filePath: filePath,
+                isInvalidPassword: !string.IsNullOrEmpty(password),
+                innerException: ex);
         }
 
-        model.ResetModifiedState();
-        return model;
+        using (pdfDoc)
+        {
+            var model = new PdfDocumentModel
+            {
+                FilePath = filePath,
+                DocumentPassword = password,
+                IsModified = false
+            };
+
+            for (int i = 0; i < pdfDoc.PageCount; i++)
+            {
+                var pdfPage = pdfDoc.Pages[i];
+                var pageRotation = PageRotationExtensions.FromDegrees(pdfPage.Rotate);
+                var pageModel = new PdfPageModel
+                {
+                    SourceFilePath = filePath,
+                    SourcePassword = password,
+                    OriginalPageIndex = i,
+                    Width = pdfPage.Width.Point,
+                    Height = pdfPage.Height.Point,
+                    OriginalRotation = pageRotation,
+                    Rotation = pageRotation
+                };
+                RestoreInkStrokesIfPresent(pdfPage, pageModel);
+                if (pageModel.InkStrokes.Count > 0)
+                {
+                    pageModel.HasSourceBinderInkAnnotation = true;
+                    model.HasBinderInkAnnotations = true;
+                }
+                model.AddPage(pageModel);
+            }
+
+            model.ResetModifiedState();
+            return model;
+        }
     }
 
     /// <inheritdoc/>
-    public async Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex = -1)
+    public Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex = -1)
+        => AppendDocumentAsync(targetDoc, filePath, insertIndex, null);
+
+    /// <inheritdoc/>
+    public async Task AppendDocumentAsync(PdfDocumentModel targetDoc, string filePath, int insertIndex, string? password)
     {
         ArgumentNullException.ThrowIfNull(targetDoc);
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
-        var importedDoc = await LoadDocumentAsync(filePath);
+        var importedDoc = await LoadDocumentAsync(filePath, password);
         int targetIndex = (insertIndex < 0 || insertIndex > targetDoc.Pages.Count)
             ? targetDoc.Pages.Count
             : insertIndex;
@@ -110,7 +137,7 @@ public class PdfService : IPdfService
 
         try
         {
-            await Task.Run(() => BuildAndSavePdf(doc.Pages, tempPath));
+            await Task.Run(() => BuildAndSavePdf(doc.Pages, tempPath, doc.DocumentPassword));
             SafeReplaceFile(tempPath, outputPath);
             doc.FilePath = outputPath;
 
@@ -119,6 +146,7 @@ public class PdfService : IPdfService
             {
                 var page = doc.Pages[i];
                 page.SourceFilePath = outputPath;
+                page.SourcePassword = doc.DocumentPassword;
                 page.OriginalPageIndex = i;
                 page.OriginalRotation = page.Rotation;
             }
@@ -135,7 +163,11 @@ public class PdfService : IPdfService
     }
 
     /// <inheritdoc/>
-    public async Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)
+    public Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath)
+        => ExportPagesAsync(pages, outputPath, null);
+
+    /// <inheritdoc/>
+    public async Task ExportPagesAsync(IEnumerable<PdfPageModel> pages, string outputPath, string? password)
     {
         ArgumentNullException.ThrowIfNull(pages);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
@@ -146,7 +178,10 @@ public class PdfService : IPdfService
             throw new InvalidOperationException("エクスポートするページが指定されていません。");
         }
 
-        await Task.Run(() => BuildAndSavePdf(pageList, outputPath));
+        // 引数で明示的に指定されていない場合、含まれるページのSourcePasswordがあればそれを継承
+        string? effectivePassword = password ?? pageList.FirstOrDefault(p => !string.IsNullOrEmpty(p.SourcePassword))?.SourcePassword;
+
+        await Task.Run(() => BuildAndSavePdf(pageList, outputPath, effectivePassword));
     }
 
     /// <inheritdoc/>
@@ -169,7 +204,7 @@ public class PdfService : IPdfService
             string outFileName = $"{cleanBaseName}_page_{i + 1:D3}.pdf";
             string outPath = Path.Combine(outputDirectory, outFileName);
 
-            await ExportPagesAsync(singlePage, outPath);
+            await ExportPagesAsync(singlePage, outPath, doc.DocumentPassword);
             count++;
         }
 
@@ -179,9 +214,13 @@ public class PdfService : IPdfService
     /// <summary>
     /// ページリストから新しいPDFドキュメントを構築し指定パスに書き出します。
     /// </summary>
-    private void BuildAndSavePdf(IEnumerable<PdfPageModel> pages, string destinationPath)
+    private void BuildAndSavePdf(IEnumerable<PdfPageModel> pages, string destinationPath, string? password = null)
     {
         using var outputDoc = new PdfDocument();
+        if (!string.IsNullOrEmpty(password))
+        {
+            outputDoc.SecuritySettings.UserPassword = password;
+        }
         var sourceCache = new Dictionary<string, PdfDocument>();
 
         try
@@ -220,12 +259,15 @@ public class PdfService : IPdfService
         else
         {
             string sourcePath = pageModel.SourceFilePath!;
-            if (!sourceCache.TryGetValue(sourcePath, out var sourceDoc))
+            string cacheKey = $"{sourcePath}::{pageModel.SourcePassword}";
+            if (!sourceCache.TryGetValue(cacheKey, out var sourceDoc))
             {
                 byte[] bytes = File.ReadAllBytes(sourcePath);
                 var stream = new MemoryStream(bytes);
-                sourceDoc = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
-                sourceCache[sourcePath] = sourceDoc;
+                sourceDoc = string.IsNullOrEmpty(pageModel.SourcePassword)
+                    ? PdfReader.Open(stream, PdfDocumentOpenMode.Import)
+                    : PdfReader.Open(stream, pageModel.SourcePassword, PdfDocumentOpenMode.Import);
+                sourceCache[cacheKey] = sourceDoc;
             }
 
             destPage = outputDoc.AddPage(sourceDoc.Pages[pageModel.OriginalPageIndex]);

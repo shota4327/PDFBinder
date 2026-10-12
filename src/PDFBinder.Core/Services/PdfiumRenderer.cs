@@ -62,7 +62,29 @@ public class PdfiumRenderer : IPdfRenderer
         int targetHeight,
         PageRotation rotation,
         CancellationToken cancellationToken = default)
-        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, RenderPriority.Normal);
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, RenderPriority.Normal, null);
+
+    /// <inheritdoc/>
+    public Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        string? password)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, RenderPriority.Normal, password);
+
+    /// <inheritdoc/>
+    public Task<BitmapSource?> RenderPageAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority)
+        => RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, priority, null);
 
     /// <inheritdoc/>
     public async Task<BitmapSource?> RenderPageAsync(
@@ -72,7 +94,8 @@ public class PdfiumRenderer : IPdfRenderer
         int targetHeight,
         PageRotation rotation,
         CancellationToken cancellationToken,
-        RenderPriority priority)
+        RenderPriority priority,
+        string? password)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -106,9 +129,13 @@ public class PdfiumRenderer : IPdfRenderer
                     var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
 
                     // マーカーが存在しない通常のPDFは直接ファイルパスを渡し、PDFiumネイティブのオンデマンド読み込みを活用（メモリ割当ゼロ）
-                    using var docReader = hasBinderInk
-                        ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), dimensions)
-                        : DocLib.Instance.GetDocReader(filePath, dimensions);
+                    using var docReader = string.IsNullOrEmpty(password)
+                        ? (hasBinderInk
+                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, dimensions))
+                        : (hasBinderInk
+                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), password, dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, password, dimensions));
                     if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
                     {
                         return CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
@@ -225,7 +252,29 @@ public class PdfiumRenderer : IPdfRenderer
         double displayHeight,
         PageRotation rotation,
         CancellationToken cancellationToken = default)
-        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, RenderPriority.Normal);
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, RenderPriority.Normal, null);
+
+    /// <inheritdoc/>
+    public Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        string? password)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, RenderPriority.Normal, password);
+
+    /// <inheritdoc/>
+    public Task<PageInteractiveData> ExtractInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken,
+        RenderPriority priority)
+        => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, priority, null);
 
     /// <inheritdoc/>
     public async Task<PageInteractiveData> ExtractInteractiveDataAsync(
@@ -235,7 +284,8 @@ public class PdfiumRenderer : IPdfRenderer
         double displayHeight,
         PageRotation rotation,
         CancellationToken cancellationToken,
-        RenderPriority priority)
+        RenderPriority priority,
+        string? password)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -260,8 +310,8 @@ public class PdfiumRenderer : IPdfRenderer
                     byte[]? bytes = hasBinderInk ? GetRenderBytes(filePath, cancellationToken) : null;
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var characters = ExtractCharacters(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
-                    var links = ExtractLinks(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken);
+                    var characters = ExtractCharacters(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, password);
+                    var links = ExtractLinks(filePath, bytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, password);
 
                     return new PageInteractiveData(characters, links, rotation);
                 }
@@ -291,14 +341,19 @@ public class PdfiumRenderer : IPdfRenderer
         double displayWidth,
         double displayHeight,
         PageRotation rotation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? password)
     {
         var result = new List<PdfTextCharacter>();
         var dimensions = new PageDimensions(1080, 1920);
 
-        using var docReader = pdfBytes != null
-            ? DocLib.Instance.GetDocReader(pdfBytes, dimensions)
-            : DocLib.Instance.GetDocReader(filePath, dimensions);
+        using var docReader = string.IsNullOrEmpty(password)
+            ? (pdfBytes != null
+                ? DocLib.Instance.GetDocReader(pdfBytes, dimensions)
+                : DocLib.Instance.GetDocReader(filePath, dimensions))
+            : (pdfBytes != null
+                ? DocLib.Instance.GetDocReader(pdfBytes, password, dimensions)
+                : DocLib.Instance.GetDocReader(filePath, password, dimensions));
         if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
         {
             return result;
@@ -337,12 +392,17 @@ public class PdfiumRenderer : IPdfRenderer
         double displayWidth,
         double displayHeight,
         PageRotation rotation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? password)
     {
         var links = new List<PdfLinkAnnotation>();
-        using var doc = pdfBytes != null
-            ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
-            : PdfSharp.Pdf.IO.PdfReader.Open(filePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        using var doc = string.IsNullOrEmpty(password)
+            ? (pdfBytes != null
+                ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
+                : PdfSharp.Pdf.IO.PdfReader.Open(filePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+            : (pdfBytes != null
+                ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), password, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
+                : PdfSharp.Pdf.IO.PdfReader.Open(filePath, password, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import));
 
         if (pageIndex < 0 || pageIndex >= doc.PageCount) return links;
 

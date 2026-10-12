@@ -1245,5 +1245,120 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- パスワード入力ダイアログ（インアプリ・オーバーレイ） -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              Style="{StaticResource ModalBackdropGridStyle}"
+              Visibility="{Binding IsPasswordPromptVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+              IsVisibleChanged="OnPasswordPromptGridIsVisibleChanged"
+              Panel.ZIndex="1007">
+            <!-- ダイアログカード（外側クリックによる誤操作を防止するためカード内のみ操作可能） -->
+            <Border Width="460"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource ModalCardBorderStyle}"
+                    Padding="24">
+                <StackPanel>
+                    <!-- ヘッダー（鍵アイコンとタイトル） -->
+                    <DockPanel LastChildFill="True" Margin="0,0,0,14">
+                        <Border Width="36" Height="36" Background="#1E3A8A" CornerRadius="18" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE897;" FontFamily="{StaticResource IconFontFamily}" FontSize="18" Foreground="#60A5FA"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="パスワードの入力" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- ファイル名と説明メッセージ -->
+                    <TextBlock FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="20" Margin="48,0,0,16">
+                        <Run Text="「" /><Run Text="{Binding PasswordPromptFileName, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" /><Run Text="」はパスワードで保護されています。" /><LineBreak />
+                        <Run Text="開くにはパスワードを入力してください。" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                    </TextBlock>
+
+                    <!-- パスワード入力フィールドと表示切り替えボタン -->
+                    <Border Margin="48,0,0,8"
+                            Background="{StaticResource SurfaceSecondaryBrush}"
+                            BorderBrush="{StaticResource SurfaceBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <Grid Height="34">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 伏せ字入力ボックス (IsPasswordInputMasked = true) -->
+                            <PasswordBox x:Name="PasswordInputBox"
+                                         Grid.Column="0"
+                                         VerticalAlignment="Center"
+                                         Background="Transparent"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         BorderThickness="0"
+                                         Padding="10,0"
+                                         PasswordChanged="OnPasswordInputBoxPasswordChanged"
+                                         Visibility="{Binding IsPasswordInputMasked, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                            <!-- 平文入力ボックス (IsPasswordInputMasked = false) -->
+                            <TextBox x:Name="PasswordPlainTextBox"
+                                     Grid.Column="0"
+                                     VerticalAlignment="Center"
+                                     Background="Transparent"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     BorderThickness="0"
+                                     Padding="10,0"
+                                     Text="{Binding PasswordPromptInput, UpdateSourceTrigger=PropertyChanged}"
+                                     TextChanged="OnPasswordPlainTextBoxTextChanged"
+                                     Visibility="{Binding IsPasswordInputMasked, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+
+                            <!-- 目アイコン（表示/非表示トグル） -->
+                            <Button Grid.Column="1"
+                                    Width="34" Height="34"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    Command="{Binding TogglePasswordMaskCommand}"
+                                    Focusable="False"
+                                    ToolTip="パスワードの表示/非表示を切り替え">
+                                <TextBlock FontFamily="{StaticResource IconFontFamily}" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="&#xE8F4;" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPasswordInputMasked}" Value="False">
+                                                    <Setter Property="Text" Value="&#xE8F5;" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- インラインエラーメッセージ表示 -->
+                    <TextBlock Text="{Binding PasswordPromptErrorMessage}"
+                               Foreground="{StaticResource DangerBrush}"
+                               FontSize="12"
+                               Margin="48,0,0,16"
+                               Visibility="{Binding PasswordPromptErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" />
+
+                    <!-- アクションボタンエリア -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <!-- OKボタン -->
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Content="OK"
+                                MinWidth="84"
+                                Margin="0,0,8,0"
+                                Command="{Binding ConfirmPasswordPromptCommand}" />
+
+                        <!-- キャンセルボタン -->
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Content="キャンセル"
+                                MinWidth="84"
+                                Command="{Binding CancelPasswordPromptCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

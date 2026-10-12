@@ -204,11 +204,10 @@ public class MainWindowInitializationTests
 
                 var fakeSettings = new FakeSettingsService(new PDFBinder.Core.Models.AppSettings
                 {
-                    Window = new PDFBinder.Core.Models.WindowSettings { IsMaximized = false }
+                    Window = new PDFBinder.Core.Models.WindowSettings { IsMaximized = true }
                 });
                 var window = new MainWindow(fakeSettings);
                 window.Show();
-                window.WindowState = WindowState.Maximized;
                 Assert.Equal(WindowState.Maximized, window.PreviousWindowState);
 
                 // 最小化する
