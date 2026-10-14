@@ -48,6 +48,16 @@ public class BackgroundPrintQueueServiceTests
             return Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(Array.Empty<PrintPreparedSheet>());
         }
 
+        public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+            Func<int, int, int, CancellationToken, Task<System.Windows.Media.Imaging.BitmapSource?>> renderPageFunc,
+            IReadOnlyList<PrintSheetLayout> sheets,
+            IReadOnlyList<(double width, double height)>? pageDimensions = null,
+            IProgress<(int currentSheet, int totalSheets)>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(Array.Empty<PrintPreparedSheet>());
+        }
+
         public Task<bool> PrintAsync(
             Func<int, CancellationToken, Task<System.Windows.Media.Imaging.BitmapSource?>> renderPageFunc,
             PrintSettings settings,

@@ -2387,13 +2387,15 @@ public partial class MainViewModel : ObservableObject
         }
 
         string docTitle = ActiveSession?.Document?.FileName ?? Document.FileName;
+        var pageDimensions = Document.Pages.Select(p => (p.DisplayWidth, p.DisplayHeight)).ToList();
         PrintViewModel = new PrintViewModel(
             _printService,
             _persistentPrintSettings,
             Document.Pages.Count,
             currentIdx,
             (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
-            (idx, ct) => RenderPageWithInkAsync(idx, 2480, 3508, ct),
+            (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
+            pageDimensions,
             docTitle);
 
         PrintViewModel.RequestClose += OnPrintDialogRequestClose;

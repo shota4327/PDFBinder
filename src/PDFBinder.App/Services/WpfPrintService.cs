@@ -1,3 +1,4 @@
+using System.IO;
 using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
@@ -58,43 +59,103 @@ public class WpfPrintService : IPrintService
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+    public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
         Func<int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
         IReadOnlyList<PrintSheetLayout> sheets,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return PrepareSheetsAsync(
+            (idx, w, h, ct) => renderPageFunc(idx, ct),
+            sheets,
+            null,
+            progress,
+            cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<(double width, double height)>? pageDimensions = null,
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (sheets.Count == 0) return Array.Empty<PrintPreparedSheet>();
 
         var preparedSheets = new List<PrintPreparedSheet>(sheets.Count);
-        var pageBitmapCache = new Dictionary<int, BitmapSource?>();
+        var pageBitmapCache = new Dictionary<(int pageIdx, int w, int h), BitmapSource?>();
 
         for (int i = 0; i < sheets.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var sheet = sheets[i];
-            var placements = new List<PrintPreparedPlacement>(sheet.Placements.Count);
+            var preparedSheet = await PrepareSingleSheetAsync(
+                sheet,
+                renderPageFunc,
+                pageDimensions,
+                pageBitmapCache,
+                cancellationToken);
 
-            foreach (var placement in sheet.Placements)
-            {
-                if (placement.PageIndex.HasValue)
-                {
-                    int pageIdx = placement.PageIndex.Value;
-                    if (!pageBitmapCache.TryGetValue(pageIdx, out var bitmap))
-                    {
-                        bitmap = await renderPageFunc(pageIdx, cancellationToken);
-                        pageBitmapCache[pageIdx] = bitmap;
-                    }
-
-                    placements.Add(new PrintPreparedPlacement(bitmap, placement.NormalizedBounds));
-                }
-            }
-
-            preparedSheets.Add(new PrintPreparedSheet(placements, sheet.Orientation, sheet.PaperSize));
+            preparedSheets.Add(preparedSheet);
             progress?.Report((i + 1, sheets.Count));
         }
 
         return preparedSheets;
+    }
+
+    /// <summary>
+    /// 1枚のシートに含まれる配置スロットの画像を処理し、事前準備シートを生成します。
+    /// </summary>
+    private static async Task<PrintPreparedSheet> PrepareSingleSheetAsync(
+        PrintSheetLayout sheet,
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<(double width, double height)>? pageDimensions,
+        Dictionary<(int pageIdx, int w, int h), BitmapSource?> pageBitmapCache,
+        CancellationToken ct)
+    {
+        var placements = new List<PrintPreparedPlacement>(sheet.Placements.Count);
+
+        foreach (var placement in sheet.Placements)
+        {
+            if (placement.PageIndex.HasValue)
+            {
+                int pageIdx = placement.PageIndex.Value;
+                var (targetW, targetH) = DetermineRenderDimensions(sheet, placement.NormalizedBounds, pageIdx, pageDimensions);
+
+                var key = (pageIdx, targetW, targetH);
+                if (!pageBitmapCache.TryGetValue(key, out var bitmap))
+                {
+                    var rawBitmap = await renderPageFunc(pageIdx, targetW, targetH, ct);
+                    bitmap = rawBitmap != null ? ConvertToCompressedPngBitmap(rawBitmap) : null;
+                    pageBitmapCache[key] = bitmap;
+                }
+
+                placements.Add(new PrintPreparedPlacement(bitmap, placement.NormalizedBounds));
+            }
+        }
+
+        return new PrintPreparedSheet(placements, sheet.Orientation, sheet.PaperSize);
+    }
+
+    /// <summary>
+    /// シート情報、スロット位置、ページ元寸法から300 DPI基準のレンダリング解像度（幅・高さ）を決定します。
+    /// </summary>
+    internal static (int width, int height) DetermineRenderDimensions(
+        PrintSheetLayout sheet,
+        Rect normalizedBounds,
+        int pageIdx,
+        IReadOnlyList<(double width, double height)>? pageDimensions)
+    {
+        var (slotW, slotH) = CalculateSlotPixelDimensions(sheet.PaperSize, sheet.Orientation, normalizedBounds);
+
+        if (pageDimensions != null && pageIdx >= 0 && pageIdx < pageDimensions.Count)
+        {
+            var (origW, origH) = pageDimensions[pageIdx];
+            return CalculatePageRenderDimensions(slotW, slotH, origW, origH);
+        }
+
+        return (slotW, slotH);
     }
 
     /// <inheritdoc/>
@@ -300,5 +361,81 @@ public class WpfPrintService : IPrintService
         };
 
         printDialog.PrintTicket = ticket;
+    }
+
+    /// <summary>
+    /// 用紙サイズおよび向きから 300 DPI 基準のピクセル幅と高さを算出します。
+    /// </summary>
+    internal static (int width, int height) GetPaperPixelDimensions(PrintPaperSize size, PrintOrientation orientation, double dpi = 300.0)
+    {
+        double shortSideMm = size == PrintPaperSize.A3 ? 297.0 : 210.0;
+        double longSideMm = size == PrintPaperSize.A3 ? 420.0 : 297.0;
+
+        int shortPx = (int)Math.Round(shortSideMm / 25.4 * dpi);
+        int longPx = (int)Math.Round(longSideMm / 25.4 * dpi);
+
+        return orientation == PrintOrientation.Landscape
+            ? (longPx, shortPx)
+            : (shortPx, longPx);
+    }
+
+    /// <summary>
+    /// 用紙サイズ、向き、正規化領域からスロットのピクセル寸法を算出します。
+    /// </summary>
+    internal static (int width, int height) CalculateSlotPixelDimensions(
+        PrintPaperSize paperSize,
+        PrintOrientation orientation,
+        Rect normalizedBounds,
+        double dpi = 300.0)
+    {
+        var (sheetW, sheetH) = GetPaperPixelDimensions(paperSize, orientation, dpi);
+        int slotW = Math.Max(1, (int)Math.Round(normalizedBounds.Width * sheetW));
+        int slotH = Math.Max(1, (int)Math.Round(normalizedBounds.Height * sheetH));
+        return (slotW, slotH);
+    }
+
+    /// <summary>
+    /// スロット寸法と元ページの縦横比から、アスペクト比を維持してスロットに内接するピクセル寸法を算出します。
+    /// </summary>
+    internal static (int width, int height) CalculatePageRenderDimensions(
+        int slotW,
+        int slotH,
+        double origW,
+        double origH)
+    {
+        if (origW <= 0 || origH <= 0 || slotW <= 0 || slotH <= 0)
+        {
+            return (Math.Max(1, slotW), Math.Max(1, slotH));
+        }
+
+        double scale = Math.Min((double)slotW / origW, (double)slotH / origH);
+        int renderW = Math.Max(1, (int)Math.Round(origW * scale));
+        int renderH = Math.Max(1, (int)Math.Round(origH * scale));
+        return (renderW, renderH);
+    }
+
+    /// <summary>
+    /// BitmapSource をメモリ上で可逆圧縮 PNG の BitmapImage に変換します。
+    /// これにより保持メモリ量を削減し、WPF XPS スプーラでの再エンコードを回避して送信を高速化します。
+    /// </summary>
+    internal static BitmapSource ConvertToCompressedPngBitmap(BitmapSource source)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(source));
+
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        ms.Position = 0;
+
+        var bitmapImage = new BitmapImage();
+        bitmapImage.BeginInit();
+        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+        bitmapImage.StreamSource = ms;
+        bitmapImage.EndInit();
+        bitmapImage.Freeze();
+
+        return bitmapImage;
     }
 }

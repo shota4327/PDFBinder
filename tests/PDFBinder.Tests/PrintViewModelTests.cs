@@ -17,6 +17,7 @@ public class FakePrintService : IPrintService
     public PrinterSettingsDialogResult? DialogResultToReturn { get; set; }
     public int ShowDialogCallCount { get; private set; }
     public string? LastPrinterNamePassed { get; private set; }
+    public IReadOnlyList<(double width, double height)>? LastPageDimensionsPassed { get; private set; }
 
     public IReadOnlyList<string> GetInstalledPrinters() => InstalledPrinters;
     public string? GetDefaultPrinterName() => DefaultPrinter;
@@ -37,6 +38,21 @@ public class FakePrintService : IPrintService
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        var result = sheets.Select(s => new PrintPreparedSheet(
+            s.Placements.Select(p => new PrintPreparedPlacement(null, p.NormalizedBounds)).ToList(),
+            s.Orientation,
+            s.PaperSize)).ToList();
+        return Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(result);
+    }
+
+    public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<(double width, double height)>? pageDimensions = null,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        LastPageDimensionsPassed = pageDimensions;
         var result = sheets.Select(s => new PrintPreparedSheet(
             s.Placements.Select(p => new PrintPreparedPlacement(null, p.NormalizedBounds)).ToList(),
             s.Orientation,
@@ -291,5 +307,33 @@ public class PrintViewModelTests
         Assert.NotNull(spoolArgs);
         Assert.Equal("invoice - PDFBinder", spoolArgs.JobName);
         Assert.True(closeResult);
+    }
+
+    [Fact]
+    public async Task ExecutePrint_PassesPageDimensionsToPrintService()
+    {
+        var settings = new PrintSettings();
+        var pageDimensions = new List<(double width, double height)>
+        {
+            (595, 842),
+            (842, 595)
+        };
+
+        var vm = new PrintViewModel(
+            _fakePrintService,
+            settings,
+            2,
+            0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            pageDimensions,
+            "invoice.pdf");
+
+        await vm.ExecutePrintCommand.ExecuteAsync(null);
+
+        Assert.NotNull(_fakePrintService.LastPageDimensionsPassed);
+        Assert.Equal(2, _fakePrintService.LastPageDimensionsPassed.Count);
+        Assert.Equal(595, _fakePrintService.LastPageDimensionsPassed[0].width);
+        Assert.Equal(842, _fakePrintService.LastPageDimensionsPassed[0].height);
     }
 }

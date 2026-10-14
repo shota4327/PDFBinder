@@ -83,6 +83,7 @@
 | **F74** | PDF操作コア / UI | PDFからJPEG/PNGへの画像書き出し機能（インアプリ確認ダイアログ、フォーマット選択、200/300/400/600 DPI解像度指定、ページ範囲指定、1ページ/複数ページ連番保存、進捗表示、高DPI JPEG書き出し時のクリッピング修正） | **完了** | Issue #30, #207 / ImageExportService, ExportImagesViewModel, MainViewModel |
 | **F75** | パフォーマンス / レンダリング | 起動・表示パフォーマンス改善および不具合修正（白矩形挿入撤廃による直描画化、サニタイズキャッシュ、高DPI表示ボケ解消、サムネイル生成重複・エラーフラグ是正、単一インスタンスリソースリーク解消、単一EXE展開圧縮オフ高速化） | **完了** | Issue #204 / PdfiumRenderer, PdfService, DetailEditorViewModel, MainViewModel, SingleInstanceManager, build.ps1 |
 | **F76** | PDF操作コア / UI | パスワード保護PDF対応（対話的パスワード入力ダイアログ、伏せ字/平文表示切り替え、インラインエラー・再試行、結合時パスワード入力、暗号化保護維持上書き保存・抽出・分割、Docnet/PdfSharp連携） | **完了** | Issue #33 / PdfService, PdfiumRenderer, PasswordPromptDialog & MainViewModel |
+| **F77** | UI・印刷 / パフォーマンス | 印刷品質の向上およびプリンター送信高速化（用紙サイズ・向き・スロット寸法・元PDFページ比率に完全連動した動的300 DPI解像度計算、可逆圧縮PNGストリームによるスプールデータ80〜90%軽量化・XPSシリアライズ高速化・プリンタ送信時間短縮） | **完了** | Issue #206 / WpfPrintService, PrintViewModel, MainViewModel |
 
 ---
 
