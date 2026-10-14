@@ -60,6 +60,22 @@ public interface IPrintService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 面付けシート一覧と各ページの元寸法情報から、スロットに応じた300 DPI解像度で各ページのビットマップ画像を事前生成します。
+    /// </summary>
+    /// <param name="renderPageFunc">ページインデックスと要求解像度（幅・高さ）からビットマップ画像を生成する関数</param>
+    /// <param name="sheets">面付けシート一覧</param>
+    /// <param name="pageDimensions">各ページの元の幅・高さ（ポイント/DIP単位）一覧（省略時は用紙全体解像度）</param>
+    /// <param name="progress">進捗通知デリゲート（処理済みシート数, 総シート数）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>レンダリング済みの事前準備シート一覧</returns>
+    Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<(double width, double height)>? pageDimensions = null,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 事前レンダリング済みのシートデータを使用してプリンターへスプール送信を実行します。
     /// </summary>
     /// <param name="preparedSheets">レンダリング済みのシートデータ</param>

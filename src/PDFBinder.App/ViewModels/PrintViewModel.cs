@@ -17,7 +17,8 @@ public partial class PrintViewModel : ObservableObject
 {
     private readonly IPrintService _printService;
     private readonly Func<int, int, int, CancellationToken, Task<BitmapSource?>> _renderPreviewPageFunc;
-    private readonly Func<int, CancellationToken, Task<BitmapSource?>> _renderPrintPageFunc;
+    private readonly Func<int, int, int, CancellationToken, Task<BitmapSource?>> _renderPrintPageFunc;
+    private readonly IReadOnlyList<(double width, double height)>? _pageDimensions;
     private readonly int _totalPages;
     private readonly int _currentPageIndex;
     private readonly string? _documentTitle;
@@ -101,7 +102,8 @@ public partial class PrintViewModel : ObservableObject
         int totalPages,
         int currentPageIndex,
         Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPreviewPageFunc,
-        Func<int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc,
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc,
+        IReadOnlyList<(double width, double height)>? pageDimensions = null,
         string? documentTitle = null)
     {
         _printService = printService;
@@ -110,11 +112,35 @@ public partial class PrintViewModel : ObservableObject
         _currentPageIndex = currentPageIndex;
         _renderPreviewPageFunc = renderPreviewPageFunc;
         _renderPrintPageFunc = renderPrintPageFunc;
+        _pageDimensions = pageDimensions;
         _documentTitle = documentTitle;
 
         InitializePrinters();
         _settings.PropertyChanged += OnSettingsPropertyChanged;
         UpdateSheetsAndPreview();
+    }
+
+    /// <summary>
+    /// 後方互換用コンストラクタ（固定解像度レンダリング関数用）
+    /// </summary>
+    public PrintViewModel(
+        IPrintService printService,
+        PrintSettings settings,
+        int totalPages,
+        int currentPageIndex,
+        Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPreviewPageFunc,
+        Func<int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc,
+        string? documentTitle = null)
+        : this(
+            printService,
+            settings,
+            totalPages,
+            currentPageIndex,
+            renderPreviewPageFunc,
+            (idx, w, h, ct) => renderPrintPageFunc(idx, ct),
+            null,
+            documentTitle)
+    {
     }
 
     /// <summary>
@@ -347,6 +373,7 @@ public partial class PrintViewModel : ObservableObject
             var preparedSheets = await _printService.PrepareSheetsAsync(
                 _renderPrintPageFunc,
                 _currentSheets,
+                _pageDimensions,
                 progress);
 
             SpoolRequested?.Invoke(this, new PrintSpoolEventArgs(
