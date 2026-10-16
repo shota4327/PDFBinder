@@ -152,12 +152,16 @@ PDFファイルの入出力、構造操作を担当。
 ### 5.2 `IPdfRenderer`
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。PDFiumネイティブAPI（Docnet.Core）の非スレッドセーフ性を回避するため、`PriorityAsyncLock` による排他・優先度制御（High: カレントページ詳細表示、Low: バックグラウンドサムネイル・先読み）を備え、多重実行によるクラッシュやフリーズを完全に防止。
 また、用紙背景はUI側（`PageBorder` の白背景）で提供するため、レンダラー内部での不要な白矩形描画および再シリアライズ（`doc.Save`）を撤廃し、自前手書き注釈を持たない通常の外部PDFはディスク上のバイト列からPDFiumへ直接渡して描画することで、読み込み直後の1ページ目表示ラグおよびサムネイル生成オーバーヘッドを完全撤廃。自前手書き注釈が存在するPDFのみ、初回レンダリング時に注釈を除去したバイト列を生成してメモリキャッシュ（ファイル更新日時検証付き）し、詳細画面での手書き線の多重焼き込みを防止。
+さらに、1ページ表示ごとのPDFファイル重複オープン・解析の解消（#219）として、画像レンダリングと文字座標抽出を同一のPDFiumリーダーセッションで一括実行する `RenderPageWithInteractiveDataAsync` を提供。リンク注釈情報は初回ドキュメントロード時に抽出・保持（`PdfPageModel.RawLinks`）またはファイル単位でキャッシュ（`_rawLinksCache`）し、ページ表示ごとのディスクからのPDF再パース（`PdfReader.Open`）を完全に排除。サムネイル生成時にも連続ページをバッチレンダリング（`RenderPagesBatchAsync`）することでファイルオープンとxrefパース回数を大幅に削減。
 パスワード保護されたPDFのレンダリングおよびインタラクティブデータ抽出時には、認証済みパスワードをDocnet.Coreへ引き渡して正常にビットマップおよび文字・リンク情報を生成。
 さらに詳細エディタ（`DetailEditorViewModel`）では、接続ディスプレイの `DpiScale` とズーム倍率を乗算してレンダリング解像度を算出（最大寸法 8192px）することで、4Kや高DPI環境での拡大・等倍表示時にも文字や図面がボケず、本来のシャープな精細度で描画。
 - `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: サムネイル/詳細画面用レンダリング（優先度指定・パスワード対応）
+- `Task<PageRenderResult> RenderPageWithInteractiveDataAsync(...)`: ページの画像描画と文字抽出・リンク座標変換を単一セッションで一括実行（詳細ビューのページめくり高速化）
+- `Task<IReadOnlyDictionary<int, BitmapSource>> RenderPagesBatchAsync(...)`: 同一ファイルの複数ページサムネイルを一括レンダリング
 - `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
 - `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用、パスワード対応）
+
 
 ### 5.3 `IUndoRedoService`
 ページ操作およびインク操作の履歴管理。

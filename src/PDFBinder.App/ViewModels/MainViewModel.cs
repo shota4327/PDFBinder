@@ -2297,15 +2297,90 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     private async Task GenerateThumbnailsAsync(int startIndex = 0)
     {
-        for (int i = startIndex; i < Document.Pages.Count; i++)
+        int i = startIndex;
+        while (i < Document.Pages.Count)
         {
             var page = Document.Pages[i];
-            if (page.Thumbnail == null)
+            if (page.Thumbnail != null)
             {
-                await UpdatePageThumbnailAsync(page);
+                i++;
+                continue;
+            }
+
+            // 同一PDFファイルの連続ページを最大10ページ単位でバッチ取得
+            if (!string.IsNullOrEmpty(page.SourceFilePath))
+            {
+                var batchPages = new List<PdfPageModel> { page };
+                int j = i + 1;
+                while (j < Document.Pages.Count && batchPages.Count < 10)
+                {
+                    var next = Document.Pages[j];
+                    if (next.Thumbnail == null &&
+                        next.SourceFilePath == page.SourceFilePath &&
+                        next.SourcePassword == page.SourcePassword &&
+                        next.RenderRotation == page.RenderRotation)
+                    {
+                        batchPages.Add(next);
+                        j++;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (batchPages.Count > 1)
+                {
+                    await UpdatePagesThumbnailsBatchAsync(batchPages);
+                    i += batchPages.Count;
+                    continue;
+                }
+            }
+
+            await UpdatePageThumbnailAsync(page);
+            i++;
+        }
+    }
+
+    /// <summary>
+    /// 同一PDFファイルの指定されたページ群のサムネイル画像をバッチレンダリングして一括設定します。
+    /// </summary>
+    private async Task UpdatePagesThumbnailsBatchAsync(IReadOnlyList<PdfPageModel> pages, CancellationToken cancellationToken = default)
+    {
+        if (pages.Count == 0 || cancellationToken.IsCancellationRequested) return;
+
+        var first = pages[0];
+        var indices = pages.Select(p => p.OriginalPageIndex).ToList();
+        var bitmaps = await _pdfRenderer.RenderPagesBatchAsync(
+            first.SourceFilePath,
+            indices,
+            ThumbnailRenderWidth,
+            ThumbnailRenderHeight,
+            first.RenderRotation,
+            cancellationToken,
+            RenderPriority.Low,
+            first.SourcePassword);
+
+        foreach (var page in pages)
+        {
+            if (bitmaps.TryGetValue(page.OriginalPageIndex, out var baseBitmap) && baseBitmap != null)
+            {
+                if (page.InkStrokes.Count > 0)
+                {
+                    page.Thumbnail = _pdfRenderer.CompositeStrokes(
+                        baseBitmap,
+                        page.InkStrokes,
+                        page.DisplayWidth,
+                        page.DisplayHeight);
+                }
+                else
+                {
+                    page.Thumbnail = baseBitmap;
+                }
             }
         }
     }
+
 
     /// <summary>
     /// 指定されたページ群のサムネイル画像を再生成・更新します。

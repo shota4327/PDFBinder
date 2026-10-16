@@ -66,6 +66,7 @@ public class PdfService : IPdfService
             {
                 var pdfPage = pdfDoc.Pages[i];
                 var pageRotation = PageRotationExtensions.FromDegrees(pdfPage.Rotate);
+                var rawLinks = PdfLinkHelper.ExtractRawLinks(pdfPage, pdfDoc);
                 var pageModel = new PdfPageModel
                 {
                     SourceFilePath = filePath,
@@ -74,7 +75,8 @@ public class PdfService : IPdfService
                     Width = pdfPage.Width.Point,
                     Height = pdfPage.Height.Point,
                     OriginalRotation = pageRotation,
-                    Rotation = pageRotation
+                    Rotation = pageRotation,
+                    RawLinks = rawLinks
                 };
                 RestoreInkStrokesIfPresent(pdfPage, pageModel);
                 if (pageModel.InkStrokes.Count > 0)

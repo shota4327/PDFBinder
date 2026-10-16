@@ -31,6 +31,9 @@ public partial class PdfPageModel : ObservableObject
     /// <summary>読み込み元のPDFページにPDF Binder専用手書き注釈が含まれていたかどうか</summary>
     public bool HasSourceBinderInkAnnotation { get; set; }
 
+    /// <summary>元PDF読み込み時に抽出されたリンク注釈（生データ）</summary>
+    public IReadOnlyList<PdfRawLinkAnnotation> RawLinks { get; set; } = Array.Empty<PdfRawLinkAnnotation>();
+
     /// <summary>ドキュメント種別（PDFまたは画像）</summary>
     public DocumentKind DocumentKind { get; set; } = DocumentKind.Pdf;
 
