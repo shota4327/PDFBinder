@@ -1007,43 +1007,62 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var rendered = await _pdfRenderer.RenderPageAsync(
-            item.Page.SourceFilePath,
-            item.Page.OriginalPageIndex,
-            targetWidth,
-            targetHeight,
-            item.Page.RenderRotation,
-            token,
-            priority,
-            item.Page.SourcePassword);
+        bool needsInteractiveData = item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation;
 
-        token.ThrowIfCancellationRequested();
-        if (generation != Volatile.Read(ref _renderGeneration)) return;
-
-        if (rendered != null)
+        if (needsInteractiveData)
         {
-            // ダブルバッファリング: 新画像が完全に完成した瞬間のみ差し替え
-            item.PageBackground = rendered;
-            item.LastRenderedWidth = targetWidth;
-            item.LastRenderedHeight = targetHeight;
-            item.LastRenderedRotation = item.Page.RenderRotation;
-        }
-
-        // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
-        UpdatePageStrokeCache(item);
-
-        if (item.InteractiveData == null || item.InteractiveData.Rotation != item.Page.RenderRotation)
-        {
-            item.InteractiveData = await _pdfRenderer.ExtractInteractiveDataAsync(
+            var result = await _pdfRenderer.RenderPageWithInteractiveDataAsync(
                 item.Page.SourceFilePath,
                 item.Page.OriginalPageIndex,
+                targetWidth,
+                targetHeight,
                 item.Page.DisplayWidth,
                 item.Page.DisplayHeight,
                 item.Page.RenderRotation,
                 token,
                 priority,
-                item.Page.SourcePassword);
+                item.Page.SourcePassword,
+                item.Page.RawLinks);
+
+            token.ThrowIfCancellationRequested();
+            if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+            if (result.Bitmap != null)
+            {
+                item.PageBackground = result.Bitmap;
+                item.LastRenderedWidth = targetWidth;
+                item.LastRenderedHeight = targetHeight;
+                item.LastRenderedRotation = item.Page.RenderRotation;
+            }
+            item.InteractiveData = result.InteractiveData;
         }
+        else
+        {
+            var rendered = await _pdfRenderer.RenderPageAsync(
+                item.Page.SourceFilePath,
+                item.Page.OriginalPageIndex,
+                targetWidth,
+                targetHeight,
+                item.Page.RenderRotation,
+                token,
+                priority,
+                item.Page.SourcePassword);
+
+            token.ThrowIfCancellationRequested();
+            if (generation != Volatile.Read(ref _renderGeneration)) return;
+
+            if (rendered != null)
+            {
+                item.PageBackground = rendered;
+                item.LastRenderedWidth = targetWidth;
+                item.LastRenderedHeight = targetHeight;
+                item.LastRenderedRotation = item.Page.RenderRotation;
+            }
+        }
+
+        // 背景レンダリングと同期してストロークキャッシュも現在のズーム解像度で再生成
+        UpdatePageStrokeCache(item);
+
     }
 
     /// <summary>

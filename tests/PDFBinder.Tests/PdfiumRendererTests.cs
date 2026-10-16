@@ -480,7 +480,120 @@ public class PdfiumRendererTests : IDisposable
         Assert.True(authBitmap.PixelWidth > 0);
         Assert.True(authBitmap.PixelHeight > 0);
     }
+
+    [Fact]
+    public async Task RenderPageWithInteractiveDataAsync_ValidPdf_ReturnsBitmapAndInteractiveDataSimultaneously()
+    {
+        // Arrange
+        string filePath = CreateSamplePdf("combined_render_test.pdf");
+
+        // Act
+        var result = await _renderer.RenderPageWithInteractiveDataAsync(
+            filePath,
+            0,
+            200,
+            300,
+            200,
+            300,
+            PageRotation.Rotate0);
+
+        // Assert: 画像とインタラクティブデータが単一呼び出しで同時に取得される
+        Assert.NotNull(result);
+        Assert.NotNull(result.Bitmap);
+        Assert.True(result.Bitmap.PixelWidth > 0);
+        Assert.NotNull(result.InteractiveData);
+
+        // ファイルロックが残らず直ちに上書き・更新可能であること
+        File.WriteAllBytes(filePath, File.ReadAllBytes(filePath));
+    }
+
+    [Fact]
+    public async Task RenderPageWithInteractiveDataAsync_WithCachedRawLinks_UsesProvidedLinksWithoutDiskParse()
+    {
+        // Arrange
+        string filePath = CreateSamplePdf("cached_links_test.pdf");
+        var rawLinks = new List<PdfRawLinkAnnotation>
+        {
+            new(new System.Windows.Rect(10, 10, 50, 20), 400, 600, PdfLinkType.Uri, "https://example.com", -1)
+        };
+
+        // Act
+        var result = await _renderer.RenderPageWithInteractiveDataAsync(
+            filePath,
+            0,
+            400,
+            600,
+            400,
+            600,
+            PageRotation.Rotate0,
+            cachedRawLinks: rawLinks);
+
+        // Assert: 渡された生リンク情報から直接変換されて設定される
+        Assert.NotNull(result.InteractiveData);
+        Assert.Single(result.InteractiveData.Links);
+        Assert.Equal("https://example.com", result.InteractiveData.Links[0].Uri);
+        // ディスクからの再パース用キャッシュは生成されない
+        Assert.Equal(0, _renderer.CachedLinkCount);
+    }
+
+    [Fact]
+    public async Task RenderPagesBatchAsync_MultiplePages_RendersAllRequestedPagesAndReleasesLock()
+    {
+        // Arrange: 5ページのPDFを作成
+        string filePath = Path.Combine(_testDirectory, "batch_render_test.pdf");
+        using (var doc = new PdfDocument())
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var page = doc.AddPage();
+                page.Width = XUnit.FromPoint(200);
+                page.Height = XUnit.FromPoint(300);
+                using var gfx = XGraphics.FromPdfPage(page);
+                gfx.DrawRectangle(XBrushes.Green, 10, 10, 50, 50);
+            }
+            doc.Save(filePath);
+        }
+
+        // Act: ページ0, 2, 4をバッチレンダリング
+        var pageIndices = new List<int> { 0, 2, 4 };
+        var bitmaps = await _renderer.RenderPagesBatchAsync(
+            filePath,
+            pageIndices,
+            100,
+            150,
+            PageRotation.Rotate0);
+
+        // Assert
+        Assert.Equal(3, bitmaps.Count);
+        Assert.True(bitmaps.ContainsKey(0));
+        Assert.True(bitmaps.ContainsKey(2));
+        Assert.True(bitmaps.ContainsKey(4));
+        Assert.All(bitmaps.Values, bmp => Assert.NotNull(bmp));
+
+        // 完了後にファイルがロックされていないこと
+        File.WriteAllBytes(filePath, File.ReadAllBytes(filePath));
+    }
+
+    [Fact]
+    public async Task ExtractLinks_MultiplePagesWithoutCachedRawLinks_CachesLinksAndClearsOnInvalidate()
+    {
+        // Arrange
+        string filePath = CreateSamplePdf("links_cache_test.pdf");
+
+        // Act: リンク抽出を2回連続実行
+        await _renderer.ExtractInteractiveDataAsync(filePath, 0, 200, 300, PageRotation.Rotate0);
+        Assert.Equal(1, _renderer.CachedLinkCount);
+
+        await _renderer.ExtractInteractiveDataAsync(filePath, 0, 200, 300, PageRotation.Rotate0);
+        // キャッシュ件数は1件のまま維持
+        Assert.Equal(1, _renderer.CachedLinkCount);
+
+        // キャッシュクリア
+        _renderer.InvalidateCache(filePath);
+        Assert.Equal(0, _renderer.CachedLinkCount);
+    }
 }
+
 
 
 

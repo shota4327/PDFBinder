@@ -18,6 +18,7 @@ public class PdfiumRenderer : IPdfRenderer
     private readonly PriorityAsyncLock _renderLock = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, byte[] Bytes)> _fileBytesCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, bool HasMarker)> _hasBinderInkMarkerCache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime LastWriteTimeUtc, Dictionary<int, List<PdfRawLinkAnnotation>> PageLinks)> _rawLinksCache = new();
 
     /// <summary>
     /// 現在のレンダリング排他ロックインスタンスを取得します（単体テスト検証用）。
@@ -34,6 +35,11 @@ public class PdfiumRenderer : IPdfRenderer
     /// </summary>
     internal int CachedMarkerCount => _hasBinderInkMarkerCache.Count;
 
+    /// <summary>
+    /// リンク情報がキャッシュされているファイル数を取得します（単体テスト検証用）。
+    /// </summary>
+    internal int CachedLinkCount => _rawLinksCache.Count;
+
     /// <inheritdoc/>
     public void InvalidateCache(string? filePath = null)
     {
@@ -41,11 +47,13 @@ public class PdfiumRenderer : IPdfRenderer
         {
             _fileBytesCache.Clear();
             _hasBinderInkMarkerCache.Clear();
+            _rawLinksCache.Clear();
         }
         else
         {
             _fileBytesCache.TryRemove(filePath, out _);
             _hasBinderInkMarkerCache.TryRemove(filePath, out _);
+            _rawLinksCache.TryRemove(filePath, out _);
         }
     }
 
@@ -331,6 +339,209 @@ public class PdfiumRenderer : IPdfRenderer
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<PageRenderResult> RenderPageWithInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default,
+        RenderPriority priority = RenderPriority.Normal,
+        string? password = null,
+        IReadOnlyList<PdfRawLinkAnnotation>? cachedRawLinks = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        {
+            var blankBmp = CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+            return new PageRenderResult(blankBmp, PageInteractiveData.Empty);
+        }
+
+        if (IsSupportedImage(filePath))
+        {
+            var imgBmp = await Task.Run(() => RenderImagePage(filePath, targetWidth, targetHeight, rotation, cancellationToken), cancellationToken);
+            return new PageRenderResult(imgBmp, PageInteractiveData.Empty);
+        }
+
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    bool hasBinderInk = HasBinderInkAnnotationMarker(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    int minDim = Math.Min(targetWidth, targetHeight);
+                    int maxDim = Math.Max(targetWidth, targetHeight);
+                    var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
+
+                    byte[]? renderBytes = hasBinderInk ? GetRenderBytes(filePath, cancellationToken) : null;
+                    using var docReader = string.IsNullOrEmpty(password)
+                        ? (renderBytes != null
+                            ? DocLib.Instance.GetDocReader(renderBytes, dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, dimensions))
+                        : (renderBytes != null
+                            ? DocLib.Instance.GetDocReader(renderBytes, password, dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, password, dimensions));
+
+                    if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
+                    {
+                        var blankBmp = CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+                        return new PageRenderResult(blankBmp, PageInteractiveData.Empty);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var pageReader = docReader.GetPageReader(pageIndex);
+                    int actualWidth = pageReader.GetPageWidth();
+                    int actualHeight = pageReader.GetPageHeight();
+                    byte[] rawBytes = pageReader.GetImage();
+                    var rawCharacters = pageReader.GetCharacters();
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var bitmap = BitmapSource.Create(
+                        actualWidth,
+                        actualHeight,
+                        96,
+                        96,
+                        PixelFormats.Bgra32,
+                        null,
+                        rawBytes,
+                        actualWidth * 4);
+                    bitmap.Freeze();
+
+                    var characters = BuildCharacters(rawCharacters, actualWidth, actualHeight, displayWidth, displayHeight, rotation, cancellationToken);
+                    var links = ExtractLinks(filePath, renderBytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, password, cachedRawLinks);
+
+                    var interactiveData = new PageInteractiveData(characters, links, rotation);
+                    return new PageRenderResult(bitmap, interactiveData);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    var blankBmp = CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+                    return new PageRenderResult(blankBmp, PageInteractiveData.Empty);
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyDictionary<int, BitmapSource>> RenderPagesBatchAsync(
+        string? filePath,
+        IReadOnlyList<int> pageIndices,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default,
+        RenderPriority priority = RenderPriority.Low,
+        string? password = null)
+    {
+        var result = new Dictionary<int, BitmapSource>();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath) || pageIndices == null || pageIndices.Count == 0)
+        {
+            return result;
+        }
+
+        if (IsSupportedImage(filePath))
+        {
+            var imgBmp = await Task.Run(() => RenderImagePage(filePath, targetWidth, targetHeight, rotation, cancellationToken), cancellationToken);
+            if (imgBmp != null)
+            {
+                foreach (int idx in pageIndices) result[idx] = imgBmp;
+            }
+            return result;
+        }
+
+        var releaser = await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    bool hasBinderInk = HasBinderInkAnnotationMarker(filePath, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    int minDim = Math.Min(targetWidth, targetHeight);
+                    int maxDim = Math.Max(targetWidth, targetHeight);
+                    var dimensions = new PageDimensions(Math.Max(1, minDim), Math.Max(1, maxDim));
+
+                    byte[]? renderBytes = hasBinderInk ? GetRenderBytes(filePath, cancellationToken) : null;
+                    using var docReader = string.IsNullOrEmpty(password)
+                        ? (renderBytes != null
+                            ? DocLib.Instance.GetDocReader(renderBytes, dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, dimensions))
+                        : (renderBytes != null
+                            ? DocLib.Instance.GetDocReader(renderBytes, password, dimensions)
+                            : DocLib.Instance.GetDocReader(filePath, password, dimensions));
+
+                    int totalPages = docReader.GetPageCount();
+                    foreach (int idx in pageIndices)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (idx < 0 || idx >= totalPages)
+                        {
+                            result[idx] = CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+                            continue;
+                        }
+
+                        using var pageReader = docReader.GetPageReader(idx);
+                        int actualWidth = pageReader.GetPageWidth();
+                        int actualHeight = pageReader.GetPageHeight();
+                        byte[] rawBytes = pageReader.GetImage();
+
+                        var bmp = BitmapSource.Create(
+                            actualWidth,
+                            actualHeight,
+                            96,
+                            96,
+                            PixelFormats.Bgra32,
+                            null,
+                            rawBytes,
+                            actualWidth * 4);
+                        bmp.Freeze();
+                        result[idx] = bmp;
+                    }
+
+                    return result;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    return result;
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            releaser.Dispose();
+        }
+    }
+
     /// <summary>
     /// Docnet.Core を用いて指定ページの文字および座標を抽出します。
     /// </summary>
@@ -344,7 +555,6 @@ public class PdfiumRenderer : IPdfRenderer
         CancellationToken cancellationToken,
         string? password)
     {
-        var result = new List<PdfTextCharacter>();
         var dimensions = new PageDimensions(1080, 1920);
 
         using var docReader = string.IsNullOrEmpty(password)
@@ -356,17 +566,32 @@ public class PdfiumRenderer : IPdfRenderer
                 : DocLib.Instance.GetDocReader(filePath, password, dimensions));
         if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
         {
-            return result;
+            return new List<PdfTextCharacter>();
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         using var pageReader = docReader.GetPageReader(pageIndex);
         int rawWidth = pageReader.GetPageWidth();
         int rawHeight = pageReader.GetPageHeight();
-        if (rawWidth <= 0 || rawHeight <= 0) return result;
-
         var rawCharacters = pageReader.GetCharacters();
-        if (rawCharacters == null) return result;
+
+        return BuildCharacters(rawCharacters, rawWidth, rawHeight, displayWidth, displayHeight, rotation, cancellationToken);
+    }
+
+    /// <summary>
+    /// 文字リストを WPF 表示座標系に変換して構築します。
+    /// </summary>
+    private static List<PdfTextCharacter> BuildCharacters(
+        IEnumerable<Character>? rawCharacters,
+        int rawWidth,
+        int rawHeight,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<PdfTextCharacter>();
+        if (rawCharacters == null || rawWidth <= 0 || rawHeight <= 0) return result;
 
         int index = 0;
         foreach (var c in rawCharacters)
@@ -383,7 +608,7 @@ public class PdfiumRenderer : IPdfRenderer
     }
 
     /// <summary>
-    /// PdfSharp を用いて指定ページのリンク注釈を抽出します。
+    /// 指定ページのリンク注釈を表示座標系に変換して取得します（キャッシュ対応）。
     /// </summary>
     private List<PdfLinkAnnotation> ExtractLinks(
         string filePath,
@@ -393,9 +618,43 @@ public class PdfiumRenderer : IPdfRenderer
         double displayHeight,
         PageRotation rotation,
         CancellationToken cancellationToken,
-        string? password)
+        string? password,
+        IReadOnlyList<PdfRawLinkAnnotation>? cachedRawLinks = null)
     {
-        var links = new List<PdfLinkAnnotation>();
+        if (cachedRawLinks != null)
+        {
+            return PdfLinkHelper.TransformRawLinks(cachedRawLinks, displayWidth, displayHeight, rotation);
+        }
+
+        var allLinks = GetOrLoadRawLinks(filePath, pdfBytes, password, cancellationToken);
+        if (allLinks.TryGetValue(pageIndex, out var pageRawLinks))
+        {
+            return PdfLinkHelper.TransformRawLinks(pageRawLinks, displayWidth, displayHeight, rotation);
+        }
+
+        return new List<PdfLinkAnnotation>();
+    }
+
+    /// <summary>
+    /// PDFファイル全体の生リンク注釈情報を一括取得・解析します（キャッシュ対応）。
+    /// </summary>
+    private Dictionary<int, List<PdfRawLinkAnnotation>> GetOrLoadRawLinks(
+        string filePath,
+        byte[]? pdfBytes,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        var fileInfo = new FileInfo(filePath);
+        var lastWrite = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.MinValue;
+
+        if (_rawLinksCache.TryGetValue(filePath, out var cached) && cached.LastWriteTimeUtc == lastWrite)
+        {
+            return cached.PageLinks;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var pageLinks = new Dictionary<int, List<PdfRawLinkAnnotation>>();
+
         using var doc = string.IsNullOrEmpty(password)
             ? (pdfBytes != null
                 ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
@@ -404,114 +663,20 @@ public class PdfiumRenderer : IPdfRenderer
                 ? PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdfBytes), password, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import)
                 : PdfSharp.Pdf.IO.PdfReader.Open(filePath, password, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import));
 
-        if (pageIndex < 0 || pageIndex >= doc.PageCount) return links;
-
-        var page = doc.Pages[pageIndex];
-        double ptWidth = page.Width.Point;
-        double ptHeight = page.Height.Point;
-        if (ptWidth <= 0 || ptHeight <= 0) return links;
-
-        for (int i = 0; i < page.Annotations.Count; i++)
+        for (int i = 0; i < doc.PageCount; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var annot = page.Annotations[i];
-            if (annot == null) continue;
-
-            if (annot.Elements.GetString("/Subtype") != "/Link") continue;
-
-            var link = ParseLinkAnnotation(annot, doc, ptWidth, ptHeight, displayWidth, displayHeight, rotation);
-            if (link != null)
+            var links = PdfLinkHelper.ExtractRawLinks(doc.Pages[i], doc, cancellationToken);
+            if (links.Count > 0)
             {
-                links.Add(link);
+                pageLinks[i] = links;
             }
         }
 
-        return links;
+        _rawLinksCache[filePath] = (lastWrite, pageLinks);
+        return pageLinks;
     }
 
-    /// <summary>
-    /// 個々のリンク注釈オブジェクトを解析してモデル化します。
-    /// </summary>
-    private PdfLinkAnnotation? ParseLinkAnnotation(
-        PdfSharp.Pdf.Annotations.PdfAnnotation annot,
-        PdfSharp.Pdf.PdfDocument doc,
-        double ptWidth,
-        double ptHeight,
-        double displayWidth,
-        double displayHeight,
-        PageRotation rotation)
-    {
-        var pdfRect = annot.Elements.GetRectangle("/Rect");
-        double pdfX = Math.Min(pdfRect.X1, pdfRect.X2);
-        double pdfY = Math.Min(pdfRect.Y1, pdfRect.Y2);
-        double pdfW = Math.Abs(pdfRect.X2 - pdfRect.X1);
-        double pdfH = Math.Abs(pdfRect.Y2 - pdfRect.Y1);
-
-        var box = TransformPdfPointRect(
-            pdfX, pdfY, pdfW, pdfH,
-            ptWidth, ptHeight, displayWidth, displayHeight, rotation);
-
-        if (box.Width <= 0 || box.Height <= 0) return null;
-
-        var action = annot.Elements.GetDictionary("/A");
-        if (action != null)
-        {
-            string s = action.Elements.GetString("/S");
-            if (s == "/URI")
-            {
-                string uri = action.Elements.GetString("/URI");
-                return new PdfLinkAnnotation(box, PdfLinkType.Uri, uri, -1);
-            }
-            if (s == "/GoTo")
-            {
-                int targetPage = ResolveGoToPage(action, doc);
-                return new PdfLinkAnnotation(box, PdfLinkType.PageJump, null, targetPage);
-            }
-        }
-
-        var dest = annot.Elements.GetArray("/Dest");
-        if (dest != null)
-        {
-            int targetPage = ResolveDestinationPage(dest, doc);
-            return new PdfLinkAnnotation(box, PdfLinkType.PageJump, null, targetPage);
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// GoTo アクションから遷移先ページ番号を解決します。
-    /// </summary>
-    private int ResolveGoToPage(PdfSharp.Pdf.PdfDictionary action, PdfSharp.Pdf.PdfDocument doc)
-    {
-        var dest = action.Elements.GetArray("/D");
-        if (dest != null)
-        {
-            return ResolveDestinationPage(dest, doc);
-        }
-        return -1;
-    }
-
-    /// <summary>
-    /// Destination 配列から遷移先ページインデックスを解決します。
-    /// </summary>
-    private int ResolveDestinationPage(PdfSharp.Pdf.PdfArray dest, PdfSharp.Pdf.PdfDocument doc)
-    {
-        if (dest.Elements.Count == 0) return -1;
-        var first = dest.Elements[0];
-        if (first is PdfSharp.Pdf.Advanced.PdfReference pref && pref.Value is PdfSharp.Pdf.PdfDictionary pageDict)
-        {
-            for (int i = 0; i < doc.PageCount; i++)
-            {
-                if (doc.Pages[i] == pageDict) return i;
-            }
-        }
-        if (first is PdfSharp.Pdf.PdfInteger pNum)
-        {
-            return pNum.Value;
-        }
-        return -1;
-    }
 
     /// <summary>
     /// Docnet.Core のピクセル文字座標を WPF 表示座標系に変換します。
@@ -543,45 +708,14 @@ public class PdfiumRenderer : IPdfRenderer
         double ptWidth, double ptHeight,
         double displayWidth, double displayHeight,
         PageRotation rotation)
-    {
-        double normLeft = pdfX / ptWidth;
-        double normTop = (ptHeight - (pdfY + pdfH)) / ptHeight;
-        double normW = pdfW / ptWidth;
-        double normH = pdfH / ptHeight;
-
-        double x = normLeft * displayWidth;
-        double y = normTop * displayHeight;
-        double w = normW * displayWidth;
-        double h = normH * displayHeight;
-
-        return ApplyRotation(new Rect(x, y, w, h), displayWidth, displayHeight, rotation);
-    }
+        => PdfLinkHelper.TransformPdfPointRect(pdfX, pdfY, pdfW, pdfH, ptWidth, ptHeight, displayWidth, displayHeight, rotation);
 
     /// <summary>
     /// 回転角度に応じた矩形のアフィン変換を適用します。
     /// </summary>
     private static Rect ApplyRotation(Rect rect, double displayWidth, double displayHeight, PageRotation rotation)
-    {
-        return rotation switch
-        {
-            PageRotation.Rotate90 => new Rect(
-                displayHeight - (rect.Y + rect.Height),
-                rect.X,
-                rect.Height,
-                rect.Width),
-            PageRotation.Rotate180 => new Rect(
-                displayWidth - (rect.X + rect.Width),
-                displayHeight - (rect.Y + rect.Height),
-                rect.Width,
-                rect.Height),
-            PageRotation.Rotate270 => new Rect(
-                rect.Y,
-                displayWidth - (rect.X + rect.Width),
-                rect.Height,
-                rect.Width),
-            _ => rect
-        };
-    }
+        => PdfLinkHelper.ApplyRotation(rect, displayWidth, displayHeight, rotation);
+
 
     /// <summary>
     /// レンダリング用に PDF バイト列から自前の手書き注釈を除外します（他社製注釈はそのまま保持）。

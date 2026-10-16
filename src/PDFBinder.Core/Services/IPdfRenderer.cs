@@ -125,6 +125,50 @@ public interface IPdfRenderer
         => ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, priority);
 
     /// <summary>
+    /// 指定されたPDFページの画像レンダリングとインタラクティブデータ抽出を同一のPDFリーダーセッションで一括実行します。
+    /// </summary>
+    async Task<PageRenderResult> RenderPageWithInteractiveDataAsync(
+        string? filePath,
+        int pageIndex,
+        int targetWidth,
+        int targetHeight,
+        double displayWidth,
+        double displayHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default,
+        RenderPriority priority = RenderPriority.Normal,
+        string? password = null,
+        IReadOnlyList<PdfRawLinkAnnotation>? cachedRawLinks = null)
+    {
+        var bmp = await RenderPageAsync(filePath, pageIndex, targetWidth, targetHeight, rotation, cancellationToken, priority, password);
+        var data = await ExtractInteractiveDataAsync(filePath, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, priority, password);
+        return new PageRenderResult(bmp, data);
+    }
+
+    /// <summary>
+    /// 同一PDFファイルの指定された複数ページを同一のリーダーセッションで連続レンダリングします。
+    /// </summary>
+    async Task<IReadOnlyDictionary<int, BitmapSource>> RenderPagesBatchAsync(
+        string? filePath,
+        IReadOnlyList<int> pageIndices,
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        CancellationToken cancellationToken = default,
+        RenderPriority priority = RenderPriority.Low,
+        string? password = null)
+    {
+        var dict = new Dictionary<int, BitmapSource>();
+        if (pageIndices == null) return dict;
+        foreach (int idx in pageIndices)
+        {
+            var bmp = await RenderPageAsync(filePath, idx, targetWidth, targetHeight, rotation, cancellationToken, priority, password);
+            if (bmp != null) dict[idx] = bmp;
+        }
+        return dict;
+    }
+
+    /// <summary>
     /// キャッシュされたファイルバイト列を解放します。
     /// 特定のファイルパスを指定した場合はそのファイルのみ、null を指定した場合は全キャッシュを解放します。
     /// </summary>
