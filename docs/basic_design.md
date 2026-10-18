@@ -112,6 +112,8 @@ PDFBinder/
 - `DocumentKind`: `DocumentKind` (ドキュメント種別: `Pdf`, `Image`)
 - `IsImage`: `bool` (画像ドキュメントフラグ)
 - `Pages`: `ObservableCollection<PdfPageModel>` (ページ順序リスト)
+- `HasBinderInkAnnotations`: `bool` (元PDF内に自前手書き注釈が含まれているかどうか)
+- `CleanRenderBytes`: `byte[]?` (自前手書き注釈を除去した描画用クリーンPDFバイト列。注釈存在時のみ保持、未存在時はnull)
 - `IsModified`: `bool` (未保存変更の有無)
 - `CanUndo` / `CanRedo`: `bool` (アンドゥ・リドゥ可能状態)
 
@@ -153,6 +155,7 @@ PDFファイルの入出力、構造操作を担当。
 PDFページの画面表示用ビットマップ生成およびストローク合成、インタラクティブデータ抽出を担当。PDFiumネイティブAPI（Docnet.Core）の非スレッドセーフ性を回避するため、`PriorityAsyncLock` による排他・優先度制御（High: カレントページ詳細表示、Low: バックグラウンドサムネイル・先読み）を備え、多重実行によるクラッシュやフリーズを完全に防止。
 また、用紙背景はUI側（`PageBorder` の白背景）で提供するため、レンダラー内部での不要な白矩形描画および再シリアライズ（`doc.Save`）を撤廃し、自前手書き注釈を持たない通常の外部PDFはディスク上のバイト列からPDFiumへ直接渡して描画することで、読み込み直後の1ページ目表示ラグおよびサムネイル生成オーバーヘッドを完全撤廃。自前手書き注釈が存在するPDFのみ、初回レンダリング時に注釈を除去したバイト列を生成してメモリキャッシュ（ファイル更新日時検証付き）し、詳細画面での手書き線の多重焼き込みを防止。
 さらに、1ページ表示ごとのPDFファイル重複オープン・解析の解消（#219）として、画像レンダリングと文字座標抽出を同一のPDFiumリーダーセッションで一括実行する `RenderPageWithInteractiveDataAsync` を提供。リンク注釈情報は初回ドキュメントロード時に抽出・保持（`PdfPageModel.RawLinks`）またはファイル単位でキャッシュ（`_rawLinksCache`）し、ページ表示ごとのディスクからのPDF再パース（`PdfReader.Open`）を完全に排除。サムネイル生成時にも連続ページをバッチレンダリング（`RenderPagesBatchAsync`）することでファイルオープンとxrefパース回数を大幅に削減。
+また、PDFオープン直後の重複ファイル全量読み込み＆全バイト走査の排除（#218）として、`PdfService.LoadDocumentAsync` 完了時に手書き注釈マーカー（/PdfBinderInk）の有無および注釈除去済みクリーンバイト列を `RegisterBinderInkMarker` 経由でキャッシュに事前登録。これにより、大容量PDFオープン時もレンダリング開始前のディスク全量バイトスキャン（`ScanStreamForMarker`）および重複した `File.ReadAllBytes` を完全にバイパスし、1ページ目の即時描画を実現。
 パスワード保護されたPDFのレンダリングおよびインタラクティブデータ抽出時には、認証済みパスワードをDocnet.Coreへ引き渡して正常にビットマップおよび文字・リンク情報を生成。
 さらに詳細エディタ（`DetailEditorViewModel`）では、接続ディスプレイの `DpiScale` とズーム倍率を乗算してレンダリング解像度を算出（最大寸法 8192px）することで、4Kや高DPI環境での拡大・等倍表示時にも文字や図面がボケず、本来のシャープな精細度で描画。
 - `Task<BitmapSource?> RenderPageAsync(string? filePath, int pageIndex, int targetWidth, int targetHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: サムネイル/詳細画面用レンダリング（優先度指定・パスワード対応）
@@ -161,6 +164,7 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)`: 白紙レンダリング
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
 - `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用、パスワード対応）
+- `void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null)`: PDF読み込み時や保存時に手書き注釈マーカー情報および描画用クリーンバイト列を事前登録（全バイト走査の排除）
 
 
 ### 5.3 `IUndoRedoService`

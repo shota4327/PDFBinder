@@ -63,6 +63,22 @@ public class PdfiumRenderer : IPdfRenderer
     internal void ClearCache() => InvalidateCache();
 
     /// <inheritdoc/>
+    public void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return;
+
+        var fileInfo = new FileInfo(filePath);
+        var lastWrite = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.UtcNow;
+
+        _hasBinderInkMarkerCache[filePath] = (lastWrite, hasMarker);
+
+        if (hasMarker && cleanRenderBytes != null)
+        {
+            _fileBytesCache[filePath] = (lastWrite, cleanRenderBytes);
+        }
+    }
+
+    /// <inheritdoc/>
     public Task<BitmapSource?> RenderPageAsync(
         string? filePath,
         int pageIndex,
@@ -797,37 +813,7 @@ public class PdfiumRenderer : IPdfRenderer
     /// 自前手書き注釈が存在しない場合は、無駄な再シリアライズ（doc.Save）を行わず元のバイト列をそのまま返却します。
     /// </summary>
     private static byte[] RemoveBinderInkAnnotationsIfPresent(byte[] pdfBytes)
-    {
-        try
-        {
-            using var msIn = new MemoryStream(pdfBytes);
-            using var doc = PdfSharp.Pdf.IO.PdfReader.Open(msIn, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
-
-            bool hasAnyBinderInk = false;
-            for (int i = 0; i < doc.PageCount; i++)
-            {
-                var page = doc.Pages[i];
-                if (PdfBinderInkAnnotation.HasBinderInkAnnotation(page))
-                {
-                    hasAnyBinderInk = true;
-                    PdfBinderInkAnnotation.RemoveBinderInkAnnotations(page);
-                }
-            }
-
-            if (!hasAnyBinderInk)
-            {
-                return pdfBytes;
-            }
-
-            using var msOut = new MemoryStream();
-            doc.Save(msOut);
-            return msOut.ToArray();
-        }
-        catch
-        {
-            return pdfBytes;
-        }
-    }
+        => PdfBinderInkAnnotation.RemoveBinderInkAnnotationsIfPresent(pdfBytes);
 
     private static readonly byte[] BinderInkMarkerBytes = System.Text.Encoding.ASCII.GetBytes(PdfBinderInkAnnotation.InkKey);
 

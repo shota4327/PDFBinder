@@ -84,6 +84,8 @@
 | **F75** | パフォーマンス / レンダリング | 起動・表示パフォーマンス改善および不具合修正（白矩形挿入撤廃による直描画化、サニタイズキャッシュ、高DPI表示ボケ解消、サムネイル生成重複・エラーフラグ是正、単一インスタンスリソースリーク解消、単一EXE展開圧縮オフ高速化） | **完了** | Issue #204 / PdfiumRenderer, PdfService, DetailEditorViewModel, MainViewModel, SingleInstanceManager, build.ps1 |
 | **F76** | PDF操作コア / UI | パスワード保護PDF対応（対話的パスワード入力ダイアログ、伏せ字/平文表示切り替え、インラインエラー・再試行、結合時パスワード入力、暗号化保護維持上書き保存・抽出・分割、Docnet/PdfSharp連携） | **完了** | Issue #33 / PdfService, PdfiumRenderer, PasswordPromptDialog & MainViewModel |
 | **F77** | UI・印刷 / パフォーマンス | 印刷品質の向上およびプリンター送信高速化（用紙サイズ・向き・スロット寸法・元PDFページ比率に完全連動した動的300 DPI解像度計算、可逆圧縮PNGストリームによるスプールデータ80〜90%軽量化・XPSシリアライズ高速化・プリンタ送信時間短縮） | **完了** | Issue #206 / WpfPrintService, PrintViewModel, MainViewModel |
+| **F78** | パフォーマンス / レンダリング | 詳細ビューのページめくり・初期表示およびサムネイル生成の高速化（PDFファイル重複オープン・解析の解消、生リンク注釈保持による再パース完全排除、サムネイルバッチレンダリング） | **完了** | Issue #219 / PdfiumRenderer, PdfLinkHelper, MainViewModel |
+| **F79** | パフォーマンス / 読み込み | PDFオープン直後の重複ファイル全量読み込み＆全バイト走査（ScanStreamForMarker）の排除（LoadDocumentAsync時のマーカー事前登録、手書き注釈除去済みクリーンバイト列保持によるディスク再読み込み排除、1ページ目表示高速化） | **完了** | Issue #218 / PdfiumRenderer, PdfService, PdfBinderInkAnnotation, PdfDocumentModel, MainViewModel |
 
 ---
 

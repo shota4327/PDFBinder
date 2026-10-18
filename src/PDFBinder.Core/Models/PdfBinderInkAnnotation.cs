@@ -89,6 +89,46 @@ public class PdfBinderInkAnnotation : PdfAnnotation
     }
 
     /// <summary>
+    /// PDFバイト列内に自前手書き注釈が存在する場合のみ、それらを除去したバイト列を生成して返却します。
+    /// 自前手書き注釈が存在しない場合は、無駄な再シリアライズを行わず元のバイト列をそのまま返却します。
+    /// パスワード付きPDFの場合はパスワードを指定できます。
+    /// </summary>
+    public static byte[] RemoveBinderInkAnnotationsIfPresent(byte[] pdfBytes, string? password = null)
+    {
+        try
+        {
+            using var msIn = new MemoryStream(pdfBytes);
+            using var doc = string.IsNullOrEmpty(password)
+                ? PdfSharp.Pdf.IO.PdfReader.Open(msIn, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify)
+                : PdfSharp.Pdf.IO.PdfReader.Open(msIn, password, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
+
+            bool hasAnyBinderInk = false;
+            for (int i = 0; i < doc.PageCount; i++)
+            {
+                var page = doc.Pages[i];
+                if (HasBinderInkAnnotation(page))
+                {
+                    hasAnyBinderInk = true;
+                    RemoveBinderInkAnnotations(page);
+                }
+            }
+
+            if (!hasAnyBinderInk)
+            {
+                return pdfBytes;
+            }
+
+            using var msOut = new MemoryStream();
+            doc.Save(msOut);
+            return msOut.ToArray();
+        }
+        catch
+        {
+            return pdfBytes;
+        }
+    }
+
+    /// <summary>
     /// 他社製リーダー閲覧用のアピアランスストリーム辞書（/AP /N）を生成します。
     /// </summary>
     public static PdfDictionary CreateAppearanceStream(

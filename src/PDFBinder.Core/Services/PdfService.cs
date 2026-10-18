@@ -15,6 +15,17 @@ namespace PDFBinder.Core.Services;
 /// </summary>
 public class PdfService : IPdfService
 {
+    private readonly IPdfRenderer? _pdfRenderer;
+
+    /// <summary>
+    /// 新しい <see cref="PdfService"/> クラスのインスタンスを初期化します。
+    /// </summary>
+    /// <param name="pdfRenderer">レンダリングサービス（省略可能）。連携することでPDF読み込み時にマーカー情報を自動事前登録します。</param>
+    public PdfService(IPdfRenderer? pdfRenderer = null)
+    {
+        _pdfRenderer = pdfRenderer;
+    }
+
     /// <inheritdoc/>
     public Task<PdfDocumentModel> LoadDocumentAsync(string filePath) => LoadDocumentAsync(filePath, null);
 
@@ -28,7 +39,12 @@ public class PdfService : IPdfService
         }
 
         byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
-        return await Task.Run(() => ParseDocumentModel(filePath, fileBytes, password));
+        var model = await Task.Run(() => ParseDocumentModel(filePath, fileBytes, password));
+        if (!string.IsNullOrEmpty(model.FilePath))
+        {
+            _pdfRenderer?.RegisterBinderInkMarker(model.FilePath, model.HasBinderInkAnnotations, model.CleanRenderBytes);
+        }
+        return model;
     }
 
     /// <summary>
@@ -85,6 +101,11 @@ public class PdfService : IPdfService
                     model.HasBinderInkAnnotations = true;
                 }
                 model.AddPage(pageModel);
+            }
+
+            if (model.HasBinderInkAnnotations)
+            {
+                model.CleanRenderBytes = PdfBinderInkAnnotation.RemoveBinderInkAnnotationsIfPresent(fileBytes, password);
             }
 
             model.ResetModifiedState();

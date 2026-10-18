@@ -195,4 +195,36 @@ public class ReEditableInkAnnotationTests : IDisposable
         // かつ手書きストローク（黒）が除外されて焼き込まれていないこと
         Assert.All(pixels, b => Assert.Equal(0, b));
     }
+
+    [Fact]
+    public async Task LoadDocumentAsync_WithInkStrokesAndRenderer_SetsCleanRenderBytesAndRegistersMarker()
+    {
+        // Arrange: 手書きストローク付きのPDFを作成・保存
+        var doc = new PdfDocumentModel();
+        var page = _service.CreateBlankPage(200, 200);
+        var stroke = new Stroke(new StylusPointCollection { new StylusPoint(10, 10), new StylusPoint(50, 50) });
+        page.InkStrokes.Add(stroke);
+        doc.AddPage(page);
+
+        string pdfPath = Path.Combine(_testDirectory, "ink_preload_test.pdf");
+        await _service.SaveDocumentAsync(doc, pdfPath);
+
+        // Act: レンダラー連携付き PdfService で読み込む
+        var renderer = new PdfiumRenderer();
+        var serviceWithRenderer = new PdfService(renderer);
+        var loadedDoc = await serviceWithRenderer.LoadDocumentAsync(pdfPath);
+
+        // Assert: モデルの HasBinderInkAnnotations が true, CleanRenderBytes が非nullで、
+        // レンダラー側のマーカーキャッシュおよびバイト列キャッシュに登録されていること
+        Assert.NotNull(loadedDoc);
+        Assert.True(loadedDoc.HasBinderInkAnnotations);
+        Assert.NotNull(loadedDoc.CleanRenderBytes);
+        Assert.True(loadedDoc.CleanRenderBytes.Length > 0);
+        Assert.Equal(1, renderer.CachedMarkerCount);
+        Assert.Equal(1, renderer.CachedFileCount);
+
+        // レンダリング実行時もキャッシュを利用して正常に描画できること
+        var bitmap = await renderer.RenderPageAsync(pdfPath, 0, 200, 200, PageRotation.Rotate0);
+        Assert.NotNull(bitmap);
+    }
 }
