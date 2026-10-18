@@ -592,6 +592,75 @@ public class PdfiumRendererTests : IDisposable
         _renderer.InvalidateCache(filePath);
         Assert.Equal(0, _renderer.CachedLinkCount);
     }
+
+    [Fact]
+    public async Task RegisterBinderInkMarker_WithNoMarker_CachesFalseAndRendersSuccessfully()
+    {
+        // Arrange: サンプルPDFを作成
+        string filePath = CreateSamplePdf("marker_test_no_ink.pdf");
+
+        // Act: マーカーなしとして事前登録
+        _renderer.RegisterBinderInkMarker(filePath, false);
+
+        // Assert: マーカーキャッシュに1件登録され、ファイルバイトキャッシュには登録されていないこと
+        Assert.Equal(1, _renderer.CachedMarkerCount);
+        Assert.Equal(0, _renderer.CachedFileCount);
+
+        // レンダリングが正常に行われること
+        var bmp = await _renderer.RenderPageAsync(filePath, 0, 200, 300, PageRotation.Rotate0);
+        Assert.NotNull(bmp);
+        Assert.Equal(1, _renderer.CachedMarkerCount);
+    }
+
+    [Fact]
+    public async Task RegisterBinderInkMarker_WithMarkerAndCleanBytes_CachesCleanBytes()
+    {
+        // Arrange: サンプルPDFを作成
+        string filePath = CreateSamplePdf("marker_test_with_ink.pdf");
+        byte[] rawBytes = File.ReadAllBytes(filePath);
+
+        // Act: マーカーあり＆クリーンバイト列として事前登録
+        _renderer.RegisterBinderInkMarker(filePath, true, rawBytes);
+
+        // Assert: マーカーキャッシュおよびバイト列キャッシュの両方に登録されること
+        Assert.Equal(1, _renderer.CachedMarkerCount);
+        Assert.Equal(1, _renderer.CachedFileCount);
+
+        // レンダリングがキャッシュから正常に行われること
+        var bmp = await _renderer.RenderPageAsync(filePath, 0, 200, 300, PageRotation.Rotate0);
+        Assert.NotNull(bmp);
+    }
+
+    [Fact]
+    public async Task PdfService_LoadDocumentAsync_WithPdfRenderer_RegistersMarkerAutomatically()
+    {
+        // Arrange
+        string filePath = CreateSamplePdf("service_auto_register.pdf");
+        var service = new PdfService(_renderer);
+
+        // Act: PdfService でドキュメントを読み込む
+        var doc = await service.LoadDocumentAsync(filePath);
+
+        // Assert: ドキュメントのモデルが正しく読み込まれ、PdfiumRenderer に自動事前登録されていること
+        Assert.NotNull(doc);
+        Assert.False(doc.HasBinderInkAnnotations);
+        Assert.Null(doc.CleanRenderBytes);
+        Assert.Equal(1, _renderer.CachedMarkerCount);
+    }
+
+    [Fact]
+    public void PdfBinderInkAnnotation_RemoveBinderInkAnnotationsIfPresent_CleansAnnotationCorrectly()
+    {
+        // Arrange: 注釈なしPDFのバイト列を用意
+        string filePath = CreateSamplePdf("clean_annot_test.pdf");
+        byte[] originalBytes = File.ReadAllBytes(filePath);
+
+        // Act: 自前手書き注釈が存在しないバイト列で実行
+        byte[] processedBytes = PdfBinderInkAnnotation.RemoveBinderInkAnnotationsIfPresent(originalBytes);
+
+        // Assert: 変更なく元のバイト列が返ること
+        Assert.Same(originalBytes, processedBytes);
+    }
 }
 
 

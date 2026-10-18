@@ -174,4 +174,13 @@ public interface IPdfRenderer
     /// </summary>
     /// <param name="filePath">解放対象のファイルパス（null時は全解放）</param>
     void InvalidateCache(string? filePath = null) { }
+
+    /// <summary>
+    /// 指定されたPDFファイルの自前手書き注釈マーカー（/PdfBinderInk）の有無および描画用クリーンバイト列をキャッシュに事前登録します。
+    /// 事前登録することで、初回レンダリング時のファイル全量バイト走査（ScanStreamForMarker）および再読み込みを排除します。
+    /// </summary>
+    /// <param name="filePath">対象のPDFファイルパス</param>
+    /// <param name="hasMarker">自前手書き注釈マーカーが含まれるかどうか</param>
+    /// <param name="cleanRenderBytes">自前手書き注釈を除去した描画用クリーンバイト列（マーカーが存在する場合のみ推奨）</param>
+    void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null) { }
 }

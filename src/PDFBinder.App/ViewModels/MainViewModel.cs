@@ -549,8 +549,8 @@ public partial class MainViewModel : ObservableObject
         IBackgroundPrintQueueService? printQueueService = null,
         IImageExportService? imageExportService = null)
     {
-        _pdfService = pdfService ?? new PdfService();
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
+        _pdfService = pdfService ?? new PdfService(_pdfRenderer);
         _undoRedoService = undoRedoService ?? new UndoRedoService();
         _printService = printService ?? new WpfPrintService();
         _imageService = imageService ?? new ImageService();
@@ -1038,6 +1038,10 @@ public partial class MainViewModel : ObservableObject
                     return;
                 }
                 doc = loadedDoc;
+                if (!string.IsNullOrEmpty(doc.FilePath))
+                {
+                    _pdfRenderer.RegisterBinderInkMarker(doc.FilePath, doc.HasBinderInkAnnotations, doc.CleanRenderBytes);
+                }
             }
 
             var session = new DocumentSession(doc);
@@ -1540,6 +1544,12 @@ public partial class MainViewModel : ObservableObject
             doc.FilePath = targetPath;
             doc.IsModified = false;
             _pdfRenderer.InvalidateCache(targetPath);
+            if (!doc.IsImage)
+            {
+                bool hasInk = doc.Pages.Any(p => p.InkStrokes.Count > 0);
+                doc.HasBinderInkAnnotations = hasInk;
+                _pdfRenderer.RegisterBinderInkMarker(targetPath, hasInk);
+            }
             StatusMessage = $"保存しました: {targetPath}";
             NotifySessionStateChanged();
             return true;

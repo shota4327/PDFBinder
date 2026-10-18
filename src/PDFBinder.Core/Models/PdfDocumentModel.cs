@@ -29,6 +29,12 @@ public partial class PdfDocumentModel : ObservableObject
     /// <summary>元PDFファイル内にPDF Binder専用手書き注釈が含まれているかどうか</summary>
     public bool HasBinderInkAnnotations { get; set; }
 
+    /// <summary>
+    /// 自前手書き注釈を除去した描画用クリーンPDFバイト列。
+    /// 自前手書き注釈が存在する場合（HasBinderInkAnnotations == true）のみ生成・保持され、存在しない場合は null です。
+    /// </summary>
+    public byte[]? CleanRenderBytes { get; set; }
+
     /// <summary>ドキュメント保存時に適用するパスワード（パスワード保護されている場合）</summary>
     public string? DocumentPassword { get; set; }
 
