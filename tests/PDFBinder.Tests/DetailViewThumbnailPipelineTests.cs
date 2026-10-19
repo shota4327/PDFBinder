@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Ink;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using PDFBinder.App.Models;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 using PDFBinder.Core.Services;
@@ -259,5 +260,43 @@ public class DetailViewThumbnailPipelineTests
         Assert.NotNull(editor.Pages[0].PageBackground);
         Assert.NotNull(editor.Pages[1].PageBackground);
         Assert.Null(editor.Pages[2].PageBackground); // 2ページ以降は対象外
+    }
+
+    [Fact]
+    public async Task ActiveSessionChanged_ExecutesUnifiedPipelineImmediately()
+    {
+        // Arrange
+        var renderer = new PipelineLoggingRenderer();
+        var vm = new MainViewModel(pdfRenderer: renderer);
+        vm.IsDetailViewActive = true;
+
+        var doc = new PdfDocumentModel { FilePath = @"C:\dummy.pdf" };
+        for (int i = 0; i < 5; i++)
+        {
+            doc.Pages.Add(new PdfPageModel
+            {
+                PageNumber = i + 1,
+                SourceFilePath = @"C:\dummy.pdf",
+                OriginalPageIndex = i
+            });
+        }
+        var session = new DocumentSession(doc);
+        vm.Documents.Add(session);
+
+        // Act: セッションをアクティブ化（パイプラインが debounceMs: 0 で即時キックされる）
+        vm.ActiveSession = session;
+
+        // パイプライン完了を待機
+        for (int i = 0; i < 20; i++)
+        {
+            if (vm.DetailEditor?.CurrentPageItem?.PageBackground != null) break;
+            await Task.Delay(50);
+        }
+
+        // Assert: 主ページ（Page=0）が高解像度でレンダリングされ、イベントログの先頭が HighRes で開始していること
+        Assert.NotNull(vm.DetailEditor?.CurrentPageItem?.PageBackground);
+        var logs = renderer.EventLog;
+        Assert.NotEmpty(logs);
+        Assert.StartsWith("HighRes:Page=0:Priority=High", logs[0]);
     }
 }

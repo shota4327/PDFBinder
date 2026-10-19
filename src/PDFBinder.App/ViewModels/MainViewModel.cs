@@ -615,10 +615,6 @@ public partial class MainViewModel : ObservableObject
         else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPageNumber))
         {
             OnPropertyChanged(nameof(CurrentPageNumber));
-            if (IsDetailViewActive)
-            {
-                _ = ScheduleDetailViewThumbnailsAsync();
-            }
         }
     }
 
@@ -642,26 +638,27 @@ public partial class MainViewModel : ObservableObject
             newValue.UndoRedoService.StateChanged += OnSessionUndoRedoStateChanged;
             newValue.PropertyChanged += OnSessionPropertyChanged;
 
-            if (DetailEditor != null)
+            if (DetailEditor != null && newValue.IsImage)
             {
-                if (newValue.IsImage)
-                {
-                    DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
-                }
-                DetailEditor.FitMode = newValue.FitMode;
+                DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
             }
 
-            Document = newValue.Document;
             IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
             SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
 
+            if (Document != newValue.Document)
+            {
+                Document = newValue.Document;
+            }
+            else
+            {
+                var preferredPage = newValue.Document.Pages.FirstOrDefault(p => p.PageNumber == newValue.CurrentPageNumber);
+                DetailEditor?.InitializeDocument(newValue.Document, preferredPage, newValue.FitMode);
+            }
+
             if (DetailEditor != null)
             {
-                if (newValue.FitMode != DetailViewFitMode.None)
-                {
-                    DetailEditor.ApplyFitMode();
-                }
-                else
+                if (newValue.FitMode == DetailViewFitMode.None)
                 {
                     DetailEditor.Zoom = newValue.ZoomFactor;
                 }
@@ -673,7 +670,11 @@ public partial class MainViewModel : ObservableObject
 
             if (IsDetailViewActive)
             {
-                _ = ScheduleInitialThumbnailsAsync();
+                _ = ScheduleDetailViewPipelineAsync(debounceMs: 0);
+            }
+            else
+            {
+                _ = EnsureThumbnailsGeneratedAsync();
             }
         }
         else
@@ -768,7 +769,10 @@ public partial class MainViewModel : ObservableObject
         var preferredPage = (ActiveSession != null && ActiveSession.Document == newValue)
             ? newValue.Pages.FirstOrDefault(p => p.PageNumber == ActiveSession.CurrentPageNumber)
             : null;
-        DetailEditor?.InitializeDocument(newValue, preferredPage);
+        var preferredFitMode = (ActiveSession != null && ActiveSession.Document == newValue)
+            ? ActiveSession.FitMode
+            : (DetailViewFitMode?)null;
+        DetailEditor?.InitializeDocument(newValue, preferredPage, preferredFitMode);
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HasOpenDocuments));
@@ -2278,7 +2282,6 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
-            _ = ScheduleDetailViewThumbnailsAsync();
         }
         StatusMessage = "操作を取り消しました。";
     }
@@ -2297,7 +2300,6 @@ public partial class MainViewModel : ObservableObject
             DetailEditor?.InitializeDocument(Document);
             DetailEditor?.OnPageDimensionsChanged();
             _ = DetailEditor?.ScheduleDynamicRender(immediate: true);
-            _ = ScheduleDetailViewThumbnailsAsync();
         }
         StatusMessage = "操作をやり直しました。";
     }

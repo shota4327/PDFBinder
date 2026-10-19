@@ -382,7 +382,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="document">同期対象のPDFドキュメントモデル</param>
     /// <param name="preferredPage">優先してカレントページに設定するページ（省略時は直前のページやインデックスを維持）</param>
-    public void InitializeDocument(PdfDocumentModel document, PdfPageModel? preferredPage = null)
+    /// <param name="preferredFitMode">適用する表示フィットモード（省略時は現在のFitModeを維持）</param>
+    public void InitializeDocument(
+        PdfDocumentModel document,
+        PdfPageModel? preferredPage = null,
+        DetailViewFitMode? preferredFitMode = null)
     {
         var previousPage = CurrentPage;
         var previousIndex = CurrentPageIndex;
@@ -409,8 +413,18 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentPageNumber));
 
         UpdatePageEdgeFlags();
-        ApplyFitMode();
-        _ = LoadInitialDocumentBackgroundAsync();
+        if (preferredFitMode.HasValue && FitMode != preferredFitMode.Value)
+        {
+            FitMode = preferredFitMode.Value;
+        }
+        else
+        {
+            ApplyFitMode();
+        }
+        if (PipelineExecutionHandler == null)
+        {
+            _ = LoadInitialDocumentBackgroundAsync();
+        }
 
         if (targetPage != null)
         {
@@ -960,7 +974,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         try
         {
             int delay = immediate ? 0 : (isPageSwitch ? PageSwitchDebounceDelayMs : DebounceDelayMs);
-            if (PipelineExecutionHandler != null && !isInitialLoad)
+            if (PipelineExecutionHandler != null)
             {
                 await PipelineExecutionHandler(delay);
                 return;
