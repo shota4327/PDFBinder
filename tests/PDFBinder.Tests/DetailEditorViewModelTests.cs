@@ -1362,6 +1362,56 @@ public class DetailEditorViewModelTests
         Assert.Contains(nameof(DetailPageItemViewModel.PageBackground), changedProps);
         Assert.Null(item.PageBackground);
     }
+
+    [Fact]
+    public void InitializeDocument_WithPreferredFitMode_AppliesSpecifiedFitMode()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(600, 800);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.UpdateViewportSize(1250, 800);
+        vm.FitMode = DetailViewFitMode.ActualSize;
+
+        // Act: preferredFitMode に FitToWidth を指定して初期化
+        vm.InitializeDocument(doc, null, DetailViewFitMode.FitToWidth);
+
+        // Assert: FitMode が FitToWidth に更新され、幅に合わせたズーム倍率が即座に計算されること
+        Assert.Equal(DetailViewFitMode.FitToWidth, vm.FitMode);
+        Assert.NotEqual(1.0, vm.Zoom);
+    }
+
+    [Fact]
+    public async Task InitializeDocument_WhenPipelineExecutionHandlerPresent_DoesNotLaunchStandaloneDynamicRender()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(600, 800);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        bool handlerInvoked = false;
+        vm.PipelineExecutionHandler = delay =>
+        {
+            handlerInvoked = true;
+            return Task.CompletedTask;
+        };
+
+        // Act: InitializeDocument を実行
+        vm.InitializeDocument(doc);
+        await Task.Delay(100);
+
+        // Assert: 描画要求は PipelineExecutionHandler に委譲され、直接のレンダリングフォールバックは走らないこと
+        Assert.True(handlerInvoked);
+        Assert.Equal(0, renderer.RenderCallCount);
+    }
 }
+
 
 

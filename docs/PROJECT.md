@@ -86,6 +86,7 @@
 | **F77** | UI・印刷 / パフォーマンス | 印刷品質の向上およびプリンター送信高速化（用紙サイズ・向き・スロット寸法・元PDFページ比率に完全連動した動的300 DPI解像度計算、可逆圧縮PNGストリームによるスプールデータ80〜90%軽量化・XPSシリアライズ高速化・プリンタ送信時間短縮） | **完了** | Issue #206 / WpfPrintService, PrintViewModel, MainViewModel |
 | **F78** | パフォーマンス / レンダリング | 詳細ビューのページめくり・初期表示およびサムネイル生成の高速化（PDFファイル重複オープン・解析の解消、生リンク注釈保持による再パース完全排除、サムネイルバッチレンダリング） | **完了** | Issue #219 / PdfiumRenderer, PdfLinkHelper, MainViewModel |
 | **F79** | パフォーマンス / 読み込み | PDFオープン直後の重複ファイル全量読み込み＆全バイト走査（ScanStreamForMarker）の排除（LoadDocumentAsync時のマーカー事前登録、手書き注釈除去済みクリーンバイト列保持によるディスク再読み込み排除、1ページ目表示高速化） | **完了** | Issue #218 / PdfiumRenderer, PdfService, PdfBinderInkAnnotation, PdfDocumentModel, MainViewModel |
+| **F80** | パフォーマンス / レンダリング | ドキュメントオープン時の詳細ビュー初期描画パイプラインの二重起動・ロック競合の解消（ApplyFitMode重複呼び出し撤廃、初期描画とサムネイル統合パイプラインの一本化、0ms即時起動による最速表示） | **完了** | Issue #221 / DetailEditorViewModel, MainViewModel |
 
 ---
 
