@@ -165,6 +165,8 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `BitmapSource CompositeStrokes(BitmapSource baseImage, StrokeCollection strokes, double originalPageWidth, double originalPageHeight)`: 手書きストローク（InkStrokes）の縮小合成描画（グリッド一覧反映用）
 - `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用、パスワード対応）
 - `void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null)`: PDF読み込み時や保存時に手書き注釈マーカー情報および描画用クリーンバイト列を事前登録（全バイト走査の排除）
+- `void Warmup()`: PDFiumネイティブライブラリ（`Docnet.Core` / `pdfium.dll`）の事前初期化（プリウォーム）。アプリ起動後（`App.OnStartup`）のバックグラウンドスレッドで先行実行し、初回PDFオープン時のコールドスタート遅延を解消（#215）
+
 
 
 ### 5.3 `IUndoRedoService`

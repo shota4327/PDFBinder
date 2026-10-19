@@ -3,6 +3,7 @@ using System.Windows;
 using PDFBinder.App.Helpers;
 using PDFBinder.App.Services;
 using PDFBinder.App.ViewModels;
+using PDFBinder.Core.Services;
 
 namespace PDFBinder.App;
 
@@ -48,6 +49,9 @@ public partial class App : Application
         MainWindow = mainWindow;
         mainWindow.Show();
         WindowActivationHelper.BringToForeground(mainWindow);
+
+        // PDFiumネイティブライブラリのコールドスタートを解消するためのバックグラウンド事前初期化
+        _ = Task.Run(() => PdfiumRenderer.Prewarm());
 
         foreach (var file in parseResult.Files)
         {

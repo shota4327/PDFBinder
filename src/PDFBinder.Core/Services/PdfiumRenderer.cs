@@ -78,6 +78,24 @@ public class PdfiumRenderer : IPdfRenderer
         }
     }
 
+    /// <summary>
+    /// PDFiumネイティブライブラリ（DocLib.Instance）をバックグラウンド等で事前に初期化（プリウォーム）します。
+    /// </summary>
+    public static void Prewarm()
+    {
+        try
+        {
+            _ = DocLib.Instance;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PdfiumRenderer] Prewarm failed: {ex.Message}");
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Warmup() => Prewarm();
+
     /// <inheritdoc/>
     public Task<BitmapSource?> RenderPageAsync(
         string? filePath,
