@@ -661,6 +661,23 @@ public class PdfiumRendererTests : IDisposable
         // Assert: 変更なく元のバイト列が返ること
         Assert.Same(originalBytes, processedBytes);
     }
+
+    [Fact]
+    public void Warmup_ExecutesSafelyWithoutException()
+    {
+        // Act & Assert (静的メソッド Prewarm 呼び出し)
+        var staticEx = Record.Exception(() => PdfiumRenderer.Prewarm());
+        Assert.Null(staticEx);
+
+        // Act & Assert (インスタンスメソッド Warmup 呼び出し)
+        var instanceEx = Record.Exception(() => _renderer.Warmup());
+        Assert.Null(instanceEx);
+
+        // Act & Assert (インターフェース経由での呼び出し)
+        IPdfRenderer interfaceRenderer = _renderer;
+        var ifaceEx = Record.Exception(() => interfaceRenderer.Warmup());
+        Assert.Null(ifaceEx);
+    }
 }
 
 

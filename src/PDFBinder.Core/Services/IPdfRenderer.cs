@@ -183,4 +183,9 @@ public interface IPdfRenderer
     /// <param name="hasMarker">自前手書き注釈マーカーが含まれるかどうか</param>
     /// <param name="cleanRenderBytes">自前手書き注釈を除去した描画用クリーンバイト列（マーカーが存在する場合のみ推奨）</param>
     void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null) { }
+
+    /// <summary>
+    /// レンダリングエンジンのネイティブライブラリ等を事前に初期化（プリウォーム）します。
+    /// </summary>
+    void Warmup() { }
 }
