@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows;
+using Microsoft.Win32;
 using PDFBinder.Core.Models;
 
 namespace PDFBinder.App.Services;
@@ -11,9 +12,18 @@ namespace PDFBinder.App.Services;
 /// <summary>
 /// ディスプレイ接続環境（モニター名、解像度、画面数）の識別および設定解決を行うサービス
 /// </summary>
-public class DisplayProfileService : IDisplayProfileService
+public partial class DisplayProfileService : IDisplayProfileService, IDisposable
 {
     private readonly Func<IReadOnlyList<DisplayMonitorInfo>> _monitorProvider;
+    private readonly object _cacheLock = new();
+    private string? _cachedProfileKey;
+    private bool _disposed;
+
+    [GeneratedRegex(@"[^a-zA-Z0-9_\-]")]
+    private static partial Regex InvalidCharsRegex();
+
+    [GeneratedRegex(@"_+")]
+    private static partial Regex ConsecutiveUnderscoresRegex();
 
     /// <summary>
     /// <see cref="DisplayProfileService"/> クラスの新しいインスタンスを初期化します。
@@ -22,13 +32,53 @@ public class DisplayProfileService : IDisplayProfileService
     public DisplayProfileService(Func<IReadOnlyList<DisplayMonitorInfo>>? monitorProvider = null)
     {
         _monitorProvider = monitorProvider ?? DetectDisplayMonitors;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
     /// <inheritdoc />
     public string GetCurrentProfileKey()
     {
-        var monitors = _monitorProvider();
-        return BuildProfileKey(monitors);
+        lock (_cacheLock)
+        {
+            if (_cachedProfileKey != null)
+            {
+                return _cachedProfileKey;
+            }
+
+            var monitors = _monitorProvider();
+            _cachedProfileKey = BuildProfileKey(monitors);
+            return _cachedProfileKey;
+        }
+    }
+
+    /// <summary>
+    /// キャッシュされたプロファイルキーをクリアし、次回取得時にディスプレイ構成を再検出させます。
+    /// </summary>
+    public void InvalidateCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedProfileKey = null;
+        }
+    }
+
+    /// <summary>
+    /// OSのディスプレイ設定変更イベント時にキャッシュを無効化します。
+    /// </summary>
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        InvalidateCache();
+    }
+
+    /// <summary>
+    /// システムイベントの購読を解除し、リソースを解放します。
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        GC.SuppressFinalize(this);
     }
 
     /// <inheritdoc />
@@ -94,8 +144,8 @@ public class DisplayProfileService : IDisplayProfileService
             return "Display";
         }
 
-        string sanitized = Regex.Replace(raw.Trim(), @"[^a-zA-Z0-9_\-]", "_");
-        sanitized = Regex.Replace(sanitized, @"_+", "_").Trim('_', '-');
+        string sanitized = InvalidCharsRegex().Replace(raw.Trim(), "_");
+        sanitized = ConsecutiveUnderscoresRegex().Replace(sanitized, "_").Trim('_', '-');
         return string.IsNullOrEmpty(sanitized) ? "Display" : sanitized;
     }
 
