@@ -524,6 +524,10 @@ public partial class MainWindow : Window
     {
         base.OnClosed(e);
         SaveWindowSettings();
+        if (_displayProfileService is IDisposable disposableProfileService)
+        {
+            disposableProfileService.Dispose();
+        }
     }
 
     /// <summary>

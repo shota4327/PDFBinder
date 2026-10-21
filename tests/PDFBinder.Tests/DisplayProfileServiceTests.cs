@@ -157,4 +157,42 @@ public class DisplayProfileServiceTests
         Assert.Equal(760, effective.Height);
         Assert.False(effective.IsMaximized);
     }
+
+    [Fact]
+    public void GetCurrentProfileKey_CachesResultAndAvoidsRepeatedMonitorDetection()
+    {
+        // 準備: モニター検出関数の呼び出し回数をカウント
+        int providerCallCount = 0;
+        var currentMonitors = new List<DisplayMonitorInfo>
+        {
+            new("T27h-30", 2560, 1440, true)
+        };
+
+        using var service = new DisplayProfileService(() =>
+        {
+            providerCallCount++;
+            return currentMonitors;
+        });
+
+        // 実行: 複数回 GetCurrentProfileKey および ResolveEffectiveWindowSettings を呼び出し
+        string key1 = service.GetCurrentProfileKey();
+        string key2 = service.GetCurrentProfileKey();
+        _ = service.ResolveEffectiveWindowSettings(new AppSettings());
+
+        // 検証: モニター検出は初回のみ実行され、以降はキャッシュが使われること
+        Assert.Equal("T27h-30_2560x1440_1mon", key1);
+        Assert.Equal(key1, key2);
+        Assert.Equal(1, providerCallCount);
+
+        // キャッシュ無効化後は再検出されること
+        currentMonitors = new List<DisplayMonitorInfo>
+        {
+            new("BOE0892", 1920, 1080, true)
+        };
+        service.InvalidateCache();
+
+        string keyAfterInvalidate = service.GetCurrentProfileKey();
+        Assert.Equal("BOE0892_1920x1080_1mon", keyAfterInvalidate);
+        Assert.Equal(2, providerCallCount);
+    }
 }

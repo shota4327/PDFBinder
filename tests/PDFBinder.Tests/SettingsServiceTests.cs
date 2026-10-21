@@ -198,4 +198,34 @@ public class SettingsServiceTests : IDisposable
         Assert.NotNull(loaded.DisplayProfiles);
         Assert.Empty(loaded.DisplayProfiles);
     }
+
+    [Fact]
+    public void Load_WhenCalledMultipleTimes_ReturnsCachedSettingsWithoutReReadingDisk()
+    {
+        // 準備: 設定を保存して初回 Load を実行
+        var service = new SettingsService(_settingsFilePath);
+        service.Save(new AppSettings
+        {
+            Window = new WindowSettings { Width = 1600, Height = 900, IsMaximized = false }
+        });
+
+        var firstLoaded = service.Load();
+        Assert.Equal(1600, firstLoaded.Window.Width);
+
+        // ディスク上のファイルを直接書き換え（キャッシュが効いていれば再読み込みされないはず）
+        File.WriteAllText(_settingsFilePath, "{\"Window\":{\"Width\":800,\"Height\":600,\"IsMaximized\":true}}");
+
+        // 実行: 2回目の Load
+        var secondLoaded = service.Load();
+
+        // 検証: メモリキャッシュから返却され、ディスク再読み込みが発生していないこと
+        Assert.Same(firstLoaded, secondLoaded);
+        Assert.Equal(1600, secondLoaded.Window.Width);
+
+        // キャッシュ無効化後はディスクから最新が読み込まれること
+        service.InvalidateCache();
+        var reloaded = service.Load();
+        Assert.Equal(800, reloaded.Window.Width);
+        Assert.True(reloaded.Window.IsMaximized);
+    }
 }
