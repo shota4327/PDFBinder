@@ -184,41 +184,71 @@ public class PdfMetadataHelperTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDocumentAsync_TargetPdf_PreservesOCPropertiesOffLayer()
+    public async Task SaveDocumentAsync_SyntheticPdf_PreservesOCPropertiesOffLayer()
     {
-        string beforePdf = Path.Combine(FindRepoRoot(), "保存前.pdf");
-        if (!File.Exists(beforePdf)) return;
+        string samplePdf = Path.Combine(_testDirectory, "synthetic_layer.pdf");
+        using (var doc = new PdfDocument())
+        {
+            var page = doc.AddPage();
+            page.Width = XUnit.FromPoint(500);
+            page.Height = XUnit.FromPoint(700);
 
-        var model = await _service.LoadDocumentAsync(beforePdf);
-        string outputPdf = Path.Combine(_testDirectory, "saved_after_fix.pdf");
+            var ocg = new PdfDictionary(doc);
+            ocg.Elements.SetName("/Type", "/OCG");
+            ocg.Elements.SetString("/Name", "DraftLayer");
+            doc.Internals.AddObject(ocg);
 
-        // Act: Save without editing
+            var ocProps = new PdfDictionary(doc);
+            var defaultD = new PdfDictionary(doc);
+            var offArray = new PdfArray(doc);
+            var ocgRef = ocg.Reference!;
+            offArray.Elements.Add(ocgRef);
+            defaultD.Elements["/OFF"] = offArray;
+            ocProps.Elements["/D"] = defaultD;
+
+            var ocgsArray = new PdfArray(doc);
+            ocgsArray.Elements.Add(ocgRef);
+            ocProps.Elements["/OCGs"] = ocgsArray;
+            doc.Internals.Catalog.Elements["/OCProperties"] = ocProps;
+
+            var res = new PdfDictionary(doc);
+            var props = new PdfDictionary(doc);
+            props.Elements["/MC0"] = ocgRef;
+            res.Elements["/Properties"] = props;
+            page.Elements["/Resources"] = res;
+
+            doc.Save(samplePdf);
+        }
+
+        var model = await _service.LoadDocumentAsync(samplePdf);
+        string outputPdf = Path.Combine(_testDirectory, "saved_synthetic_layer.pdf");
+
+        // Act
         await _service.SaveDocumentAsync(model, outputPdf);
 
-        // Assert: Catalog must contain /OCProperties and /D /OFF must match the remapped Layer 1
+        // Assert
         using var reloaded = PdfReader.Open(outputPdf, PdfDocumentOpenMode.Import);
         var catalog = reloaded.Internals.Catalog;
         Assert.True(catalog.Elements.ContainsKey("/OCProperties"));
 
-        var ocProps = catalog.Elements.GetDictionary("/OCProperties");
-        Assert.NotNull(ocProps);
-        var defaultDict = ocProps.Elements.GetDictionary("/D");
+        var reloadedOcProps = catalog.Elements.GetDictionary("/OCProperties");
+        Assert.NotNull(reloadedOcProps);
+        var defaultDict = reloadedOcProps.Elements.GetDictionary("/D");
         Assert.NotNull(defaultDict);
 
-        var offArray = defaultDict.Elements.GetArray("/OFF");
-        Assert.NotNull(offArray);
-        Assert.NotEmpty(offArray.Elements);
+        var reloadedOffArray = defaultDict.Elements.GetArray("/OFF");
+        Assert.NotNull(reloadedOffArray);
+        Assert.NotEmpty(reloadedOffArray.Elements);
 
-        // Verify that Page 1's /Properties /MC0 reference is in /OFF
         var page1 = reloaded.Pages[0];
         var resources = page1.Elements.GetDictionary("/Resources");
         Assert.NotNull(resources);
-        var props = resources.Elements.GetDictionary("/Properties");
-        Assert.NotNull(props);
-        var mc0Ref = props.Elements["/MC0"] as PdfSharp.Pdf.Advanced.PdfReference;
+        var propsDict = resources.Elements.GetDictionary("/Properties");
+        Assert.NotNull(propsDict);
+        var mc0Ref = propsDict.Elements["/MC0"] as PdfSharp.Pdf.Advanced.PdfReference;
         Assert.NotNull(mc0Ref);
 
-        bool isMc0Off = offArray.Elements.OfType<PdfSharp.Pdf.Advanced.PdfReference>()
+        bool isMc0Off = reloadedOffArray.Elements.OfType<PdfSharp.Pdf.Advanced.PdfReference>()
             .Any(r => r.ObjectID == mc0Ref.ObjectID);
         Assert.True(isMc0Off, "Page 1's /MC0 layer must be included in /OFF array");
     }
