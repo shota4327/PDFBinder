@@ -67,6 +67,15 @@ public partial class MainWindow : Window
     /// <summary>
     /// キー入力を先行検知し、フォーカス位置に関わらずショートカットキーの確実な実行を制御します。
     /// </summary>
+    /// <summary>
+    /// ウィンドウの Win32 ハンドル作成時にシステムアクセントカラーの初期化および変更監視フックを登録します。
+    /// </summary>
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        SystemAccentColorHelper.Initialize(this);
+    }
+
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
