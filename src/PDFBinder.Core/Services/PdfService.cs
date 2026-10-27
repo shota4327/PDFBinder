@@ -252,6 +252,8 @@ public class PdfService : IPdfService
             {
                 AppendPageToDocument(outputDoc, pageModel, sourceCache);
             }
+            var pageList = pages as IReadOnlyList<PdfPageModel> ?? pages.ToList();
+            PdfMetadataHelper.TransferMetadata(outputDoc, pageList, sourceCache);
             outputDoc.Save(destinationPath);
         }
         finally

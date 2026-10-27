@@ -28,7 +28,7 @@
 | **F14** | PDF操作コア | 空白ページの追加（隣接サイズ継承 / A4標準） | **完了** | PdfService.CreateBlankPage |
 | **F15** | PDF操作コア | 外部PDFの結合（Append / 任意位置挿入） | **完了** | PdfService.AppendDocumentAsync |
 | **F16** | PDF操作コア | PDF分割（選択ページ抽出 / 個別1ページ分割） | **完了** | PdfService.ExportPagesAsync / SplitAll |
-| **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存） | **完了** | SafeReplaceFile アトミック保存 |
+| **F17** | PDF操作コア | ドキュメント保存（上書き保存 / 別名で保存、非表示レイヤー・しおり・表示設定・文書情報メタデータ保持・統合） | **完了** | Issue #232 / SafeReplaceFile アトミック保存 & PdfMetadataHelper |
 | **F18** | PDF操作コア / UI | 未保存変更確認ダイアログ（終了時・別ファイルオープン時の保存確認、手書き既存ファイル復元後の変更検知、モダンインアプリオーバーレイ） | **完了** | Issue #49, #54, #111 / インアプリオーバーレイ & OnClosing |
 | **F19** | PDF操作コア / 起動 | 起動時コマンドライン引数処理および単一インスタンス管理（「プログラムから開く」・関連付け起動時の同一ウィンドウ新タブ統合・IPC通信・最前面復元・最大化状態およびウィンドウサイズ保持・--new-windowオプション・複数ウィンドウ統合管理） | **完了** | Issue #83, #123, #200 / SingleInstanceManager, CommandLineArgsHelper, WindowActivationHelper & App.OnStartup |
 | **F20** | レンダリング | PDFiumによる高精細サムネイル生成（最大3200%ズーム対応・720x1008px事前レンダリング・高DPI対応） | **完了** | PdfiumRenderer (Docnet.Core) |
