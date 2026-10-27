@@ -88,6 +88,7 @@
 | **F79** | パフォーマンス / 読み込み | PDFオープン直後の重複ファイル全量読み込み＆全バイト走査（ScanStreamForMarker）の排除（LoadDocumentAsync時のマーカー事前登録、手書き注釈除去済みクリーンバイト列保持によるディスク再読み込み排除、1ページ目表示高速化） | **完了** | Issue #218 / PdfiumRenderer, PdfService, PdfBinderInkAnnotation, PdfDocumentModel, MainViewModel |
 | **F80** | パフォーマンス / レンダリング | ドキュメントオープン時の詳細ビュー初期描画パイプラインの二重起動・ロック競合の解消（ApplyFitMode重複呼び出し撤廃、初期描画とサムネイル統合パイプラインの一本化、0ms即時起動による最速表示） | **完了** | Issue #221 / DetailEditorViewModel, MainViewModel |
 | **F81** | パフォーマンス / 起動 | PDFiumネイティブライブラリのコールドスタート遅延解消（事前初期化・バックグラウンドプリウォーム、初回PDFオープン時の1ページ目表示高速化） | **完了** | Issue #215 / PdfiumRenderer, IPdfRenderer, App.xaml.cs |
+| **F84** | UI・ウィンドウ管理 | アクティブウィンドウへのOSアクセントカラー連動縁取り（DWM API/レジストリ自動取得、設定変更リアルタイム追従、非アクティブ時枠線切替、最大化時0px非表示） | **完了** | Issue #236 / SystemAccentColorHelper & MainWindow |
 
 ---
 

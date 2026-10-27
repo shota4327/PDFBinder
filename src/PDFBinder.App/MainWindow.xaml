@@ -64,7 +64,25 @@
         <KeyBinding Key="Right" Command="{Binding GoToNextPageCommand}" />
     </Window.InputBindings>
 
-    <Grid Background="{StaticResource AppBackgroundBrush}">
+    <!-- ウィンドウ外枠（アクティブ時にOSアクセントカラー、最大化時は非表示） -->
+    <Border x:Name="WindowFrameBorder">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
+                <Style.Triggers>
+                    <!-- アクティブ時はOSアクセントカラーで縁取り -->
+                    <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
+                    </DataTrigger>
+                    <!-- 最大化時は境界線を非表示（画面端へのはみ出し防止） -->
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="BorderThickness" Value="0" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+        <Grid Background="{StaticResource AppBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="38" />
             <RowDefinition Height="Auto" />
@@ -1361,4 +1379,5 @@
             </Border>
         </Grid>
     </Grid>
+    </Border>
 </Window>

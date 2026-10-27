@@ -43,6 +43,8 @@
             <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F1F1F1" />
             <SolidColorBrush x:Key="TextSecondaryBrush" Color="#CCCCCC" />
             <SolidColorBrush x:Key="TextMutedBrush" Color="#858585" />
+            <!-- Windows OS システムアクセントカラー連動ブラシ（アクティブウィンドウ外枠等） -->
+            <SolidColorBrush x:Key="SystemAccentBrush" Color="#0078D4" />
             <SolidColorBrush x:Key="AccentBrush" Color="#007ACC" />
             <SolidColorBrush x:Key="AccentHoverBrush" Color="#1F8AD2" />
             <SolidColorBrush x:Key="AccentPressedBrush" Color="#094771" />
