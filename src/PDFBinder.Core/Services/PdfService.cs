@@ -88,8 +88,8 @@ public class PdfService : IPdfService
                     SourceFilePath = filePath,
                     SourcePassword = password,
                     OriginalPageIndex = i,
-                    Width = pdfPage.Width.Point,
-                    Height = pdfPage.Height.Point,
+                    Width = GetEffectivePageSize(pdfPage).Width,
+                    Height = GetEffectivePageSize(pdfPage).Height,
                     OriginalRotation = pageRotation,
                     Rotation = pageRotation,
                     RawLinks = rawLinks
@@ -318,11 +318,11 @@ public class PdfService : IPdfService
             return;
         }
 
-        double pageWidth = page.Width.Point;
-        double pageHeight = page.Height.Point;
+        var (pageWidth, pageHeight) = GetEffectivePageSize(page);
+        var cropBox = page.CropBox;
 
         var annot = new PdfBinderInkAnnotation(outputDoc);
-        annot.Elements.SetRectangle("/Rect", new PdfRectangle(new XRect(0, 0, pageWidth, pageHeight)));
+        annot.Elements.SetRectangle("/Rect", cropBox);
         annot.Elements.SetString(PdfBinderInkAnnotation.InkKey, PdfBinderInkAnnotation.SerializeStrokes(strokes));
         annot.Elements["/AP"] = PdfBinderInkAnnotation.CreateAppearanceStream(
             outputDoc, strokes, rotation, pageWidth, pageHeight);
@@ -521,6 +521,24 @@ public class PdfService : IPdfService
     }
 
     /// <summary>
+    /// PDFページの有効な表示寸法（CropBox優先、未定義または無効時はMediaBox）を取得します。
+    /// </summary>
+    internal static (double Width, double Height) GetEffectivePageSize(PdfPage pdfPage)
+    {
+        ArgumentNullException.ThrowIfNull(pdfPage);
+
+        var cropBox = pdfPage.CropBox;
+        double cropWidth = Math.Abs(cropBox.Width);
+        double cropHeight = Math.Abs(cropBox.Height);
+
+        if (cropWidth > 0 && cropHeight > 0)
+        {
+            return (cropWidth, cropHeight);
+        }
+
+        return (pdfPage.Width.Point, pdfPage.Height.Point);
+    }
+
     /// 画面の表示向きとページの回転角度に基づいて、切り出す CropBox 領域を算出します。
     /// </summary>
     private static (PdfRectangle Box1, PdfRectangle Box2) CalculateCropBoxes(

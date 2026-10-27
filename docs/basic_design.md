@@ -145,7 +145,7 @@ PDFBinder/
 
 ### 5.1 `IPdfService`
 PDFファイルの入出力、構造操作を担当。
-- `Task<PdfDocumentModel> LoadDocumentAsync(string filePath, string? password = null)`: ファイルロックを行わずメモリ読み込み（パスワード保護PDFの復号対応、未指定/誤入力時は `PdfPasswordRequiredException` をスロー）
+- `Task<PdfDocumentModel> LoadDocumentAsync(string filePath, string? password = null)`: ファイルロックを行わずメモリ読み込み（パスワード保護PDFの復号対応、未指定/誤入力時は `PdfPasswordRequiredException` をスロー。また、ページに `CropBox`（表示枠）が設定されている場合は `CropBox` の寸法を優先認識し、冊子等の表紙・見開きサイズを正確に反映）
 - `Task SaveDocumentAsync(PdfDocumentModel doc, string outputPath)`: ページ配置・回転・インク合成を行い保存（元ドキュメントがパスワード保護されている場合はパスワードを維持して再暗号化保存。保存成功時に全ページのSourceFilePath、OriginalPageIndex、SourcePasswordを最新ファイル構成に合わせて同期。また、元ドキュメントのレイヤー設定（/OCPropertiesの非表示リスト含む）、しおり・目次（/Outlinesのページ追従）、初期表示・見開き設定（/ViewerPreferences、/PageLayout等）、文書情報（単一ファイル時）を安全に保持・統合して出力）
 - `PdfPageModel CreateBlankPage(double width, double height)`: 指定サイズの白紙ページ生成
 - `Task AppendDocumentAsync(PdfDocumentModel doc, string filePath, int insertIndex, string? password = null)`: 別PDFのページ差し込み結合（パスワード付きPDF対応）

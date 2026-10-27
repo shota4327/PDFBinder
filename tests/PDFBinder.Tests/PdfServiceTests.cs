@@ -329,4 +329,76 @@ public class PdfServiceTests : IDisposable
         var exportedDoc = await _service.LoadDocumentAsync(exportPath, "exportpass");
         Assert.Equal(1, exportedDoc.PageCount);
     }
+
+    [Fact]
+    public async Task LoadDocumentAsync_PdfWithCropBox_UsesCropBoxDimensionsInsteadOfMediaBox()
+    {
+        // Arrange
+        string filePath = Path.Combine(_testDirectory, "cropbox_sample.pdf");
+        using (var doc = new PdfDocument())
+        {
+            // 1ページ目: MediaBoxはA4横(840x590)、CropBoxは縦長(360x510)
+            var page1 = doc.AddPage();
+            page1.MediaBox = new PdfSharp.Pdf.PdfRectangle(new PdfSharp.Drawing.XPoint(0, 0), new PdfSharp.Drawing.XPoint(840, 590));
+            page1.CropBox = new PdfSharp.Pdf.PdfRectangle(new PdfSharp.Drawing.XPoint(420, 40), new PdfSharp.Drawing.XPoint(780, 550));
+
+            // 2ページ目: MediaBoxはA4横(840x590)、CropBoxは横長(720x510)
+            var page2 = doc.AddPage();
+            page2.MediaBox = new PdfSharp.Pdf.PdfRectangle(new PdfSharp.Drawing.XPoint(0, 0), new PdfSharp.Drawing.XPoint(840, 590));
+            page2.CropBox = new PdfSharp.Pdf.PdfRectangle(new PdfSharp.Drawing.XPoint(60, 40), new PdfSharp.Drawing.XPoint(780, 550));
+
+            // 3ページ目: CropBoxなし（MediaBoxのみ 500x700）
+            var page3 = doc.AddPage();
+            page3.Width = PdfSharp.Drawing.XUnit.FromPoint(500);
+            page3.Height = PdfSharp.Drawing.XUnit.FromPoint(700);
+
+            doc.Save(filePath);
+        }
+
+        // Act
+        var docModel = await _service.LoadDocumentAsync(filePath);
+
+        // Assert
+        Assert.Equal(3, docModel.PageCount);
+        // 1ページ目: CropBoxの寸法（360x510）が採用され、縦長と認識されること
+        Assert.Equal(360, docModel.Pages[0].Width, 1);
+        Assert.Equal(510, docModel.Pages[0].Height, 1);
+        Assert.True(docModel.Pages[0].DisplayWidth < docModel.Pages[0].DisplayHeight);
+
+        // 2ページ目: CropBoxの寸法（720x510）が採用され、横長と認識されること
+        Assert.Equal(720, docModel.Pages[1].Width, 1);
+        Assert.Equal(510, docModel.Pages[1].Height, 1);
+        Assert.True(docModel.Pages[1].DisplayWidth > docModel.Pages[1].DisplayHeight);
+
+        // 3ページ目: CropBox未定義時はMediaBoxの寸法（500x700）が採用されること
+        Assert.Equal(500, docModel.Pages[2].Width, 1);
+        Assert.Equal(700, docModel.Pages[2].Height, 1);
+    }
+
+    [Fact]
+    public async Task LoadDocumentAsync_ActualShaverPdf_RecognizesFirstPageAsPortrait()
+    {
+        // プロジェクトルートにある実ファイル シェーバー.pdf が存在する場合のテスト
+        string shaverPdf = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\..\..\..\シェーバー.pdf"));
+        if (!File.Exists(shaverPdf))
+        {
+            shaverPdf = Path.GetFullPath("シェーバー.pdf");
+        }
+        if (File.Exists(shaverPdf))
+        {
+            var docModel = await _service.LoadDocumentAsync(shaverPdf);
+            // 1ページ目は縦長 (約 362.8 x 515.9 pt)
+            Assert.True(docModel.Pages[0].DisplayWidth < docModel.Pages[0].DisplayHeight);
+            Assert.InRange(docModel.Pages[0].DisplayWidth, 360, 365);
+            Assert.InRange(docModel.Pages[0].DisplayHeight, 515, 520);
+
+            // 2ページ目は横長 (約 725.7 x 515.9 pt)
+            Assert.True(docModel.Pages[1].DisplayWidth > docModel.Pages[1].DisplayHeight);
+            Assert.InRange(docModel.Pages[1].DisplayWidth, 720, 730);
+
+            // 19ページ目（最終ページ）も縦長
+            Assert.True(docModel.Pages[18].DisplayWidth < docModel.Pages[18].DisplayHeight);
+            Assert.InRange(docModel.Pages[18].DisplayWidth, 360, 365);
+        }
+    }
 }

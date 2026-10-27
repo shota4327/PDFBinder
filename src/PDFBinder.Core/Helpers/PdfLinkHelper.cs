@@ -1,5 +1,6 @@
 using System.Windows;
 using PDFBinder.Core.Models;
+using PDFBinder.Core.Services;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
 using PdfAnnotation = PdfSharp.Pdf.Annotations.PdfAnnotation;
@@ -23,8 +24,10 @@ public static class PdfLinkHelper
         var rawLinks = new List<PdfRawLinkAnnotation>();
         if (page == null || doc == null || page.Annotations == null) return rawLinks;
 
-        double ptWidth = page.Width.Point;
-        double ptHeight = page.Height.Point;
+        var (ptWidth, ptHeight) = PdfService.GetEffectivePageSize(page);
+        var cropBox = page.CropBox;
+        double originX = Math.Min(cropBox.X1, cropBox.X2);
+        double originY = Math.Min(cropBox.Y1, cropBox.Y2);
         if (ptWidth <= 0 || ptHeight <= 0) return rawLinks;
 
         for (int i = 0; i < page.Annotations.Count; i++)
@@ -33,7 +36,7 @@ public static class PdfLinkHelper
             var annot = page.Annotations[i];
             if (annot == null || annot.Elements.GetString("/Subtype") != "/Link") continue;
 
-            var rawLink = ParseRawLinkAnnotation(annot, doc, ptWidth, ptHeight);
+            var rawLink = ParseRawLinkAnnotation(annot, doc, ptWidth, ptHeight, originX, originY);
             if (rawLink != null)
             {
                 rawLinks.Add(rawLink);
@@ -50,11 +53,13 @@ public static class PdfLinkHelper
         PdfAnnotation annot,
         PdfDocument doc,
         double ptWidth,
-        double ptHeight)
+        double ptHeight,
+        double originX = 0,
+        double originY = 0)
     {
         var pdfRect = annot.Elements.GetRectangle("/Rect");
-        double pdfX = Math.Min(pdfRect.X1, pdfRect.X2);
-        double pdfY = Math.Min(pdfRect.Y1, pdfRect.Y2);
+        double pdfX = Math.Min(pdfRect.X1, pdfRect.X2) - originX;
+        double pdfY = Math.Min(pdfRect.Y1, pdfRect.Y2) - originY;
         double pdfW = Math.Abs(pdfRect.X2 - pdfRect.X1);
         double pdfH = Math.Abs(pdfRect.Y2 - pdfRect.Y1);
         if (pdfW <= 0 || pdfH <= 0 || ptWidth <= 0 || ptHeight <= 0) return null;
