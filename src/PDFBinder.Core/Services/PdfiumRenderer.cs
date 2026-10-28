@@ -452,6 +452,13 @@ public class PdfiumRenderer : IPdfRenderer
                         actualWidth * 4);
                     bitmap.Freeze();
 
+                    if (rotation != PageRotation.Rotate0)
+                    {
+                        var rotated = new TransformedBitmap(bitmap, new RotateTransform((int)rotation));
+                        rotated.Freeze();
+                        bitmap = rotated;
+                    }
+
                     var characters = BuildCharacters(rawCharacters, actualWidth, actualHeight, displayWidth, displayHeight, rotation, cancellationToken);
                     var links = ExtractLinks(filePath, renderBytes, pageIndex, displayWidth, displayHeight, rotation, cancellationToken, password, cachedRawLinks);
 
@@ -555,7 +562,16 @@ public class PdfiumRenderer : IPdfRenderer
                             rawBytes,
                             actualWidth * 4);
                         bmp.Freeze();
-                        result[idx] = bmp;
+                        if (rotation != PageRotation.Rotate0)
+                        {
+                            var rotated = new TransformedBitmap(bmp, new RotateTransform((int)rotation));
+                            rotated.Freeze();
+                            result[idx] = rotated;
+                        }
+                        else
+                        {
+                            result[idx] = bmp;
+                        }
                     }
 
                     return result;
