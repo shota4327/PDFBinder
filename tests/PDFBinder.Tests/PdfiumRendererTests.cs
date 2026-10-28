@@ -537,6 +537,62 @@ public class PdfiumRendererTests : IDisposable
     }
 
     [Fact]
+    public async Task RenderPageWithInteractiveDataAsync_WithRotation90_RotatesBitmapCorrectly()
+    {
+        // Arrange: 縦長(400x600)のPDFを作成
+        string filePath = CreateSamplePdf("rotation_test.pdf");
+
+        // Act: 0度と90度でレンダリング
+        var normalResult = await _renderer.RenderPageWithInteractiveDataAsync(
+            filePath, 0, 400, 600, 400, 600, PageRotation.Rotate0);
+        var rotatedResult = await _renderer.RenderPageWithInteractiveDataAsync(
+            filePath, 0, 600, 400, 600, 400, PageRotation.Rotate90);
+
+        // Assert: 90度回転後のビットマップの縦横が正しく反転していること
+        Assert.NotNull(normalResult.Bitmap);
+        Assert.NotNull(rotatedResult.Bitmap);
+        Assert.True(normalResult.Bitmap.PixelHeight > normalResult.Bitmap.PixelWidth);
+        Assert.True(rotatedResult.Bitmap.PixelWidth > rotatedResult.Bitmap.PixelHeight);
+        Assert.Equal(normalResult.Bitmap.PixelWidth, rotatedResult.Bitmap.PixelHeight);
+        Assert.Equal(normalResult.Bitmap.PixelHeight, rotatedResult.Bitmap.PixelWidth);
+    }
+
+    [Fact]
+    public async Task RenderPagesBatchAsync_WithRotation90_RotatesAllBitmapsCorrectly()
+    {
+        // Arrange: 縦長(200x300)の複数ページPDFを作成
+        string filePath = Path.Combine(_testDirectory, "batch_rotation_test.pdf");
+        using (var doc = new PdfDocument())
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                var page = doc.AddPage();
+                page.Width = XUnit.FromPoint(200);
+                page.Height = XUnit.FromPoint(300);
+                using var gfx = XGraphics.FromPdfPage(page);
+                gfx.DrawRectangle(XBrushes.Green, 10, 10, 50, 50);
+            }
+            doc.Save(filePath);
+        }
+
+        // Act: 90度回転でバッチレンダリング
+        var bitmaps = await _renderer.RenderPagesBatchAsync(
+            filePath,
+            new List<int> { 0, 1 },
+            150,
+            100,
+            PageRotation.Rotate90);
+
+        // Assert: 全ページのビットマップが90度回転（幅 > 高さ）していること
+        Assert.Equal(2, bitmaps.Count);
+        Assert.All(bitmaps.Values, bmp =>
+        {
+            Assert.NotNull(bmp);
+            Assert.True(bmp.PixelWidth > bmp.PixelHeight);
+        });
+    }
+
+    [Fact]
     public async Task RenderPagesBatchAsync_MultiplePages_RendersAllRequestedPagesAndReleasesLock()
     {
         // Arrange: 5ページのPDFを作成
