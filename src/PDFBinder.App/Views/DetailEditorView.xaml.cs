@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using PDFBinder.App.Controls;
 using PDFBinder.App.Helpers;
 using PDFBinder.App.Models;
@@ -18,12 +19,20 @@ namespace PDFBinder.App.Views;
 public partial class DetailEditorView : UserControl
 {
     private readonly WheelPageTurnTracker _wheelTracker = new();
+    private readonly DispatcherTimer _scrollDebounceTimer;
 
     public DetailEditorView()
     {
         InitializeComponent();
+        _scrollDebounceTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(150)
+        };
+        _scrollDebounceTimer.Tick += OnScrollDebounceTimerTick;
+
         DataContextChanged += OnDataContextChanged;
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         DetailScrollViewer.SizeChanged += OnDetailScrollViewerSizeChanged;
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
@@ -39,6 +48,17 @@ public partial class DetailEditorView : UserControl
     {
         UpdateDpiToViewModel();
         UpdateViewportToViewModel();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _scrollDebounceTimer.Stop();
+    }
+
+    private void OnScrollDebounceTimerTick(object? sender, EventArgs e)
+    {
+        _scrollDebounceTimer.Stop();
+        ViewModel?.ScheduleContinuousScrollRender();
     }
 
     /// <inheritdoc/>
@@ -84,6 +104,7 @@ public partial class DetailEditorView : UserControl
     {
         if (e.OldValue is DetailEditorViewModel oldVm)
         {
+            _scrollDebounceTimer.Stop();
             oldVm.ScrollToPageRequested -= OnScrollToPageRequested;
             oldVm.VisiblePagesProvider = null;
         }
@@ -149,36 +170,66 @@ public partial class DetailEditorView : UserControl
         // 連続表示時のみ、スクロール位置に応じた現在ページ判定を実施
         if (ViewModel == null || ViewModel.Pages.Count == 0 || ViewModel.PageViewMode != DetailPageViewMode.Continuous) return;
 
-        double targetCenterY = DetailScrollViewer.ViewportHeight / 2.0;
-        DetailPageItemViewModel? bestMatch = null;
-        double minDistance = double.MaxValue;
+        UpdateCurrentPageFromScroll();
 
-        foreach (var itemVm in ViewModel.Pages)
+        // スクロール停止時に新しく可視領域に入ったページをデバウンス動的レンダリング
+        _scrollDebounceTimer.Stop();
+        _scrollDebounceTimer.Start();
+    }
+
+    /// <summary>
+    /// 連続スクロール時の現在スクロール位置に基づいてカレントページを特定・更新します。
+    /// </summary>
+    private void UpdateCurrentPageFromScroll()
+    {
+        if (ViewModel == null || DetailScrollViewer.ViewportHeight <= 0) return;
+
+        var visibleItems = ViewportLayoutHelper.FindVisibleItems(
+            ViewModel.Pages.Count,
+            DetailScrollViewer.ViewportHeight,
+            GetPageBounds);
+
+        double targetCenterY = DetailScrollViewer.ViewportHeight / 2.0;
+        int? bestIndex = ViewportLayoutHelper.FindBestMatchingIndex(visibleItems, targetCenterY);
+
+        if (bestIndex.HasValue && bestIndex.Value >= 0 && bestIndex.Value < ViewModel.Pages.Count)
         {
-            if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+            var bestMatch = ViewModel.Pages[bestIndex.Value];
+            if (ViewModel.CurrentPage != bestMatch.Page)
             {
-                var transform = container.TransformToVisual(DetailScrollViewer);
-                Point pt = transform.Transform(new Point(0, container.ActualHeight / 2.0));
-                double dist = Math.Abs(pt.Y - targetCenterY);
-                if (dist < minDistance)
+                ViewModel.CurrentPage = bestMatch.Page;
+                foreach (var p in ViewModel.Pages)
                 {
-                    minDistance = dist;
-                    bestMatch = itemVm;
+                    p.IsCurrent = (p == bestMatch);
                 }
             }
         }
+    }
 
-        if (bestMatch != null && ViewModel.CurrentPage != bestMatch.Page)
+    /// <summary>
+    /// 指定インデックスのページコンテナにおけるビューポート相対の垂直境界を取得します。
+    /// </summary>
+    private PageBounds? GetPageBounds(int index)
+    {
+        if (ViewModel == null || index < 0 || index >= ViewModel.Pages.Count)
         {
-            ViewModel.CurrentPage = bestMatch.Page;
-            foreach (var p in ViewModel.Pages)
-            {
-                p.IsCurrent = (p == bestMatch);
-            }
+            return null;
         }
 
-        // スクロール停止時に新しく可視領域に入ったページをデバウンス動的レンダリング
-        ViewModel.ScheduleContinuousScrollRender();
+        var itemVm = ViewModel.Pages[index];
+        if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is not FrameworkElement container)
+        {
+            return null;
+        }
+
+        if (container.ActualHeight <= 0)
+        {
+            return null;
+        }
+
+        var transform = container.TransformToVisual(DetailScrollViewer);
+        Point pt = transform.Transform(new Point(0, 0));
+        return new PageBounds(pt.Y, pt.Y + container.ActualHeight);
     }
 
     /// <summary>
@@ -191,24 +242,21 @@ public partial class DetailEditorView : UserControl
             return Enumerable.Empty<DetailPageItemViewModel>();
         }
 
-        var visible = new List<DetailPageItemViewModel>();
-        double viewportHeight = DetailScrollViewer.ViewportHeight;
+        var visibleItems = ViewportLayoutHelper.FindVisibleItems(
+            ViewModel.Pages.Count,
+            DetailScrollViewer.ViewportHeight,
+            GetPageBounds);
 
-        foreach (var itemVm in ViewModel.Pages)
+        var result = new List<DetailPageItemViewModel>(visibleItems.Count);
+        foreach (var item in visibleItems)
         {
-            if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+            if (item.Index >= 0 && item.Index < ViewModel.Pages.Count)
             {
-                var transform = container.TransformToVisual(DetailScrollViewer);
-                Point pt = transform.Transform(new Point(0, 0));
-                // コンテナがビューポート範囲 [0, viewportHeight] と交差しているかを判定
-                if (pt.Y + container.ActualHeight >= 0 && pt.Y <= viewportHeight)
-                {
-                    visible.Add(itemVm);
-                }
+                result.Add(ViewModel.Pages[item.Index]);
             }
         }
 
-        return visible;
+        return result;
     }
 
     private void OnScrollViewerPreviewMouseWheel(object sender, MouseWheelEventArgs e)
