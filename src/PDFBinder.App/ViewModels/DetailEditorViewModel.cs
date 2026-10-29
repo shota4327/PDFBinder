@@ -656,8 +656,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// 連続表示スクロール時の動的レンダリングをスケジュールします。
     /// View側のデバウンスタイマー完了後に呼び出されるため、既定で即時レンダリングを実行します。
-    /// <param name="immediate">即座にレンダリングを開始するかどうか（既定: true）</param>
     /// </summary>
+    /// <param name="immediate">即座にレンダリングを開始するかどうか（既定: true）</param>
     public void ScheduleContinuousScrollRender(bool immediate = true)
     {
         if (PageViewMode == DetailPageViewMode.Continuous)
