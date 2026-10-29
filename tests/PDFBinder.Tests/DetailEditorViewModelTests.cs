@@ -1411,6 +1411,64 @@ public class DetailEditorViewModelTests
         Assert.True(handlerInvoked);
         Assert.Equal(0, renderer.RenderCallCount);
     }
+
+    [Fact]
+    public async Task ScheduleContinuousScrollRender_InContinuousMode_InvokesPipelineImmediatelyWithImmediateTrue()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(600, 800);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.Continuous;
+
+        int receivedDelay = -1;
+        vm.PipelineExecutionHandler = delay =>
+        {
+            receivedDelay = delay;
+            return Task.CompletedTask;
+        };
+
+        // Act: 既定（immediate: true）で連続スクロール描画を要求
+        vm.ScheduleContinuousScrollRender();
+        await Task.Yield();
+
+        // Assert: immediate: true のため delay が 0ms でハンドラーが実行されること
+        Assert.Equal(0, receivedDelay);
+    }
+
+    [Fact]
+    public async Task ScheduleContinuousScrollRender_InSinglePageMode_DoesNotInvokePipeline()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        var page = CreateSamplePage(600, 800);
+        page.PageNumber = 1;
+        doc.Pages.Add(page);
+
+        using var vm = new DetailEditorViewModel(renderer);
+        vm.InitializeDocument(doc);
+        vm.PageViewMode = DetailPageViewMode.SinglePage;
+
+        bool handlerInvoked = false;
+        vm.PipelineExecutionHandler = delay =>
+        {
+            handlerInvoked = true;
+            return Task.CompletedTask;
+        };
+
+        // Act: 単一ページ表示時に呼び出し
+        vm.ScheduleContinuousScrollRender();
+        await Task.Delay(50);
+
+        // Assert: 連続表示モード以外では実行されないこと
+        Assert.False(handlerInvoked);
+    }
 }
 
 
