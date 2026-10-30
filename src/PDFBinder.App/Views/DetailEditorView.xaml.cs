@@ -19,7 +19,10 @@ namespace PDFBinder.App.Views;
 public partial class DetailEditorView : UserControl
 {
     private readonly WheelPageTurnTracker _wheelTracker = new();
+    private readonly DetailTouchTracker _touchTracker = new();
     private readonly DispatcherTimer _scrollDebounceTimer;
+
+    internal DetailTouchTracker TouchTracker => _touchTracker;
 
     public DetailEditorView()
     {
@@ -37,6 +40,8 @@ public partial class DetailEditorView : UserControl
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         SinglePageContainer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+
+        AttachScrollViewerTouchHandlers();
 
         if (ViewModel != null)
         {
@@ -444,4 +449,154 @@ public partial class DetailEditorView : UserControl
             }
         }
     }
+
+    #region 余白およびページ全域でのマルチタッチ（パン・ピンチズーム）制御
+
+    private void AttachScrollViewerTouchHandlers()
+    {
+        DetailScrollViewer.PreviewTouchDown += OnScrollViewerPreviewTouchDown;
+        DetailScrollViewer.PreviewTouchMove += OnScrollViewerPreviewTouchMove;
+        DetailScrollViewer.PreviewTouchUp += OnScrollViewerPreviewTouchUp;
+        DetailScrollViewer.TouchLeave += OnScrollViewerTouchLeave;
+        DetailScrollViewer.LostTouchCapture += OnScrollViewerLostTouchCapture;
+
+        DetailScrollViewer.PreviewStylusDown += OnScrollViewerPreviewStylusDown;
+        DetailScrollViewer.PreviewStylusUp += OnScrollViewerPreviewStylusUp;
+        DetailScrollViewer.StylusInRange += OnScrollViewerStylusInRange;
+        DetailScrollViewer.StylusOutOfRange += OnScrollViewerStylusOutOfRange;
+    }
+
+    private void OnScrollViewerPreviewTouchDown(object? sender, TouchEventArgs e)
+    {
+        if (_touchTracker.IsStylusSuppressed())
+        {
+            e.Handled = true;
+            return;
+        }
+
+        Point pos = e.GetTouchPoint(DetailScrollViewer).Position;
+        if (_touchTracker.OnTouchDown(e.TouchDevice.Id, pos))
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.IsTouchInteracting = true;
+            }
+            DetailScrollViewer.CaptureTouch(e.TouchDevice);
+            e.Handled = true;
+        }
+    }
+
+    private void OnScrollViewerPreviewTouchMove(object? sender, TouchEventArgs e)
+    {
+        if (_touchTracker.IsStylusSuppressed())
+        {
+            _touchTracker.PurgeActiveTouches();
+            if (ViewModel != null)
+            {
+                ViewModel.IsTouchInteracting = false;
+            }
+            DetailScrollViewer.ReleaseTouchCapture(e.TouchDevice);
+            e.Handled = true;
+            return;
+        }
+
+        if (!_touchTracker.IsActiveTouch(e.TouchDevice.Id) || ViewModel == null) return;
+
+        Point pos = e.GetTouchPoint(DetailScrollViewer).Position;
+        var result = _touchTracker.OnTouchMove(
+            e.TouchDevice.Id,
+            pos,
+            ViewModel.Zoom,
+            DetailEditorViewModel.MinZoom,
+            DetailEditorViewModel.MaxZoom,
+            DetailScrollViewer.HorizontalOffset,
+            DetailScrollViewer.VerticalOffset);
+
+        ApplyTouchResult(result);
+        e.Handled = true;
+    }
+
+    private void ApplyTouchResult(TouchMoveResult result)
+    {
+        if (result.GestureType == TouchGestureType.Pan)
+        {
+            DetailScrollViewer.ScrollToHorizontalOffset(DetailScrollViewer.HorizontalOffset + result.DeltaX);
+            DetailScrollViewer.ScrollToVerticalOffset(DetailScrollViewer.VerticalOffset + result.DeltaY);
+        }
+        else if (result.GestureType == TouchGestureType.Zoom)
+        {
+            ViewModel?.SetZoom(result.NewZoom);
+            DetailScrollViewer.UpdateLayout();
+            DetailScrollViewer.ScrollToHorizontalOffset(result.TargetHorizontalOffset);
+            DetailScrollViewer.ScrollToVerticalOffset(result.TargetVerticalOffset);
+        }
+    }
+
+    private void OnScrollViewerPreviewTouchUp(object? sender, TouchEventArgs e)
+    {
+        DetailScrollViewer.ReleaseTouchCapture(e.TouchDevice);
+        _touchTracker.OnTouchUp(e.TouchDevice.Id);
+        if (_touchTracker.ActiveTouchCount == 0 && ViewModel != null)
+        {
+            ViewModel.IsTouchInteracting = false;
+        }
+        e.Handled = true;
+    }
+
+    private void OnScrollViewerTouchLeave(object? sender, TouchEventArgs e)
+    {
+        DetailScrollViewer.ReleaseTouchCapture(e.TouchDevice);
+        _touchTracker.OnTouchUp(e.TouchDevice.Id);
+        if (_touchTracker.ActiveTouchCount == 0 && ViewModel != null)
+        {
+            ViewModel.IsTouchInteracting = false;
+        }
+    }
+
+    private void OnScrollViewerLostTouchCapture(object? sender, TouchEventArgs e)
+    {
+        _touchTracker.OnTouchUp(e.TouchDevice.Id);
+        if (_touchTracker.ActiveTouchCount == 0 && ViewModel != null)
+        {
+            ViewModel.IsTouchInteracting = false;
+        }
+    }
+
+    private void OnScrollViewerPreviewStylusDown(object? sender, StylusDownEventArgs e)
+    {
+        if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus)
+        {
+            _touchTracker.NotifyStylusActivity(isTouching: true, isInRange: true);
+            if (ViewModel != null)
+            {
+                ViewModel.IsTouchInteracting = false;
+            }
+        }
+    }
+
+    private void OnScrollViewerPreviewStylusUp(object? sender, StylusEventArgs e)
+    {
+        if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus)
+        {
+            _touchTracker.NotifyStylusActivity(isTouching: false, isInRange: true);
+        }
+    }
+
+    private void OnScrollViewerStylusInRange(object? sender, StylusEventArgs e)
+    {
+        if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus)
+        {
+            _touchTracker.NotifyStylusActivity(isTouching: false, isInRange: true);
+        }
+    }
+
+    private void OnScrollViewerStylusOutOfRange(object? sender, StylusEventArgs e)
+    {
+        if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus)
+        {
+            _touchTracker.NotifyStylusActivity(isTouching: false, isInRange: false);
+        }
+    }
+
+    #endregion
 }

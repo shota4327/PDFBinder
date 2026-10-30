@@ -163,6 +163,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private bool _isPenPressureEnabled;
 
     /// <summary>
+    /// ビューポート全域でのタッチ操作（パン・ピンチズーム）中であるか
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTouchInteracting;
+
+    /// <summary>
     /// 現在のモニターのDPIスケール倍率（100%=1.0, 150%=1.5, 200%=2.0等）
     /// </summary>
     [ObservableProperty]

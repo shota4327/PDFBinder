@@ -198,6 +198,27 @@ public class EditorInkCanvas : InkCanvas
     /// <summary>現在のDynamicRendererを取得します（テスト・検証用）。</summary>
     public DynamicRenderer? CurrentDynamicRenderer => DynamicRenderer;
 
+    public static readonly DependencyProperty IsTouchInteractingProperty = DependencyProperty.Register(
+        nameof(IsTouchInteracting),
+        typeof(bool),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(false, OnIsTouchInteractingChanged));
+
+    /// <summary>ビューポート全域でのタッチ操作中であるか</summary>
+    public bool IsTouchInteracting
+    {
+        get => (bool)GetValue(IsTouchInteractingProperty);
+        set => SetValue(IsTouchInteractingProperty, value);
+    }
+
+    private static void OnIsTouchInteractingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.UpdateEditingMode();
+        }
+    }
+
     public EditorInkCanvas()
     {
         UseCustomCursor = true;
@@ -274,7 +295,7 @@ public class EditorInkCanvas : InkCanvas
     /// </summary>
     public void UpdateEditingMode()
     {
-        if (_activeTouchPoints.Count > 0)
+        if (_activeTouchPoints.Count > 0 || IsTouchInteracting)
         {
             EditingMode = InkCanvasEditingMode.None;
             return;
@@ -397,16 +418,16 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.LeftButton == MouseButtonState.Pressed)
         {
             if (IsStraightLineActive)
             {
-                if (IsTouchPromotedMouseEvent(e))
-                {
-                    base.OnPreviewMouseDown(e);
-                    return;
-                }
-
                 _lineStartPoint = e.GetPosition(this);
                 _currentLinePoint = _lineStartPoint;
                 _isDrawingLine = true;
@@ -417,12 +438,6 @@ public class EditorInkCanvas : InkCanvas
 
             if (ToolMode == EditorToolMode.Hand)
             {
-                if (IsTouchPromotedMouseEvent(e))
-                {
-                    base.OnPreviewMouseDown(e);
-                    return;
-                }
-
                 _parentScrollViewer ??= FindParentScrollViewer(this);
                 if (_parentScrollViewer != null)
                 {
@@ -439,14 +454,14 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseMove(MouseEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_isDrawingLine && _lineStartPoint.HasValue)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseMove(e);
-                return;
-            }
-
             _currentLinePoint = e.GetPosition(this);
             InvalidateVisual();
             e.Handled = true;
@@ -455,12 +470,6 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand && _panStartPoint.HasValue && _parentScrollViewer != null)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseMove(e);
-                return;
-            }
-
             ProcessMousePan(e.GetPosition(_parentScrollViewer));
             e.Handled = true;
             return;
@@ -471,14 +480,14 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseUp(MouseButtonEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_isDrawingLine && _lineStartPoint.HasValue && _currentLinePoint.HasValue)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseUp(e);
-                return;
-            }
-
             var start = _lineStartPoint.Value;
             var end = _currentLinePoint.Value;
             _isDrawingLine = false;
@@ -499,12 +508,6 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseUp(e);
-                return;
-            }
-
             EndMousePan();
             e.Handled = true;
             return;
@@ -589,7 +592,6 @@ public class EditorInkCanvas : InkCanvas
             PurgeActiveTouches();
             base.OnPreviewStylusDown(e);
         }
-        // タッチデバイス（TabletDeviceType.Touch）時はbaseを呼ばず、InkCanvasによる誤描画を根本防止する
     }
 
     protected override void OnPreviewStylusMove(StylusEventArgs e)
