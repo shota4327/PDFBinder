@@ -7,7 +7,7 @@
 ---
 
 ## 1. 実装内容の概要
-詳細手書きエディタ（`DetailEditorView`）において、PDFページ上だけでなく、ページの周囲にある余白エリアやページ間の余白を指でタッチ・操作しても、滑らかなスクロール（1本指パン）および拡大・縮小（2本指ピンチズーム）が行えるように機能を拡張しました。
+詳細手書きエディタ（`DetailEditorView`）において、PDFページ上だけでなく、ページの周囲にある余白エリアやページ間の余白を指でタッチ・操作しても、滑らかなスクロール（1本指パン）および拡大・縮小（2本指ピンチズーム）が行えるように機能を拡張しました。また、ペンツール選択時に指でスクロール操作を行った際に線が描画されてしまう現象を根本解消し、タッチイベントの正常な発火を維持しました。
 
 ### 主な改修点
 1. **`DetailTouchTracker` の新設 (`src/PDFBinder.App/Helpers/DetailTouchTracker.cs`)**:
@@ -16,11 +16,13 @@
 2. **`DetailEditorView` へのタッチ・スタイラスイベント統合 (`src/PDFBinder.App/Views/DetailEditorView.xaml.cs`)**:
    - ページ全体および周囲余白を含む親コンテナ `DetailScrollViewer` レベルで `PreviewTouchDown` / `PreviewTouchMove` / `PreviewTouchUp` を購読・捕捉。
    - 余白エリアのみならず、片方の指がページ内・もう片方が余白にある場合でも、両指の距離変化からシームレスにピンチズームが追従。
+   - タッチ操作中は `ViewModel.IsTouchInteracting = true` を設定し、離脱時に `false` へ自動復帰。
    - スタイラスペンでの筆記時（`PreviewStylusDown`、近接ホバー中、離脱後150ms以内）は、手のひらが余白エリアに接地してもタッチ操作を一括抑止（パームリジェクション）。
-   - タッチ由来のStylusイベントおよび昇格マウスイベント（`PreviewMouseDown` / `Move` / `Up`）を親レベルで消費し、下位のインク収集エンジンへの到達を遮断。
-3. **ペンツール選択時の指操作による誤描画の完全防止 (`src/PDFBinder.App/Controls/EditorInkCanvas.cs`)**:
-   - `OnPreviewMouseDown` / `Move` / `Up` の先頭でタッチ昇格マウスイベントを即時消費（`e.Handled = true`）。
-   - `OnPreviewStylusDown` / `Move` / `Up` において、タッチデバイス（`TabletDeviceType.Touch`）からのStylusイベントを明示的に消費（`e.Handled = true`）し、ペン選択時でも指でのスクロール操作時に線が描画される不具合を根本解消。
+   - タッチの起点となるStylusイベントを不必要にキャンセルせず通過させることで、WPF TouchDevice の正常なイベント発火を完全保証。
+3. **ペンツール選択時の指操作による誤描画の完全防止 ([`EditorInkCanvas.cs`](file:///c:/Git/PDFBinder/src/PDFBinder.App/Controls/EditorInkCanvas.cs))**:
+   - `IsTouchInteracting` 依存関係プロパティを新設し、XAML経由で `DetailEditorViewModel.IsTouchInteracting` とMVVM双方向同期。
+   - タッチ操作中は `EditingMode` を `InkCanvasEditingMode.None` へ自動切り替えし、インク収集エンジンによる誤ストローク生成を完全遮断。
+   - タッチ終了時は即座に元の `ToolMode`（ペン・蛍光ペン・消しゴム等）に応じた描画モードへ自動復帰。
 4. **ドキュメント・バージョンの同期**:
    - `Directory.Build.props`: 新機能追加に伴い `0.15.0` から `0.16.0` へマイナーインクリメント。
    - `CHANGELOG.md`: エンドユーザー向けリリースノートの確定・追記。
@@ -32,8 +34,8 @@
 
 ### 2.1 単体テスト実行結果 (`dotnet test`)
 - コマンド: `dotnet test`
-- 結果: **全 695 件 PASS（成功: 695、失敗: 0、スキップ: 0）**
-- 新規追加および改修テスト:
+- 結果: **全 696 件 PASS（成功: 696、失敗: 0、スキップ: 0）**
+- 新規追加および改修テスト ([`DetailTouchTrackerTests.cs`](file:///c:/Git/PDFBinder/tests/PDFBinder.Tests/DetailTouchTrackerTests.cs) / [`EditorInkCanvasTouchTests.cs`](file:///c:/Git/PDFBinder/tests/PDFBinder.Tests/EditorInkCanvasTouchTests.cs)):
   - `OneFingerPan_SuppressesMicroMovement_UntilTouchSlopExceeded`: スロップ閾値（8px）未満の微小移動抑止および閾値超過後の正確なパン変位計算を検証 -> **PASS**
   - `TwoFingerPinchZoom_CalculatesNewZoomAndOffset`: 2本指によるピンチ操作で新しい拡大率および幾何学的中心追従スクロール位置が算出されることを検証 -> **PASS**
   - `CrossBoundaryPinch_OperatesSeamlesslyAcrossPageAndMargin`: 片指が余白・片指がページ内にある境界跨ぎピンチズームの正常動作を検証 -> **PASS**
@@ -42,7 +44,7 @@
   - `StylusActivity_PurgesExistingActiveTouches`: スタイラス検知時の既存タッチ即時パージを検証 -> **PASS**
   - `StylusSuppression_CooldownPeriodWorks`: スタイラス離脱後150ms以内の抑止継続とクールダウン経過後の受付再開を検証 -> **PASS**
   - `IsTouchPromotedMouseEvent_DetectsActiveTouches`: タッチ操作中のマウス昇格イベントの正確な検知を検証 -> **PASS**
-  - `EditorInkCanvas_OnPreviewMouseDown_SuppressesTouchPromotedEvent_WhenPenSelected`: ペン選択時にタッチ昇格マウスイベントが消費され、意図しないインク描画が開始されないことを検証 -> **PASS**
+  - `EditorInkCanvas_IsTouchInteracting_SwitchesEditingModeToNone`: タッチ操作中プロパティによるEditingModeのNone自動切り替えおよび復帰を検証 -> **PASS**
 
 ### 2.2 ビルド検証結果 (`dotnet build`)
 - コマンド: `dotnet build`

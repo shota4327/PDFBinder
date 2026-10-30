@@ -200,6 +200,27 @@ public class EditorInkCanvasTouchTests
     }
 
     [Fact]
+    public void EditorInkCanvas_IsTouchInteracting_SwitchesEditingModeToNone()
+    {
+        var thread = new Thread(() =>
+        {
+            var canvas = new EditorInkCanvas { ToolMode = EditorToolMode.Pen };
+            Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
+
+            canvas.IsTouchInteracting = true;
+            Assert.Equal(InkCanvasEditingMode.None, canvas.EditingMode);
+
+            canvas.IsTouchInteracting = false;
+            Assert.Equal(InkCanvasEditingMode.Ink, canvas.EditingMode);
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "Thread timed out");
+    }
+
+    [Fact]
     public void EditorInkCanvas_MousePan_TracksDeltaAndUpdatesStartPoint()
     {
         var thread = new Thread(() =>

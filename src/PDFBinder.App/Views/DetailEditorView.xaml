@@ -52,6 +52,7 @@
                     <!-- 前面手書きInkCanvas（ペン描画中は現在描画中の1画のみを保持して超高速動作） -->
                     <controls:EditorInkCanvas PageItem="{Binding}"
                                               ToolMode="{Binding DataContext.SelectedTool, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              IsTouchInteracting="{Binding DataContext.IsTouchInteracting, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               IsStraightLine="{Binding DataContext.IsStraightLine, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               IsPenPressureEnabled="{Binding DataContext.IsPenPressureEnabled, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               DrawingColor="{Binding DataContext.SelectedColor, RelativeSource={RelativeSource AncestorType=UserControl}}"

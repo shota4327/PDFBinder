@@ -198,6 +198,27 @@ public class EditorInkCanvas : InkCanvas
     /// <summary>現在のDynamicRendererを取得します（テスト・検証用）。</summary>
     public DynamicRenderer? CurrentDynamicRenderer => DynamicRenderer;
 
+    public static readonly DependencyProperty IsTouchInteractingProperty = DependencyProperty.Register(
+        nameof(IsTouchInteracting),
+        typeof(bool),
+        typeof(EditorInkCanvas),
+        new PropertyMetadata(false, OnIsTouchInteractingChanged));
+
+    /// <summary>ビューポート全域でのタッチ操作中であるか</summary>
+    public bool IsTouchInteracting
+    {
+        get => (bool)GetValue(IsTouchInteractingProperty);
+        set => SetValue(IsTouchInteractingProperty, value);
+    }
+
+    private static void OnIsTouchInteractingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is EditorInkCanvas canvas)
+        {
+            canvas.UpdateEditingMode();
+        }
+    }
+
     public EditorInkCanvas()
     {
         UseCustomCursor = true;
@@ -274,7 +295,7 @@ public class EditorInkCanvas : InkCanvas
     /// </summary>
     public void UpdateEditingMode()
     {
-        if (_activeTouchPoints.Count > 0)
+        if (_activeTouchPoints.Count > 0 || IsTouchInteracting)
         {
             EditingMode = InkCanvasEditingMode.None;
             return;
@@ -571,11 +592,6 @@ public class EditorInkCanvas : InkCanvas
             PurgeActiveTouches();
             base.OnPreviewStylusDown(e);
         }
-        else
-        {
-            // タッチデバイス（TabletDeviceType.Touch）時はイベントを消費し、InkCanvasによる誤描画を根本防止する
-            e.Handled = true;
-        }
     }
 
     protected override void OnPreviewStylusMove(StylusEventArgs e)
@@ -584,10 +600,6 @@ public class EditorInkCanvas : InkCanvas
         {
             _lastStylusActivityTime = DateTime.UtcNow;
             base.OnPreviewStylusMove(e);
-        }
-        else
-        {
-            e.Handled = true;
         }
     }
 
@@ -598,10 +610,6 @@ public class EditorInkCanvas : InkCanvas
             _isStylusTouching = false;
             _lastStylusActivityTime = DateTime.UtcNow;
             base.OnPreviewStylusUp(e);
-        }
-        else
-        {
-            e.Handled = true;
         }
     }
 
