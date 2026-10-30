@@ -82,6 +82,19 @@ public class DetailTouchTracker
     /// </summary>
     public bool IsActiveTouch(int touchId) => _activeTouchPoints.ContainsKey(touchId);
 
+    /// <summary>
+    /// マウスイベントが手指タッチから昇格されたものか判定します。
+    /// </summary>
+    public bool IsTouchPromotedMouseEvent(MouseEventArgs e)
+    {
+        if (e.StylusDevice != null && e.StylusDevice.TabletDevice?.Type != TabletDeviceType.Stylus)
+        {
+            return true;
+        }
+
+        return _activeTouchPoints.Count > 0;
+    }
+
     #region スタイラス・パームリジェクション制御
 
     /// <summary>

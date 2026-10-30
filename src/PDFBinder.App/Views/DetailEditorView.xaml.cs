@@ -460,10 +460,39 @@ public partial class DetailEditorView : UserControl
         DetailScrollViewer.TouchLeave += OnScrollViewerTouchLeave;
         DetailScrollViewer.LostTouchCapture += OnScrollViewerLostTouchCapture;
 
+        DetailScrollViewer.PreviewMouseDown += OnScrollViewerPreviewMouseDown;
+        DetailScrollViewer.PreviewMouseMove += OnScrollViewerPreviewMouseMove;
+        DetailScrollViewer.PreviewMouseUp += OnScrollViewerPreviewMouseUp;
+
         DetailScrollViewer.PreviewStylusDown += OnScrollViewerPreviewStylusDown;
+        DetailScrollViewer.PreviewStylusMove += OnScrollViewerPreviewStylusMove;
         DetailScrollViewer.PreviewStylusUp += OnScrollViewerPreviewStylusUp;
         DetailScrollViewer.StylusInRange += OnScrollViewerStylusInRange;
         DetailScrollViewer.StylusOutOfRange += OnScrollViewerStylusOutOfRange;
+    }
+
+    private void OnScrollViewerPreviewMouseDown(object? sender, MouseButtonEventArgs e)
+    {
+        if (_touchTracker.IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnScrollViewerPreviewMouseMove(object? sender, MouseEventArgs e)
+    {
+        if (_touchTracker.IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnScrollViewerPreviewMouseUp(object? sender, MouseButtonEventArgs e)
+    {
+        if (_touchTracker.IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+        }
     }
 
     private void OnScrollViewerPreviewTouchDown(object? sender, TouchEventArgs e)
@@ -548,6 +577,18 @@ public partial class DetailEditorView : UserControl
         {
             _touchTracker.NotifyStylusActivity(isTouching: true, isInRange: true);
         }
+        else
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnScrollViewerPreviewStylusMove(object? sender, StylusEventArgs e)
+    {
+        if (e.StylusDevice?.TabletDevice?.Type != TabletDeviceType.Stylus)
+        {
+            e.Handled = true;
+        }
     }
 
     private void OnScrollViewerPreviewStylusUp(object? sender, StylusEventArgs e)
@@ -555,6 +596,10 @@ public partial class DetailEditorView : UserControl
         if (e.StylusDevice?.TabletDevice?.Type == TabletDeviceType.Stylus)
         {
             _touchTracker.NotifyStylusActivity(isTouching: false, isInRange: true);
+        }
+        else
+        {
+            e.Handled = true;
         }
     }
 

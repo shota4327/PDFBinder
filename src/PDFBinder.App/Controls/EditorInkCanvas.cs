@@ -397,16 +397,16 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.LeftButton == MouseButtonState.Pressed)
         {
             if (IsStraightLineActive)
             {
-                if (IsTouchPromotedMouseEvent(e))
-                {
-                    base.OnPreviewMouseDown(e);
-                    return;
-                }
-
                 _lineStartPoint = e.GetPosition(this);
                 _currentLinePoint = _lineStartPoint;
                 _isDrawingLine = true;
@@ -417,12 +417,6 @@ public class EditorInkCanvas : InkCanvas
 
             if (ToolMode == EditorToolMode.Hand)
             {
-                if (IsTouchPromotedMouseEvent(e))
-                {
-                    base.OnPreviewMouseDown(e);
-                    return;
-                }
-
                 _parentScrollViewer ??= FindParentScrollViewer(this);
                 if (_parentScrollViewer != null)
                 {
@@ -439,14 +433,14 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseMove(MouseEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_isDrawingLine && _lineStartPoint.HasValue)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseMove(e);
-                return;
-            }
-
             _currentLinePoint = e.GetPosition(this);
             InvalidateVisual();
             e.Handled = true;
@@ -455,12 +449,6 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand && _panStartPoint.HasValue && _parentScrollViewer != null)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseMove(e);
-                return;
-            }
-
             ProcessMousePan(e.GetPosition(_parentScrollViewer));
             e.Handled = true;
             return;
@@ -471,14 +459,14 @@ public class EditorInkCanvas : InkCanvas
 
     protected override void OnPreviewMouseUp(MouseButtonEventArgs e)
     {
+        if (IsTouchPromotedMouseEvent(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_isDrawingLine && _lineStartPoint.HasValue && _currentLinePoint.HasValue)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseUp(e);
-                return;
-            }
-
             var start = _lineStartPoint.Value;
             var end = _currentLinePoint.Value;
             _isDrawingLine = false;
@@ -499,12 +487,6 @@ public class EditorInkCanvas : InkCanvas
 
         if (ToolMode == EditorToolMode.Hand)
         {
-            if (IsTouchPromotedMouseEvent(e))
-            {
-                base.OnPreviewMouseUp(e);
-                return;
-            }
-
             EndMousePan();
             e.Handled = true;
             return;
@@ -589,7 +571,11 @@ public class EditorInkCanvas : InkCanvas
             PurgeActiveTouches();
             base.OnPreviewStylusDown(e);
         }
-        // タッチデバイス（TabletDeviceType.Touch）時はbaseを呼ばず、InkCanvasによる誤描画を根本防止する
+        else
+        {
+            // タッチデバイス（TabletDeviceType.Touch）時はイベントを消費し、InkCanvasによる誤描画を根本防止する
+            e.Handled = true;
+        }
     }
 
     protected override void OnPreviewStylusMove(StylusEventArgs e)
@@ -598,6 +584,10 @@ public class EditorInkCanvas : InkCanvas
         {
             _lastStylusActivityTime = DateTime.UtcNow;
             base.OnPreviewStylusMove(e);
+        }
+        else
+        {
+            e.Handled = true;
         }
     }
 
@@ -608,6 +598,10 @@ public class EditorInkCanvas : InkCanvas
             _isStylusTouching = false;
             _lastStylusActivityTime = DateTime.UtcNow;
             base.OnPreviewStylusUp(e);
+        }
+        else
+        {
+            e.Handled = true;
         }
     }
 

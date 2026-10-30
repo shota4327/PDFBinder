@@ -175,6 +175,31 @@ public class EditorInkCanvasTouchTests
     }
 
     [Fact]
+    public void EditorInkCanvas_OnPreviewMouseDown_SuppressesTouchPromotedEvent_WhenPenSelected()
+    {
+        var thread = new Thread(() =>
+        {
+            var canvas = new EditorInkCanvas { ToolMode = EditorToolMode.Pen };
+            canvas.AddTouchPointForTesting(1, new Point(50, 50));
+
+            // タッチが存在する状態（IsTouchPromotedMouseEvent == true）でのマウスダウン
+            var mouseArgs = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseDownEvent
+            };
+            canvas.RaiseEvent(mouseArgs);
+
+            // イベントが消費（Handled = true）され、ペン描画処理が遮断されることを確認
+            Assert.True(mouseArgs.Handled);
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        bool finished = thread.Join(5000);
+        Assert.True(finished, "Thread timed out");
+    }
+
+    [Fact]
     public void EditorInkCanvas_MousePan_TracksDeltaAndUpdatesStartPoint()
     {
         var thread = new Thread(() =>

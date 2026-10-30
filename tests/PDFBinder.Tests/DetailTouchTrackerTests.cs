@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Input;
 using PDFBinder.App.Helpers;
 using Xunit;
 
@@ -144,13 +145,20 @@ public class DetailTouchTrackerTests
     }
 
     [Fact]
-    public void DetailEditorView_InitializesTouchTracker()
+    public void IsTouchPromotedMouseEvent_DetectsActiveTouches()
     {
         var thread = new System.Threading.Thread(() =>
         {
-            var view = new PDFBinder.App.Views.DetailEditorView();
-            Assert.NotNull(view.TouchTracker);
-            Assert.Equal(0, view.TouchTracker.ActiveTouchCount);
+            var tracker = new DetailTouchTracker();
+            var mouseArgs = new MouseEventArgs(Mouse.PrimaryDevice, 0);
+
+            Assert.False(tracker.IsTouchPromotedMouseEvent(mouseArgs));
+
+            tracker.OnTouchDown(1, new Point(50, 50));
+            Assert.True(tracker.IsTouchPromotedMouseEvent(mouseArgs));
+
+            tracker.OnTouchUp(1);
+            Assert.False(tracker.IsTouchPromotedMouseEvent(mouseArgs));
         });
 
         thread.SetApartmentState(System.Threading.ApartmentState.STA);
