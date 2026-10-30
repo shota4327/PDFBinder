@@ -100,6 +100,8 @@ public partial class DetailEditorView : UserControl
 
     private DetailEditorViewModel? ViewModel => DataContext as DetailEditorViewModel;
 
+    private bool _isRestoringScroll;
+
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (e.OldValue is DetailEditorViewModel oldVm)
@@ -107,6 +109,8 @@ public partial class DetailEditorView : UserControl
             _scrollDebounceTimer.Stop();
             oldVm.ScrollToPageRequested -= OnScrollToPageRequested;
             oldVm.VisiblePagesProvider = null;
+            oldVm.SavedVerticalOffset = DetailScrollViewer.VerticalOffset;
+            oldVm.SavedHorizontalOffset = DetailScrollViewer.HorizontalOffset;
         }
 
         if (e.NewValue is DetailEditorViewModel newVm)
@@ -114,13 +118,62 @@ public partial class DetailEditorView : UserControl
             newVm.ScrollToPageRequested += OnScrollToPageRequested;
             newVm.VisiblePagesProvider = GetVisiblePagesInViewport;
             UpdateViewportToViewModel();
+            RestoreScrollPosition(newVm);
         }
+    }
+
+    /// <summary>
+    /// セッション切り替え時に、保持されているスクロール位置を即座に復元し、復元中の誤判定を抑止します。
+    /// </summary>
+    private void RestoreScrollPosition(DetailEditorViewModel newVm)
+    {
+        _isRestoringScroll = true;
+        Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                DetailScrollViewer.UpdateLayout();
+                if (newVm.PageViewMode == DetailPageViewMode.Continuous)
+                {
+                    if (newVm.SavedVerticalOffset > 0 || newVm.SavedHorizontalOffset > 0)
+                    {
+                        DetailScrollViewer.ScrollToVerticalOffset(newVm.SavedVerticalOffset);
+                        DetailScrollViewer.ScrollToHorizontalOffset(newVm.SavedHorizontalOffset);
+                    }
+                    else if (newVm.CurrentPage != null)
+                    {
+                        ScrollToPageInContinuousMode(newVm.CurrentPage, isRetry: false);
+                    }
+                }
+                else
+                {
+                    if (newVm.SavedVerticalOffset > 0 || newVm.SavedHorizontalOffset > 0)
+                    {
+                        DetailScrollViewer.ScrollToVerticalOffset(newVm.SavedVerticalOffset);
+                        DetailScrollViewer.ScrollToHorizontalOffset(newVm.SavedHorizontalOffset);
+                    }
+                    else
+                    {
+                        DetailScrollViewer.ScrollToTop();
+                    }
+                }
+            }
+            finally
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _isRestoringScroll = false;
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnScrollToPageRequested(PdfPageModel page)
     {
         Dispatcher.InvokeAsync(() =>
         {
+            if (_isRestoringScroll) return;
+
             if (ViewModel?.PageViewMode == DetailPageViewMode.SinglePage)
             {
                 DetailScrollViewer.ScrollToTop();
@@ -167,6 +220,8 @@ public partial class DetailEditorView : UserControl
 
     private void OnScrollViewerScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        if (_isRestoringScroll) return;
+
         // 連続表示時のみ、スクロール位置に応じた現在ページ判定を実施
         if (ViewModel == null || ViewModel.Pages.Count == 0 || ViewModel.PageViewMode != DetailPageViewMode.Continuous) return;
 

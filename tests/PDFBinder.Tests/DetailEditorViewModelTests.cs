@@ -270,6 +270,37 @@ public class DetailEditorViewModelTests
     }
 
     [Fact]
+    public void SetZoom_AndZoomCommands_TransitionFitModeToNone()
+    {
+        // Arrange
+        var page = CreateSamplePage();
+        var renderer = new FakePdfRenderer();
+        using var vm = new DetailEditorViewModel(page, renderer, () => { }, _ => null);
+        vm.FitMode = DetailViewFitMode.FitToWindow;
+
+        // Act 1: SetZoom
+        vm.SetZoom(2.5);
+
+        // Assert 1: FitMode が None になり、倍率が反映されていること
+        Assert.Equal(DetailViewFitMode.None, vm.FitMode);
+        Assert.Equal(2.5, vm.Zoom);
+
+        // Act 2: FitMode を幅合わせにしてから ZoomIn
+        vm.FitMode = DetailViewFitMode.FitToWidth;
+        vm.ZoomInCommand.Execute(null);
+
+        // Assert 2
+        Assert.Equal(DetailViewFitMode.None, vm.FitMode);
+
+        // Act 3: FitMode を等倍にしてから ZoomOut
+        vm.FitMode = DetailViewFitMode.ActualSize;
+        vm.ZoomOutCommand.Execute(null);
+
+        // Assert 3
+        Assert.Equal(DetailViewFitMode.None, vm.FitMode);
+    }
+
+    [Fact]
     public void InitialValues_DefaultToolIsHand()
     {
         // Arrange & Act

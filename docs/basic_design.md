@@ -120,13 +120,17 @@ PDFBinder/
 - `CanUndo` / `CanRedo`: `bool` (アンドゥ・リドゥ可能状態)
 
 ### 4.3 `DocumentSession`
-1つの開いているPDFまたは画像ドキュメントの作業状態（データ、履歴、表示コンテキスト）をカプセル化するモデル。
+1つの開いているPDFまたは画像ドキュメントの作業状態（データ、履歴、表示コンテキスト、詳細エディタViewModel）をカプセル化するモデル。各ドキュメントが固有の `DetailEditorViewModel` を保持することにより、ファイル切り替え時のプレビュー画像キャッシュ、拡大率、表示レイアウト（単一/連続）、スクロール位置の完全保持・即時復帰を実現。
 - `Document`: `PdfDocumentModel` (ドキュメントデータ)
 - `IsImage`: `bool` (画像ドキュメントフラグ)
 - `UndoRedoService`: `IUndoRedoService` (ドキュメント専用のアンドゥ・リドゥ履歴)
+- `DetailEditor`: `DetailEditorViewModel` (ドキュメント専用の詳細エディタViewModel。プレビュー画像キャッシュおよびUI状態を保持)
 - `IsDetailViewActive`: `bool` (詳細ビュー/グリッドビュー状態)
 - `CurrentPageNumber`: `int` (現在表示中のページ番号)
 - `ZoomFactor`: `double` (詳細エディタのズーム倍率)
+- `FitMode`: `DetailViewFitMode` (詳細エディタの表示フィットモード)
+- `PageViewMode`: `DetailPageViewMode` (単一ページ表示 / 連続スクロール表示)
+- `SavedVerticalOffset` / `SavedHorizontalOffset`: `double` (ファイル切り替え時に保持するピクセル単位のスクロール位置)
 - `SelectedRibbonTabIndex`: `int` (選択中のリボンタブ)
 - `IsActive`: `bool` (現在アクティブに表示中かどうか)
 - `DisplayTitle`: `string` (プルダウン用表示名。未保存変更時は末尾に `*` を付与)

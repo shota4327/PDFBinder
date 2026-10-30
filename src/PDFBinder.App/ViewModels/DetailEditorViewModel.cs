@@ -17,7 +17,7 @@ namespace PDFBinder.App.ViewModels;
 /// </summary>
 public partial class DetailEditorViewModel : ObservableObject, IDisposable
 {
-    private readonly IPdfRenderer _pdfRenderer;
+    private IPdfRenderer _pdfRenderer;
     private readonly IStrokeCacheService _strokeCacheService;
     private readonly Action _onBackToGrid;
     private readonly Func<int, PdfPageModel?> _pageLookup;
@@ -334,12 +334,25 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private double _viewportHeight;
 
     /// <summary>
+    /// ファイル切り替え時に保持する垂直スクロールオフセット（px）
+    /// </summary>
+    [ObservableProperty]
+    private double _savedVerticalOffset;
+
+    /// <summary>
+    /// ファイル切り替え時に保持する水平スクロールオフセット（px）
+    /// </summary>
+    [ObservableProperty]
+    private double _savedHorizontalOffset;
+
+    /// <summary>
     /// ドキュメントを指定して初期化するメインコンストラクタ
     /// </summary>
     public DetailEditorViewModel(
         IPdfRenderer pdfRenderer,
         PdfDocumentModel? document = null,
-        IStrokeCacheService? strokeCacheService = null)
+        IStrokeCacheService? strokeCacheService = null,
+        bool autoLoadBackground = true)
     {
         _pdfRenderer = pdfRenderer;
         _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
@@ -348,9 +361,9 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         UpdateThicknessPresets(_selectedTool);
 
-        if (document != null)
+        if (document != null && document.Pages.Count > 0)
         {
-            InitializeDocument(document);
+            InitializeDocument(document, autoLoadBackground: autoLoadBackground);
         }
     }
 
@@ -383,13 +396,17 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <param name="document">同期対象のPDFドキュメントモデル</param>
     /// <param name="preferredPage">優先してカレントページに設定するページ（省略時は直前のページやインデックスを維持）</param>
     /// <param name="preferredFitMode">適用する表示フィットモード（省略時は現在のFitModeを維持）</param>
+    /// <param name="autoLoadBackground">パイプラインハンドラー不在時に即座に背景画像を先行読み込みするかどうか（既定: true）</param>
     public void InitializeDocument(
         PdfDocumentModel document,
         PdfPageModel? preferredPage = null,
-        DetailViewFitMode? preferredFitMode = null)
+        DetailViewFitMode? preferredFitMode = null,
+        bool autoLoadBackground = true)
     {
         var previousPage = CurrentPage;
         var previousIndex = CurrentPageIndex;
+        SavedVerticalOffset = 0;
+        SavedHorizontalOffset = 0;
         ClearPageItems();
         foreach (var page in document.Pages)
         {
@@ -421,7 +438,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             ApplyFitMode();
         }
-        if (PipelineExecutionHandler == null)
+        if (autoLoadBackground && PipelineExecutionHandler == null)
         {
             _ = LoadInitialDocumentBackgroundAsync();
         }
@@ -1237,9 +1254,26 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// ズーム倍率を直接設定します（境界値内にクランプ）。
+    /// 使用するPDFレンダラーを設定・更新します。
+    /// </summary>
+    public void SetPdfRenderer(IPdfRenderer pdfRenderer)
+    {
+        _pdfRenderer = pdfRenderer ?? throw new ArgumentNullException(nameof(pdfRenderer));
+    }
+
+    /// <summary>
+    /// ズーム倍率を直接設定します（手動ズームのためFitModeをNoneへ移行）。
     /// </summary>
     public void SetZoom(double zoom)
+    {
+        FitMode = DetailViewFitMode.None;
+        SetZoomInternal(zoom);
+    }
+
+    /// <summary>
+    /// ズーム倍率を内部的に設定します（境界値内にクランプ）。
+    /// </summary>
+    internal void SetZoomInternal(double zoom)
     {
         Zoom = Math.Clamp(Math.Round(zoom, 3), MinZoom, MaxZoom);
     }
@@ -1295,7 +1329,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         if (FitMode == DetailViewFitMode.ActualSize)
         {
-            SetZoom(1.0);
+            SetZoomInternal(1.0);
             return;
         }
 
@@ -1323,7 +1357,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     {
         double scaleX = availableWidth / page.DisplayWidth;
         double scaleY = availableHeight / page.DisplayHeight;
-        SetZoom(Math.Min(scaleX, scaleY));
+        SetZoomInternal(Math.Min(scaleX, scaleY));
     }
 
     private void ApplyFitToWidth(PdfPageModel page, double availableWidth, double availableHeight)
@@ -1334,11 +1368,11 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (hasVerticalScroll)
         {
             double widthWithScrollbar = Math.Max(50.0, availableWidth - ScrollBarWidth);
-            SetZoom(widthWithScrollbar / page.DisplayWidth);
+            SetZoomInternal(widthWithScrollbar / page.DisplayWidth);
         }
         else
         {
-            SetZoom(testScale);
+            SetZoomInternal(testScale);
         }
     }
 
@@ -1385,14 +1419,14 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private void ZoomIn()
     {
         FitMode = DetailViewFitMode.None;
-        Zoom = GetNextZoomIn(Zoom);
+        SetZoomInternal(GetNextZoomIn(Zoom));
     }
 
     [RelayCommand]
     private void ZoomOut()
     {
         FitMode = DetailViewFitMode.None;
-        Zoom = GetNextZoomOut(Zoom);
+        SetZoomInternal(GetNextZoomOut(Zoom));
     }
 
     [RelayCommand]
@@ -1474,6 +1508,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 _renderCts?.Cancel();
                 _renderCts?.Dispose();
                 _renderCts = null;
+                ClearPageItems();
             }
             _isDisposed = true;
         }
