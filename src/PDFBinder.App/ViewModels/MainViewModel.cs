@@ -583,21 +583,29 @@ public partial class MainViewModel : ObservableObject
         };
     }
 
+    /// <summary>
+    /// ドキュメント専用の DetailEditorViewModel を備えた新規セッションを生成します。
+    /// </summary>
+    private DocumentSession CreateDocumentSession(PdfDocumentModel document, IUndoRedoService? undoRedoService = null)
+    {
+        var editor = new DetailEditorViewModel(_pdfRenderer, document);
+        if (DetailEditor != null && DetailEditor.ViewportWidth > 0 && DetailEditor.ViewportHeight > 0)
+        {
+            editor.UpdateViewportSize(DetailEditor.ViewportWidth, DetailEditor.ViewportHeight);
+        }
+        editor.PipelineExecutionHandler = delayMs => ScheduleDetailViewPipelineAsync(delayMs);
+        editor.PropertyChanged += OnDetailEditorPropertyChanged;
+        return new DocumentSession(document, undoRedoService, editor, _pdfRenderer);
+    }
+
     private void OnDetailEditorPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(DetailEditorViewModel.FitMode))
         {
-            if (ActiveSession != null && DetailEditor != null)
-            {
-                ActiveSession.FitMode = DetailEditor.FitMode;
-            }
+            OnPropertyChanged(nameof(CurrentZoomText));
         }
         else if (e.PropertyName == nameof(DetailEditorViewModel.Zoom))
         {
-            if (ActiveSession != null && DetailEditor != null)
-            {
-                ActiveSession.ZoomFactor = DetailEditor.Zoom;
-            }
             OnPropertyChanged(nameof(CurrentZoomText));
             OnPropertyChanged(nameof(CanZoomIn));
             OnPropertyChanged(nameof(CanZoomOut));
@@ -624,12 +632,13 @@ public partial class MainViewModel : ObservableObject
         {
             oldValue.IsActive = false;
             oldValue.IsDetailViewActive = IsDetailViewActive;
-            oldValue.CurrentPageNumber = DetailEditor?.CurrentPageNumber ?? 1;
-            oldValue.ZoomFactor = DetailEditor?.Zoom ?? 1.0;
-            oldValue.FitMode = DetailEditor?.FitMode ?? DetailViewFitMode.FitToWindow;
             oldValue.SelectedRibbonTabIndex = SelectedRibbonTabIndex;
             oldValue.UndoRedoService.StateChanged -= OnSessionUndoRedoStateChanged;
             oldValue.PropertyChanged -= OnSessionPropertyChanged;
+            if (oldValue.DetailEditor != null)
+            {
+                oldValue.DetailEditor.PropertyChanged -= OnDetailEditorPropertyChanged;
+            }
         }
 
         if (newValue != null)
@@ -638,34 +647,32 @@ public partial class MainViewModel : ObservableObject
             newValue.UndoRedoService.StateChanged += OnSessionUndoRedoStateChanged;
             newValue.PropertyChanged += OnSessionPropertyChanged;
 
-            if (DetailEditor != null && newValue.IsImage)
+            if (newValue.IsImage)
             {
-                DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
+                newValue.DetailEditor.PageViewMode = DetailPageViewMode.SinglePage;
             }
 
             IsDetailViewActive = newValue.IsImage || newValue.IsDetailViewActive;
             SelectedRibbonTabIndex = newValue.SelectedRibbonTabIndex;
 
+            newValue.DetailEditor.SetPdfRenderer(_pdfRenderer);
+
+            var prevEditor = oldValue?.DetailEditor ?? DetailEditor;
+            if (prevEditor != null && prevEditor.ViewportWidth > 0 && prevEditor.ViewportHeight > 0)
+            {
+                newValue.DetailEditor.UpdateViewportSize(
+                    prevEditor.ViewportWidth,
+                    prevEditor.ViewportHeight);
+            }
+
+            newValue.DetailEditor.PipelineExecutionHandler = delayMs => ScheduleDetailViewPipelineAsync(delayMs);
+            newValue.DetailEditor.PropertyChanged += OnDetailEditorPropertyChanged;
+
+            DetailEditor = newValue.DetailEditor;
+
             if (Document != newValue.Document)
             {
                 Document = newValue.Document;
-            }
-            else
-            {
-                var preferredPage = newValue.Document.Pages.FirstOrDefault(p => p.PageNumber == newValue.CurrentPageNumber);
-                DetailEditor?.InitializeDocument(newValue.Document, preferredPage, newValue.FitMode);
-            }
-
-            if (DetailEditor != null)
-            {
-                if (newValue.FitMode == DetailViewFitMode.None)
-                {
-                    DetailEditor.Zoom = newValue.ZoomFactor;
-                }
-                if (DetailEditor.CurrentPageNumber != newValue.CurrentPageNumber)
-                {
-                    DetailEditor.CurrentPageNumber = newValue.CurrentPageNumber;
-                }
             }
 
             if (IsDetailViewActive)
@@ -680,6 +687,7 @@ public partial class MainViewModel : ObservableObject
         else
         {
             Document = new PdfDocumentModel();
+            DetailEditor = new DetailEditorViewModel(_pdfRenderer, Document);
             IsDetailViewActive = true;
             SelectedRibbonTabIndex = 0;
         }
@@ -760,19 +768,12 @@ public partial class MainViewModel : ObservableObject
             }
             else if (!string.IsNullOrEmpty(newValue.FilePath) || newValue.Pages.Count > 0)
             {
-                var newSession = new DocumentSession(newValue);
+                var newSession = CreateDocumentSession(newValue);
                 Documents.Add(newSession);
                 ActiveSession = newSession;
             }
         }
 
-        var preferredPage = (ActiveSession != null && ActiveSession.Document == newValue)
-            ? newValue.Pages.FirstOrDefault(p => p.PageNumber == ActiveSession.CurrentPageNumber)
-            : null;
-        var preferredFitMode = (ActiveSession != null && ActiveSession.Document == newValue)
-            ? ActiveSession.FitMode
-            : (DetailViewFitMode?)null;
-        DetailEditor?.InitializeDocument(newValue, preferredPage, preferredFitMode);
         OnPropertyChanged(nameof(DisplayFileName));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HasOpenDocuments));
@@ -1048,7 +1049,7 @@ public partial class MainViewModel : ObservableObject
                 }
             }
 
-            var session = new DocumentSession(doc);
+            var session = CreateDocumentSession(doc);
 
             // 未編集かつ0ページの「名称未設定」セッションが存在する場合はそれを除去
             var emptyUntitled = Documents.FirstOrDefault(d =>
@@ -1579,7 +1580,7 @@ public partial class MainViewModel : ObservableObject
         {
             var newDoc = new PdfDocumentModel();
             var blankPage = _pdfService.CreateBlankPage(595.28, 841.89);
-            var session = new DocumentSession(newDoc);
+            var session = CreateDocumentSession(newDoc);
             Documents.Add(session);
             ActiveSession = session;
 

@@ -547,5 +547,68 @@ public class MainViewModelMultiFileTests
         Assert.Equal(DetailViewFitMode.None, vm.DetailEditor.FitMode);
         Assert.Equal(1.75, vm.DetailEditor.Zoom);
     }
+
+    [Fact]
+    public async Task SwitchDocument_PreservesDetailEditorInstances_AndKeepsBackgroundAndScrollOffsets()
+    {
+        // Arrange
+        var service = new MockMultiPdfService();
+        var vm = new MainViewModel(pdfService: service);
+
+        // DocA: 連続表示、手動拡大 3.0 (300%)、スクロールオフセット
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocA.pdf");
+        var sessionA = vm.ActiveSession!;
+        var editorA = vm.DetailEditor!;
+        editorA.PageViewMode = DetailPageViewMode.Continuous;
+        editorA.SetZoom(3.0);
+        editorA.SavedVerticalOffset = 1250.0;
+        editorA.SavedHorizontalOffset = 300.0;
+        var dummyBitmapA = System.Windows.Media.Imaging.BitmapSource.Create(
+            10, 10, 96, 96,
+            System.Windows.Media.PixelFormats.Bgra32, null,
+            new byte[10 * 10 * 4], 10 * 4);
+        dummyBitmapA.Freeze();
+        editorA.Pages[0].PageBackground = dummyBitmapA;
+
+        // DocB: 単一表示、FitToWindow
+        await vm.OpenSingleDocumentAsync(@"C:\Folder\DocB.pdf");
+        var sessionB = vm.ActiveSession!;
+        var editorB = vm.DetailEditor!;
+        editorB.PageViewMode = DetailPageViewMode.SinglePage;
+        editorB.SetFitMode(DetailViewFitMode.FitToWindow);
+
+        Assert.NotSame(editorA, editorB);
+        Assert.Same(editorB, vm.DetailEditor);
+        Assert.NotNull(vm.DetailEditor);
+        Assert.Equal(DetailPageViewMode.SinglePage, vm.DetailEditor!.PageViewMode);
+
+        // Act 1: DocA に切り替え
+        vm.SwitchDocument(sessionA);
+
+        // Assert 1: DocA の ViewModel インスタンス、設定、キャッシュがすべて保持されていること
+        Assert.Same(editorA, vm.DetailEditor);
+        Assert.Equal(DetailPageViewMode.Continuous, vm.DetailEditor!.PageViewMode);
+        Assert.Equal(DetailViewFitMode.None, vm.DetailEditor.FitMode);
+        Assert.Equal(3.0, vm.DetailEditor.Zoom);
+        Assert.Equal(1250.0, vm.DetailEditor.SavedVerticalOffset);
+        Assert.Equal(300.0, vm.DetailEditor.SavedHorizontalOffset);
+        Assert.NotNull(vm.DetailEditor.Pages[0].PageBackground);
+
+        // Act 2: DocB に切り替え
+        vm.SwitchDocument(sessionB);
+
+        // Assert 2: DocB の状態が崩れず保持されていること
+        Assert.Same(editorB, vm.DetailEditor);
+        Assert.Equal(DetailPageViewMode.SinglePage, vm.DetailEditor.PageViewMode);
+        Assert.Equal(DetailViewFitMode.FitToWindow, vm.DetailEditor.FitMode);
+
+        // Act 3: DocA を閉じる
+        await vm.CloseDocumentAsync(sessionA);
+
+        // Assert 3: DocA が閉じられ、DocB がアクティブであること
+        Assert.Single(vm.Documents);
+        Assert.Same(sessionB, vm.ActiveSession);
+        Assert.Same(editorB, vm.DetailEditor);
+    }
 }
 
