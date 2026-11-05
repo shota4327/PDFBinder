@@ -30,7 +30,8 @@ public class ImageExportService : IImageExportService
         string filePath,
         ImageExportFormat format,
         int dpi,
-        int quality = 90)
+        int quality = 90,
+        bool isTransparent = false)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
@@ -47,7 +48,7 @@ public class ImageExportService : IImageExportService
 
         try
         {
-            await Task.Run(() => WriteImageFile(bitmap, tempPath, format, dpi, quality));
+            await Task.Run(() => WriteImageFile(bitmap, tempPath, format, dpi, quality, isTransparent));
             PdfService.SafeReplaceFile(tempPath, filePath);
         }
         finally
@@ -67,9 +68,10 @@ public class ImageExportService : IImageExportService
         string targetFilePath,
         ImageExportFormat format,
         int dpi,
-        int quality)
+        int quality,
+        bool isTransparent)
     {
-        BitmapSource prepared = PrepareBitmapForExport(sourceBitmap, format, dpi);
+        BitmapSource prepared = PrepareBitmapForExport(sourceBitmap, format, dpi, isTransparent);
         BitmapEncoder encoder = CreateEncoder(format, quality);
         encoder.Frames.Add(BitmapFrame.Create(prepared));
 
@@ -80,9 +82,10 @@ public class ImageExportService : IImageExportService
     /// <summary>
     /// フォーマットおよびDPIに合わせたBitmapSource（白背景合成やDPIメタデータ設定）を準備します。
     /// </summary>
-    private static BitmapSource PrepareBitmapForExport(BitmapSource bitmap, ImageExportFormat format, int dpi)
+    private static BitmapSource PrepareBitmapForExport(BitmapSource bitmap, ImageExportFormat format, int dpi, bool isTransparent)
     {
-        if (format == ImageExportFormat.Jpeg)
+        // JPEG形式または透過オプションが無効（白背景原則）の場合は白背景へ合成
+        if (format == ImageExportFormat.Jpeg || !isTransparent)
         {
             return CompositeOnWhiteBackground(bitmap, dpi);
         }

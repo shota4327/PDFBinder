@@ -89,6 +89,7 @@
 | **F80** | パフォーマンス / レンダリング | ドキュメントオープン時の詳細ビュー初期描画パイプラインの二重起動・ロック競合の解消（ApplyFitMode重複呼び出し撤廃、初期描画とサムネイル統合パイプラインの一本化、0ms即時起動による最速表示） | **完了** | Issue #221 / DetailEditorViewModel, MainViewModel |
 | **F81** | パフォーマンス / 起動 | PDFiumネイティブライブラリのコールドスタート遅延解消（事前初期化・バックグラウンドプリウォーム、初回PDFオープン時の1ページ目表示高速化） | **完了** | Issue #215 / PdfiumRenderer, IPdfRenderer, App.xaml.cs |
 | **F84** | UI・ウィンドウ管理 | アクティブウィンドウへのOSアクセントカラー連動縁取り（DWM API/レジストリ自動取得、設定変更リアルタイム追従、非アクティブ時枠線切替、最大化時0px非表示） | **完了** | Issue #236 / SystemAccentColorHelper & MainWindow |
+| **F85** | PDF操作コア / UI | 画像書き出し時のPNG出力において白背景を原則化し「背景を透過にする」オプションを追加（デフォルト白背景合成、透過PNG選択可能、JPEG連動無効化、プレビュー用紙の市松模様表示） | **完了** | Issue #243 / ImageExportService, ImageExportSettings, ExportImagesViewModel, MainWindow |
 
 ---
 
