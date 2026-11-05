@@ -12,16 +12,16 @@ namespace PDFBinder.Tests;
 /// </summary>
 public class FakeImageExportService : IImageExportService
 {
-    public List<(BitmapSource Bitmap, string FilePath, ImageExportFormat Format, int Dpi, int Quality)> SavedImages { get; } = new();
+    public List<(BitmapSource Bitmap, string FilePath, ImageExportFormat Format, int Dpi, int Quality, bool IsTransparent)> SavedImages { get; } = new();
 
     public (int Width, int Height) CalculatePixelSize(double pointWidth, double pointHeight, int dpi)
     {
         return ((int)pointWidth, (int)pointHeight);
     }
 
-    public Task SaveImageAsync(BitmapSource bitmap, string filePath, ImageExportFormat format, int dpi, int quality = 90)
+    public Task SaveImageAsync(BitmapSource bitmap, string filePath, ImageExportFormat format, int dpi, int quality = 90, bool isTransparent = false)
     {
-        SavedImages.Add((bitmap, filePath, format, dpi, quality));
+        SavedImages.Add((bitmap, filePath, format, dpi, quality, isTransparent));
         return Task.CompletedTask;
     }
 }
@@ -224,5 +224,84 @@ public class ExportImagesViewModelTests
         Assert.Equal(3, exportedCount);
         Assert.Equal(3, _fakeService.SavedImages.Count);
         Assert.All(_fakeService.SavedImages, item => Assert.StartsWith(chosenFolder, item.FilePath));
+    }
+
+    [Fact]
+    public void CanEnableTransparency_TrueOnlyForPng()
+    {
+        var settings = new ImageExportSettings { Format = ImageExportFormat.Png };
+        var vm = new ExportImagesViewModel(
+            _fakeService,
+            settings,
+            totalPages: 1,
+            currentPageIndex: 0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            idx => (595, 842));
+
+        Assert.True(vm.CanEnableTransparency);
+
+        // JPEGに変更すると無効化
+        settings.Format = ImageExportFormat.Jpeg;
+        Assert.False(vm.CanEnableTransparency);
+
+        // 再度PNGに戻すと有効化
+        settings.Format = ImageExportFormat.Png;
+        Assert.True(vm.CanEnableTransparency);
+    }
+
+    [Fact]
+    public void IsCheckerboardBackground_TrueOnlyWhenPngAndTransparent()
+    {
+        var settings = new ImageExportSettings
+        {
+            Format = ImageExportFormat.Png,
+            IsTransparentBackground = false
+        };
+        var vm = new ExportImagesViewModel(
+            _fakeService,
+            settings,
+            totalPages: 1,
+            currentPageIndex: 0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            idx => (595, 842));
+
+        Assert.False(vm.IsCheckerboardBackground);
+
+        // PNGかつ透過ONでチェッカーボード有効
+        settings.IsTransparentBackground = true;
+        Assert.True(vm.IsCheckerboardBackground);
+
+        // JPEGに切り替えると透過ONでもチェッカーボード無効（白背景）
+        settings.Format = ImageExportFormat.Jpeg;
+        Assert.False(vm.IsCheckerboardBackground);
+    }
+
+    [Fact]
+    public async Task ExecuteExportAsync_PassesTransparentSettingToService()
+    {
+        var settings = new ImageExportSettings
+        {
+            Format = ImageExportFormat.Png,
+            RangeType = ImageExportRangeType.CurrentPage,
+            IsTransparentBackground = true
+        };
+        var vm = new ExportImagesViewModel(
+            _fakeService,
+            settings,
+            totalPages: 1,
+            currentPageIndex: 0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(CreateDummyBitmap()),
+            idx => (595, 842));
+
+        string chosenFile = @"C:\ExportFolder\page_1.png";
+        vm.PickSaveFileFunc = (def, filter, title) => chosenFile;
+
+        await vm.ExecuteExportAsync();
+
+        Assert.Single(_fakeService.SavedImages);
+        Assert.True(_fakeService.SavedImages[0].IsTransparent);
     }
 }

@@ -20,6 +20,12 @@ public partial class ImageExportSettings : ObservableObject
     private string _customRangeText = string.Empty;
 
     /// <summary>
+    /// PNG出力時に背景を透過にするかどうか（デフォルトはfalse: 白背景）
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTransparentBackground;
+
+    /// <summary>
     /// 設定内容をデフォルト値にリセットします。
     /// </summary>
     public void ResetToDefault()
@@ -28,6 +34,7 @@ public partial class ImageExportSettings : ObservableObject
         Dpi = ImageExportDpi.Dpi400;
         RangeType = ImageExportRangeType.AllPages;
         CustomRangeText = string.Empty;
+        IsTransparentBackground = false;
     }
 
     /// <summary>
@@ -41,5 +48,6 @@ public partial class ImageExportSettings : ObservableObject
         Dpi = source.Dpi;
         RangeType = source.RangeType;
         CustomRangeText = source.CustomRangeText;
+        IsTransparentBackground = source.IsTransparentBackground;
     }
 }

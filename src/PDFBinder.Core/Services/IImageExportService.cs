@@ -25,5 +25,6 @@ public interface IImageExportService
     /// <param name="format">出力画像フォーマット（PNG / JPEG）</param>
     /// <param name="dpi">出力DPI</param>
     /// <param name="quality">JPEG品質（1〜100、デフォルト90）</param>
-    Task SaveImageAsync(BitmapSource bitmap, string filePath, ImageExportFormat format, int dpi, int quality = 90);
+    /// <param name="isTransparent">PNG出力時に背景を透過にするかどうか（デフォルトfalse: 白背景）</param>
+    Task SaveImageAsync(BitmapSource bitmap, string filePath, ImageExportFormat format, int dpi, int quality = 90, bool isTransparent = false);
 }

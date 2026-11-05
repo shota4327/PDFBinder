@@ -69,6 +69,12 @@ public partial class ExportImagesViewModel : ObservableObject
     /// <summary>次のページへ移動可能かどうか</summary>
     public bool CanGoToNextPage => CurrentExportPageIndex < TotalExportPages - 1 && !IsExporting;
 
+    /// <summary>PNG形式選択時のみ「背景を透過にする」チェックボックスを操作可能とします</summary>
+    public bool CanEnableTransparency => Settings.Format == ImageExportFormat.Png;
+
+    /// <summary>PNG形式かつ背景透過が有効な場合にプレビュー用紙背景を市松模様（チェッカーボード）にします</summary>
+    public bool IsCheckerboardBackground => Settings.Format == ImageExportFormat.Png && Settings.IsTransparentBackground;
+
     /// <summary>ファイル保存先選択ダイアログの差し替えデリゲート（テスト用）</summary>
     public Func<string, string, string, string?>? PickSaveFileFunc { get; set; }
 
@@ -106,6 +112,16 @@ public partial class ExportImagesViewModel : ObservableObject
 
     private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ImageExportSettings.Format))
+        {
+            OnPropertyChanged(nameof(CanEnableTransparency));
+            OnPropertyChanged(nameof(IsCheckerboardBackground));
+        }
+        else if (e.PropertyName == nameof(ImageExportSettings.IsTransparentBackground))
+        {
+            OnPropertyChanged(nameof(IsCheckerboardBackground));
+        }
+
         ValidateAndRefresh();
     }
 
@@ -359,7 +375,13 @@ public partial class ExportImagesViewModel : ObservableObject
                 ? targetPath
                 : Path.Combine(targetPath, $"{cleanTitle}_page_{pageIdx + 1:D3}.{ext}");
 
-            await _imageExportService.SaveImageAsync(bitmap, outFilePath, Settings.Format, dpiValue, quality: 90);
+            await _imageExportService.SaveImageAsync(
+                bitmap,
+                outFilePath,
+                Settings.Format,
+                dpiValue,
+                quality: 90,
+                isTransparent: Settings.IsTransparentBackground);
             ExportProgressValue = (double)(i + 1) / total * 100;
         }
 

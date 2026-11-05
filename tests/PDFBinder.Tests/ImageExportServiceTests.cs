@@ -177,4 +177,105 @@ public class ImageExportServiceTests
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public async Task SaveImageAsync_PngFormat_Default_CompositesOnWhiteBackground()
+    {
+        // 透過ピクセル（A=0, RGB=0）のビットマップを準備
+        var transparentBitmap = CreateTransparentTestBitmap(50, 50);
+        string tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
+
+        try
+        {
+            // isTransparent を省略（デフォルト: false）して保存
+            await _service.SaveImageAsync(transparentBitmap, tempFile, ImageExportFormat.Png, 300);
+
+            using var stream = File.OpenRead(tempFile);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            var frame = decoder.Frames[0];
+
+            byte[] pixelData = new byte[4];
+            var cb = new CroppedBitmap(frame, new System.Windows.Int32Rect(25, 25, 1, 1));
+            cb.CopyPixels(pixelData, 4, 0);
+
+            // 背景が白（B=255, G=255, R=255, A=255）に合成されていることを確認
+            Assert.Equal(255, pixelData[0]); // B
+            Assert.Equal(255, pixelData[1]); // G
+            Assert.Equal(255, pixelData[2]); // R
+            Assert.Equal(255, pixelData[3]); // A
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task SaveImageAsync_PngFormat_WhenTransparentRequested_PreservesTransparency()
+    {
+        // 透過ピクセル（A=0, RGB=0）のビットマップを準備
+        var transparentBitmap = CreateTransparentTestBitmap(50, 50);
+        string tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
+
+        try
+        {
+            // isTransparent = true を明示して保存
+            await _service.SaveImageAsync(transparentBitmap, tempFile, ImageExportFormat.Png, 300, isTransparent: true);
+
+            using var stream = File.OpenRead(tempFile);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            var frame = decoder.Frames[0];
+
+            byte[] pixelData = new byte[4];
+            var cb = new CroppedBitmap(frame, new System.Windows.Int32Rect(25, 25, 1, 1));
+            cb.CopyPixels(pixelData, 4, 0);
+
+            // アルファ値が 0（透過）のまま保持されていることを確認
+            Assert.Equal(0, pixelData[3]); // A
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task SaveImageAsync_JpegFormat_WhenTransparentRequested_AlwaysCompositesOnWhiteBackground()
+    {
+        // 透過ピクセル（A=0, RGB=0）のビットマップを準備
+        var transparentBitmap = CreateTransparentTestBitmap(50, 50);
+        string tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.jpg");
+
+        try
+        {
+            // JPEG保存時は isTransparent = true が渡されても白背景で合成されることを確認
+            await _service.SaveImageAsync(transparentBitmap, tempFile, ImageExportFormat.Jpeg, 300, quality: 90, isTransparent: true);
+
+            using var stream = File.OpenRead(tempFile);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            var frame = decoder.Frames[0];
+
+            byte[] pixelData = new byte[4];
+            var cb = new CroppedBitmap(frame, new System.Windows.Int32Rect(25, 25, 1, 1));
+            cb.CopyPixels(pixelData, 4, 0);
+
+            // 白背景（B, G, R すべて250以上）になっていることを確認
+            Assert.True(pixelData[0] >= 245, $"青成分が白に近いこと (実際: {pixelData[0]})");
+            Assert.True(pixelData[1] >= 245, $"緑成分が白に近いこと (実際: {pixelData[1]})");
+            Assert.True(pixelData[2] >= 245, $"赤成分が白に近いこと (実際: {pixelData[2]})");
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    private static BitmapSource CreateTransparentTestBitmap(int width, int height)
+    {
+        int stride = width * 4;
+        byte[] pixels = new byte[stride * height]; // すべて 0 (透過)
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+        bitmap.Freeze();
+        return bitmap;
+    }
 }
