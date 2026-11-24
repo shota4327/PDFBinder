@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows.Ink;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -135,11 +136,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         }
     }
 
+    private DetailPageItemViewModel? _cachedCurrentPageItem;
+    private int _cachedCurrentPageIndex = -1;
+    private bool _isCurrentPageCacheValid;
+
     /// <summary>
     /// 現在アクティブなページのDetailPageItemViewModelを取得します。
     /// </summary>
-    public DetailPageItemViewModel? CurrentPageItem =>
-        Pages.FirstOrDefault(p => p.Page == CurrentPage) ?? Pages.FirstOrDefault();
+    public DetailPageItemViewModel? CurrentPageItem
+    {
+        get
+        {
+            EnsureCurrentPageCache();
+            return _cachedCurrentPageItem;
+        }
+    }
 
     /// <summary>
     /// 指定ページへのスクロール要求を通知するイベント
@@ -247,12 +258,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (CurrentPage == null || Pages.Count == 0) return -1;
-            for (int i = 0; i < Pages.Count; i++)
-            {
-                if (Pages[i].Page == CurrentPage) return i;
-            }
-            return -1;
+            EnsureCurrentPageCache();
+            return _cachedCurrentPageIndex;
         }
     }
 
@@ -364,6 +371,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
         _onBackToGrid = () => { };
         _pageLookup = _ => null;
+        Pages.CollectionChanged += OnPagesCollectionChanged;
 
         UpdateThicknessPresets(_selectedTool);
 
@@ -388,6 +396,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
         _onBackToGrid = onBackToGrid;
         _pageLookup = pageLookup;
+        Pages.CollectionChanged += OnPagesCollectionChanged;
 
         AddPageItem(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
         UpdatePageEdgeFlags();
@@ -540,8 +549,62 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         ScrollToPageRequested?.Invoke(page);
     }
 
+    /// <summary>
+    /// Pagesコレクション変更時にカレントページキャッシュを無効化します。
+    /// </summary>
+    private void OnPagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        _isCurrentPageCacheValid = false;
+    }
+
+    /// <summary>
+    /// CurrentPageItemおよびCurrentPageIndexのキャッシュを最新状態に同期します。
+    /// ページ番号をインデックスヒントとして利用し、通常時はO(1)で解決します。
+    /// </summary>
+    private void EnsureCurrentPageCache()
+    {
+        if (_isCurrentPageCacheValid) return;
+
+        _cachedCurrentPageIndex = -1;
+        _cachedCurrentPageItem = null;
+
+        if (Pages.Count == 0)
+        {
+            _isCurrentPageCacheValid = true;
+            return;
+        }
+
+        if (CurrentPage != null)
+        {
+            int hintIndex = CurrentPage.PageNumber - 1;
+            if (hintIndex >= 0 && hintIndex < Pages.Count && Pages[hintIndex].Page == CurrentPage)
+            {
+                _cachedCurrentPageIndex = hintIndex;
+                _cachedCurrentPageItem = Pages[hintIndex];
+                _isCurrentPageCacheValid = true;
+                return;
+            }
+
+            for (int i = 0; i < Pages.Count; i++)
+            {
+                if (Pages[i].Page == CurrentPage)
+                {
+                    _cachedCurrentPageIndex = i;
+                    _cachedCurrentPageItem = Pages[i];
+                    _isCurrentPageCacheValid = true;
+                    return;
+                }
+            }
+        }
+
+        // CurrentPageがnullまたはPages内に存在しない場合は先頭要素へフォールバック（従来仕様を維持）
+        _cachedCurrentPageItem = Pages[0];
+        _isCurrentPageCacheValid = true;
+    }
+
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
+        _isCurrentPageCacheValid = false;
         if (oldValue != null)
         {
             oldValue.PropertyChanged -= OnCurrentPagePropertyChanged;
@@ -1387,10 +1450,16 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         if (PageViewMode == DetailPageViewMode.Continuous && Pages.Count > 1)
         {
             // 連続表示時は先頭上部・最終下部の余白を除外し、ページ間マージン (N - 1) * 30.0 のみを加算して正確に判定
-            double totalPageHeight = Pages.Sum(p => p.Page.DisplayHeight);
-            double totalSpacing = (Pages.Count - 1) * 30.0;
-            double totalHeight = (totalPageHeight + totalSpacing) * scale;
-            return totalHeight > availableHeight;
+            double accumulatedHeight = (Pages.Count - 1) * 30.0;
+            for (int i = 0; i < Pages.Count; i++)
+            {
+                accumulatedHeight += Pages[i].Page.DisplayHeight;
+                if (accumulatedHeight * scale > availableHeight)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
         return (page.DisplayHeight * scale) > availableHeight;
     }
@@ -1507,6 +1576,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             if (disposing)
             {
+                Pages.CollectionChanged -= OnPagesCollectionChanged;
                 if (CurrentPage != null)
                 {
                     CurrentPage.PropertyChanged -= OnCurrentPagePropertyChanged;

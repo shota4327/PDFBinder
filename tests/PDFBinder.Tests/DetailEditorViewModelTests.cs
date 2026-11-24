@@ -1500,6 +1500,118 @@ public class DetailEditorViewModelTests
         // Assert: 連続表示モード以外では実行されないこと
         Assert.False(handlerInvoked);
     }
+
+    [Fact]
+    public void CurrentPageItem_AndCurrentPageIndex_UpdateCorrectlyAcrossPageSwitchesAndFallback()
+    {
+        // Arrange: 5ページドキュメントを作成
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        for (int i = 1; i <= 5; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            doc.Pages.Add(p);
+        }
+
+        using var vm = new DetailEditorViewModel(renderer, doc);
+
+        // Assert: 初期状態は先頭ページ
+        Assert.Same(vm.Pages[0], vm.CurrentPageItem);
+        Assert.Equal(0, vm.CurrentPageIndex);
+
+        // Act & Assert: 4ページ目へ切り替え（PageNumberヒントによるO(1)解決）
+        vm.CurrentPage = doc.Pages[3];
+        Assert.Same(vm.Pages[3], vm.CurrentPageItem);
+        Assert.Equal(3, vm.CurrentPageIndex);
+
+        // Act & Assert: PageNumberがインデックスと不一致でもフォールバックで正しく解決されること
+        doc.Pages[4].PageNumber = 99;
+        vm.CurrentPage = doc.Pages[4];
+        Assert.Same(vm.Pages[4], vm.CurrentPageItem);
+        Assert.Equal(4, vm.CurrentPageIndex);
+
+        // Act & Assert: Pagesに存在しないページを設定時は先頭要素へフォールバックし、インデックスは-1
+        var externalPage = CreateSamplePage(500, 700);
+        externalPage.PageNumber = 1;
+        vm.CurrentPage = externalPage;
+        Assert.Same(vm.Pages[0], vm.CurrentPageItem);
+        Assert.Equal(-1, vm.CurrentPageIndex);
+
+        // Act & Assert: CurrentPageがnullの場合は先頭要素へフォールバックし、インデックスは-1
+        vm.CurrentPage = null;
+        Assert.Same(vm.Pages[0], vm.CurrentPageItem);
+        Assert.Equal(-1, vm.CurrentPageIndex);
+    }
+
+    [Fact]
+    public void CurrentPageItem_CacheInvalidates_WhenPagesCollectionChanges()
+    {
+        // Arrange
+        var renderer = new FakePdfRenderer();
+        var doc = new PdfDocumentModel();
+        var page1 = CreateSamplePage(500, 700);
+        page1.PageNumber = 1;
+        var page2 = CreateSamplePage(500, 700);
+        page2.PageNumber = 2;
+        doc.Pages.Add(page1);
+        doc.Pages.Add(page2);
+
+        using var vm = new DetailEditorViewModel(renderer, doc);
+        vm.CurrentPage = page2;
+        Assert.Same(vm.Pages[1], vm.CurrentPageItem);
+        Assert.Equal(1, vm.CurrentPageIndex);
+
+        // Act: 先頭ページを直接削除し、page2がインデックス0へ移動
+        vm.Pages.RemoveAt(0);
+        Assert.Same(vm.Pages[0], vm.CurrentPageItem);
+        Assert.Equal(0, vm.CurrentPageIndex);
+
+        // Act: 全ページをクリア
+        vm.Pages.Clear();
+        Assert.Null(vm.CurrentPageItem);
+        Assert.Equal(-1, vm.CurrentPageIndex);
+    }
+
+    [Fact]
+    public void FitToWidth_ContinuousMode_CalculatesScrollOverflowAccuratelyWithEarlyExit()
+    {
+        // Arrange: 垂直スクロールが発生しないケース（2ページ計高さがビューポート高さ未満）
+        var renderer = new FakePdfRenderer();
+        var smallDoc = new PdfDocumentModel();
+        for (int i = 1; i <= 2; i++)
+        {
+            var p = CreateSamplePage(500, 200);
+            p.PageNumber = i;
+            smallDoc.Pages.Add(p);
+        }
+
+        using var vmNoScroll = new DetailEditorViewModel(renderer, smallDoc);
+        vmNoScroll.PageViewMode = DetailPageViewMode.Continuous;
+        vmNoScroll.UpdateViewportSize(600, 1000);
+        vmNoScroll.SetFitMode(DetailViewFitMode.FitToWidth);
+
+        double availableWidth = 600.0 - DetailEditorViewModel.TotalHorizontalMargin - DetailEditorViewModel.SafetyBuffer;
+        double expectedNoScrollZoom = Math.Round(availableWidth / 500.0, 3);
+        Assert.Equal(expectedNoScrollZoom, vmNoScroll.Zoom);
+
+        // Arrange: 垂直スクロールが発生するケース（多ページで早期終了判定）
+        var largeDoc = new PdfDocumentModel();
+        for (int i = 1; i <= 50; i++)
+        {
+            var p = CreateSamplePage(500, 700);
+            p.PageNumber = i;
+            largeDoc.Pages.Add(p);
+        }
+
+        using var vmWithScroll = new DetailEditorViewModel(renderer, largeDoc);
+        vmWithScroll.PageViewMode = DetailPageViewMode.Continuous;
+        vmWithScroll.UpdateViewportSize(600, 1000);
+        vmWithScroll.SetFitMode(DetailViewFitMode.FitToWidth);
+
+        double expectedWithScrollZoom = Math.Round((availableWidth - DetailEditorViewModel.ScrollBarWidth) / 500.0, 3);
+        Assert.Equal(expectedWithScrollZoom, vmWithScroll.Zoom);
+    }
 }
 
 

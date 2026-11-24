@@ -171,6 +171,9 @@ public class EditorInkCanvas : InkCanvas
     private Point? _lineStartPoint;
     private Point? _currentLinePoint;
     private bool _isDrawingLine;
+    private Pen? _cachedLinePreviewPen;
+    private Color _cachedLinePreviewColor;
+    private double _cachedLinePreviewWidth;
 
     // 手のひら（パン）用
     private Point? _panStartPoint;
@@ -380,6 +383,7 @@ public class EditorInkCanvas : InkCanvas
         };
 
         DefaultDrawingAttributes = attr;
+        _cachedLinePreviewPen = null;
 
         if (ToolMode == EditorToolMode.EraserPoint)
         {
@@ -906,11 +910,49 @@ public class EditorInkCanvas : InkCanvas
     internal bool IsDrawingLineForTesting => _isDrawingLine;
     internal Point? LineStartPointForTesting => _lineStartPoint;
     internal Point? CurrentLinePointForTesting => _currentLinePoint;
+    internal Pen? CachedLinePreviewPenForTesting => _cachedLinePreviewPen;
+    internal Pen GetLinePreviewPenForTesting() => GetOrCreateLinePreviewPen();
     internal void ProcessLostMouseCaptureForTesting() => OnLostMouseCapture(new MouseEventArgs(Mouse.PrimaryDevice, 0));
 
     #endregion
 
     #endregion
+
+    /// <summary>
+    /// 直線プレビュー用のフリーズ済みPenを取得または生成してキャッシュします。
+    /// </summary>
+    private Pen GetOrCreateLinePreviewPen()
+    {
+        var attr = DefaultDrawingAttributes;
+        var color = attr.Color;
+        if (attr.IsHighlighter || ToolMode == EditorToolMode.Highlighter)
+        {
+            color = Color.FromArgb(120, color.R, color.G, color.B);
+        }
+
+        double width = attr.Width;
+        if (_cachedLinePreviewPen != null &&
+            _cachedLinePreviewColor == color &&
+            _cachedLinePreviewWidth == width)
+        {
+            return _cachedLinePreviewPen;
+        }
+
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+
+        var pen = new Pen(brush, width)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round
+        };
+        pen.Freeze();
+
+        _cachedLinePreviewColor = color;
+        _cachedLinePreviewWidth = width;
+        _cachedLinePreviewPen = pen;
+        return pen;
+    }
 
     /// <summary>
     /// 直線プレビューを描画します。
@@ -921,19 +963,7 @@ public class EditorInkCanvas : InkCanvas
 
         if (_isDrawingLine && _lineStartPoint.HasValue && _currentLinePoint.HasValue)
         {
-            var attr = DefaultDrawingAttributes;
-            var color = attr.Color;
-            if (attr.IsHighlighter || ToolMode == EditorToolMode.Highlighter)
-            {
-                color = Color.FromArgb(120, color.R, color.G, color.B);
-            }
-
-            var pen = new Pen(new SolidColorBrush(color), attr.Width)
-            {
-                StartLineCap = PenLineCap.Round,
-                EndLineCap = PenLineCap.Round
-            };
-
+            var pen = GetOrCreateLinePreviewPen();
             dc.DrawLine(pen, _lineStartPoint.Value, _currentLinePoint.Value);
         }
     }
