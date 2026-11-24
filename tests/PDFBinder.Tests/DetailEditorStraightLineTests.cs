@@ -2,6 +2,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using PDFBinder.App.Controls;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
@@ -337,6 +338,83 @@ public class DetailEditorStraightLineTests
             Assert.Null(canvas.LineStartPointForTesting);
             Assert.Null(canvas.CurrentLinePointForTesting);
             Assert.Empty(page.InkStrokes);
+        });
+    }
+
+    [Fact]
+    public void EditorInkCanvas_LinePreviewPen_IsFrozenAndReusedAcrossFrames()
+    {
+        RunInSta(() =>
+        {
+            // Arrange
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                DrawingColor = Colors.Red,
+                StrokeThickness = 2.0
+            };
+
+            // Act: 同一属性で複数回プレビュー用Penを取得（毎フレームのOnRender呼び出しを模倣）
+            var firstPen = canvas.GetLinePreviewPenForTesting();
+            var secondPen = canvas.GetLinePreviewPenForTesting();
+
+            // Assert: PenとBrushがともにFreeze済みで、同一インスタンスが再利用されること
+            Assert.Same(firstPen, secondPen);
+            Assert.Same(firstPen, canvas.CachedLinePreviewPenForTesting);
+            Assert.True(firstPen.IsFrozen);
+            Assert.IsType<SolidColorBrush>(firstPen.Brush);
+            var brush = (SolidColorBrush)firstPen.Brush;
+            Assert.True(brush.IsFrozen);
+            Assert.Equal(Colors.Red, brush.Color);
+            Assert.Equal(2.0, firstPen.Thickness);
+            Assert.Equal(PenLineCap.Round, firstPen.StartLineCap);
+            Assert.Equal(PenLineCap.Round, firstPen.EndLineCap);
+        });
+    }
+
+    [Fact]
+    public void EditorInkCanvas_LinePreviewPen_UpdatesWhenDrawingAttributesOrToolChange()
+    {
+        RunInSta(() =>
+        {
+            // Arrange
+            var canvas = new EditorInkCanvas
+            {
+                ToolMode = EditorToolMode.Pen,
+                IsStraightLine = true,
+                DrawingColor = Colors.Black,
+                StrokeThickness = 1.0
+            };
+
+            var initialPen = canvas.GetLinePreviewPenForTesting();
+
+            // Act 1: 色変更 -> キャッシュが無効化され、新しい色のフリーズ済みPenが生成されること
+            canvas.DrawingColor = Colors.Blue;
+            Assert.Null(canvas.CachedLinePreviewPenForTesting);
+            var bluePen = canvas.GetLinePreviewPenForTesting();
+            Assert.NotSame(initialPen, bluePen);
+            Assert.True(bluePen.IsFrozen);
+            Assert.Equal(Colors.Blue, ((SolidColorBrush)bluePen.Brush).Color);
+
+            // Act 2: 太さ変更 -> 新しい太さのフリーズ済みPenが生成されること
+            canvas.StrokeThickness = 4.0;
+            Assert.Null(canvas.CachedLinePreviewPenForTesting);
+            var thickPen = canvas.GetLinePreviewPenForTesting();
+            Assert.NotSame(bluePen, thickPen);
+            Assert.True(thickPen.IsFrozen);
+            Assert.Equal(4.0, thickPen.Thickness);
+
+            // Act 3: 蛍光ペンへ切り替え -> Alpha=120の半透明フリーズ済みPenが生成されること
+            canvas.ToolMode = EditorToolMode.Highlighter;
+            var highlighterPen = canvas.GetLinePreviewPenForTesting();
+            Assert.NotSame(thickPen, highlighterPen);
+            Assert.True(highlighterPen.IsFrozen);
+            var highlighterColor = ((SolidColorBrush)highlighterPen.Brush).Color;
+            Assert.Equal(120, highlighterColor.A);
+            Assert.Equal(Colors.Blue.R, highlighterColor.R);
+            Assert.Equal(Colors.Blue.G, highlighterColor.G);
+            Assert.Equal(Colors.Blue.B, highlighterColor.B);
         });
     }
 
