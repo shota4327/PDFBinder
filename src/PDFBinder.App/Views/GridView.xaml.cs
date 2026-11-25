@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using PDFBinder.App.Controls;
+using PDFBinder.App.Helpers;
 using PDFBinder.App.ViewModels;
 using PDFBinder.Core.Models;
 
@@ -25,6 +26,7 @@ public partial class GridView : UserControl
     private DragAdorner? _dragAdorner;
     private readonly List<FrameworkElement> _draggedContainers = new();
     private int? _currentDropTargetIndex;
+    private Rect _lastIndicatorRect = Rect.Empty;
 
     private bool _isDragging;
     private bool _isExternalDragOver;
@@ -33,7 +35,9 @@ public partial class GridView : UserControl
 
     private bool _isRubberBandActive;
     private Point _rubberBandStart;
-    private HashSet<PdfPageModel> _initialSelection = new();
+    private readonly RubberBandSelectionTracker _rubberBandTracker = new();
+    private GridLayoutCache? _layoutCache;
+    private PdfDocumentModel? _cachedLayoutDocument;
 
     public GridView()
     {
@@ -49,7 +53,9 @@ public partial class GridView : UserControl
         {
             _autoScroller.Stop();
             _mouseWheelHook.Dispose();
-            _initialSelection.Clear();
+            _isRubberBandActive = false;
+            _rubberBandTracker.Reset();
+            InvalidateLayoutCache();
         };
     }
 
@@ -244,6 +250,7 @@ public partial class GridView : UserControl
         _draggedContainers.Clear();
 
         HideInsertionIndicator();
+        InvalidateLayoutCache();
         _dragStartPoint = null;
         _draggedPage = null;
     }
@@ -396,6 +403,7 @@ public partial class GridView : UserControl
                 _mouseWheelHook.StopHook();
             }
             HideInsertionIndicator();
+            InvalidateLayoutCache();
         }
     }
 
@@ -413,6 +421,7 @@ public partial class GridView : UserControl
 
         int targetIndex = _currentDropTargetIndex ?? (ViewModel?.Document.Pages.Count ?? 0);
         HideInsertionIndicator();
+        InvalidateLayoutCache();
 
         if (e.Data.GetDataPresent("PdfPages") && ViewModel != null)
         {
@@ -433,6 +442,55 @@ public partial class GridView : UserControl
     }
 
     /// <summary>
+    /// 現在のレイアウトシグネチャに対応する座標キャッシュを取得し、未生成または変化時のみ再構築します。
+    /// </summary>
+    private GridLayoutCache EnsureLayoutCache()
+    {
+        var vm = ViewModel;
+        if (vm == null)
+        {
+            return GridLayoutCache.Build(Array.Empty<GridItemBounds>(), default);
+        }
+
+        int count = vm.Document.Pages.Count;
+        var signature = new GridLayoutSignature(
+            count,
+            ThumbnailItemsControl.ActualWidth,
+            ThumbnailItemsControl.ActualHeight,
+            vm.ThumbnailSize);
+
+        if (_layoutCache != null &&
+            ReferenceEquals(_cachedLayoutDocument, vm.Document) &&
+            _layoutCache.Signature == signature)
+        {
+            return _layoutCache;
+        }
+
+        var itemBounds = new List<GridItemBounds>(count);
+        for (int i = 0; i < count; i++)
+        {
+            if (ThumbnailItemsControl.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement container)
+            {
+                var pos = container.TranslatePoint(new Point(0, 0), ItemsHostGrid);
+                itemBounds.Add(new GridItemBounds(i, new Rect(pos, container.RenderSize)));
+            }
+        }
+
+        _cachedLayoutDocument = vm.Document;
+        _layoutCache = GridLayoutCache.Build(itemBounds, signature);
+        return _layoutCache;
+    }
+
+    /// <summary>
+    /// 保持しているグリッドレイアウトキャッシュを無効化します。
+    /// </summary>
+    private void InvalidateLayoutCache()
+    {
+        _layoutCache = null;
+        _cachedLayoutDocument = null;
+    }
+
+    /// <summary>
     /// 現在のマウス座標に基づいてドロップ挿入先のページインデックスと表示矩形を算出します。
     /// </summary>
     private (int TargetIndex, Rect BarRect) CalculateInsertionTarget(Point mousePos)
@@ -440,66 +498,10 @@ public partial class GridView : UserControl
         int count = ViewModel?.Document.Pages.Count ?? 0;
         if (count == 0)
         {
-            return (0, new Rect(10, 10, 4, 150));
+            return (0, GridLayoutCache.EmptyDocumentBarRect);
         }
 
-        var itemBounds = new List<(int Index, Rect Bounds)>();
-        for (int i = 0; i < count; i++)
-        {
-            if (ThumbnailItemsControl.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement container)
-            {
-                var pos = container.TranslatePoint(new Point(0, 0), ItemsHostGrid);
-                itemBounds.Add((i, new Rect(pos, container.RenderSize)));
-            }
-        }
-
-        if (itemBounds.Count == 0)
-        {
-            return (0, new Rect(10, 10, 4, 150));
-        }
-
-        var rowItems = itemBounds
-            .Where(item => mousePos.Y >= item.Bounds.Top - 8 && mousePos.Y <= item.Bounds.Bottom + 8)
-            .OrderBy(item => item.Bounds.Left)
-            .ToList();
-
-        if (rowItems.Count > 0)
-        {
-            for (int i = 0; i < rowItems.Count; i++)
-            {
-                var item = rowItems[i];
-                double midX = item.Bounds.Left + item.Bounds.Width / 2.0;
-                if (mousePos.X < midX)
-                {
-                    // 先頭アイテムの場合は左側余白に収まるよう配置
-                    double barX = (i == 0) ? Math.Max(4, item.Bounds.Left + 3) : item.Bounds.Left - 2;
-                    double barY = item.Bounds.Top + 10;
-                    double barHeight = Math.Max(20, item.Bounds.Height - 20);
-                    return (item.Index, new Rect(barX, barY, 4, barHeight));
-                }
-            }
-
-            var lastInRow = rowItems[^1];
-            double afterX = lastInRow.Bounds.Right - 7;
-            double lastY = lastInRow.Bounds.Top + 10;
-            double lastHeight = Math.Max(20, lastInRow.Bounds.Height - 20);
-            return (lastInRow.Index + 1, new Rect(afterX, lastY, 4, lastHeight));
-        }
-
-        if (mousePos.Y < itemBounds[0].Bounds.Top)
-        {
-            var first = itemBounds[0];
-            double barX = Math.Max(4, first.Bounds.Left + 3);
-            double barY = first.Bounds.Top + 10;
-            double barHeight = Math.Max(20, first.Bounds.Height - 20);
-            return (0, new Rect(barX, barY, 4, barHeight));
-        }
-
-        var last = itemBounds[^1];
-        double endX = last.Bounds.Right - 7;
-        double endY = last.Bounds.Top + 10;
-        double endHeight = Math.Max(20, last.Bounds.Height - 20);
-        return (count, new Rect(endX, endY, 4, endHeight));
+        return EnsureLayoutCache().CalculateInsertionTarget(mousePos, count);
     }
 
     /// <summary>
@@ -508,11 +510,22 @@ public partial class GridView : UserControl
     private void UpdateInsertionIndicator(Point mousePos)
     {
         var (targetIndex, barRect) = CalculateInsertionTarget(mousePos);
+        if (_currentDropTargetIndex == targetIndex &&
+            _lastIndicatorRect == barRect &&
+            InsertionIndicator.Visibility == Visibility.Visible)
+        {
+            return;
+        }
+
         _currentDropTargetIndex = targetIndex;
+        _lastIndicatorRect = barRect;
 
         InsertionIndicator.Margin = new Thickness(barRect.X, barRect.Y, 0, 0);
         InsertionIndicator.Height = barRect.Height;
-        InsertionIndicator.Visibility = Visibility.Visible;
+        if (InsertionIndicator.Visibility != Visibility.Visible)
+        {
+            InsertionIndicator.Visibility = Visibility.Visible;
+        }
     }
 
     /// <summary>
@@ -522,6 +535,7 @@ public partial class GridView : UserControl
     {
         InsertionIndicator.Visibility = Visibility.Collapsed;
         _currentDropTargetIndex = null;
+        _lastIndicatorRect = Rect.Empty;
     }
 
     #endregion
@@ -564,13 +578,17 @@ public partial class GridView : UserControl
         {
             foreach (var p in ViewModel.Document.Pages)
             {
-                p.IsSelected = false;
+                if (p.IsSelected)
+                {
+                    p.IsSelected = false;
+                }
             }
         }
 
         _isRubberBandActive = true;
         _rubberBandStart = e.GetPosition(ItemsHostGrid);
-        _initialSelection = new HashSet<PdfPageModel>(ViewModel.Document.Pages.Where(p => p.IsSelected));
+        InvalidateLayoutCache();
+        _rubberBandTracker.Begin(ViewModel.Document.Pages);
 
         Canvas.SetLeft(RubberBandBorder, _rubberBandStart.X);
         Canvas.SetTop(RubberBandBorder, _rubberBandStart.Y);
@@ -617,21 +635,8 @@ public partial class GridView : UserControl
 
         var selectionRect = new Rect(x, y, width, height);
         bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
-
-        for (int i = 0; i < ViewModel.Document.Pages.Count; i++)
-        {
-            var page = ViewModel.Document.Pages[i];
-            if (ThumbnailItemsControl.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement container)
-            {
-                var pos = container.TranslatePoint(new Point(0, 0), ItemsHostGrid);
-                var itemRect = new Rect(pos, container.RenderSize);
-                bool intersects = selectionRect.IntersectsWith(itemRect);
-
-                page.IsSelected = ctrl
-                    ? _initialSelection.Contains(page) || intersects
-                    : intersects;
-            }
-        }
+        var cache = EnsureLayoutCache();
+        _rubberBandTracker.Update(cache, selectionRect, ctrl, ViewModel.Document.Pages);
     }
 
     /// <summary>
@@ -641,12 +646,35 @@ public partial class GridView : UserControl
     {
         if (_isRubberBandActive)
         {
-            _autoScroller.Stop();
-            _isRubberBandActive = false;
-            _initialSelection.Clear();
-            RubberBandBorder.Visibility = Visibility.Collapsed;
-            GridScrollViewer.ReleaseMouseCapture();
+            EndRubberBandSelection();
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// マウスキャプチャ喪失時（ウィンドウ切替等）に矩形選択セッションを確実に終了します。
+    /// </summary>
+    private void OnGridLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_isRubberBandActive)
+        {
+            EndRubberBandSelection();
+        }
+    }
+
+    /// <summary>
+    /// 矩形選択セッションの終了およびキャッシュ・トラッカーの解放を行います。
+    /// </summary>
+    private void EndRubberBandSelection()
+    {
+        _autoScroller.Stop();
+        _isRubberBandActive = false;
+        _rubberBandTracker.Reset();
+        InvalidateLayoutCache();
+        RubberBandBorder.Visibility = Visibility.Collapsed;
+        if (GridScrollViewer.IsMouseCaptured)
+        {
+            GridScrollViewer.ReleaseMouseCapture();
         }
     }
 
