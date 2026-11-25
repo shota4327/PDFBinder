@@ -615,7 +615,7 @@
               PreviewDragLeave="OnMainAreaDragLeave"
               PreviewDrop="OnMainAreaDrop">
             <!-- グリッド俯瞰ビュー -->
-            <views:GridView Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanConverter}}" />
+            <views:GridView Visibility="{Binding IsDetailViewActive, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
 
             <!-- 詳細手書きエディタビュー -->
             <views:DetailEditorView DataContext="{Binding DetailEditor}"

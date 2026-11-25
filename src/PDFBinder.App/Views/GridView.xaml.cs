@@ -24,7 +24,8 @@ public partial class GridView : UserControl
     private PdfPageModel? _draggedPage;
     private int _anchorPageIndex = -1;
     private DragAdorner? _dragAdorner;
-    private readonly List<FrameworkElement> _draggedContainers = new();
+    private readonly List<PdfPageModel> _draggedPages = new();
+    private VirtualizingThumbnailWrapPanel? _wrapPanel;
     private int? _currentDropTargetIndex;
     private Rect _lastIndicatorRect = Rect.Empty;
 
@@ -55,6 +56,8 @@ public partial class GridView : UserControl
             _mouseWheelHook.Dispose();
             _isRubberBandActive = false;
             _rubberBandTracker.Reset();
+            ClearDraggedFlags();
+            _wrapPanel = null;
             InvalidateLayoutCache();
         };
     }
@@ -195,16 +198,12 @@ public partial class GridView : UserControl
             ? ViewModel.Document.Pages.Where(p => p.IsSelected).ToList()
             : new List<PdfPageModel> { page };
 
-        // ドラッグ元のサムネイル要素を半透明化
-        _draggedContainers.Clear();
+        // ドラッグ元のサムネイルモデルを半透明状態へ設定（コンテナリサイクル安全）
+        ClearDraggedFlags();
         foreach (var p in pagesToMove)
         {
-            int idx = ViewModel.Document.Pages.IndexOf(p);
-            if (ThumbnailItemsControl.ItemContainerGenerator.ContainerFromIndex(idx) is FrameworkElement container)
-            {
-                container.Opacity = 0.4;
-                _draggedContainers.Add(container);
-            }
+            p.IsBeingDragged = true;
+            _draggedPages.Add(p);
         }
 
         // 浮遊プレビュー用アドーナーを生成・配置
@@ -243,16 +242,24 @@ public partial class GridView : UserControl
             _dragAdorner = null;
         }
 
-        foreach (var elem in _draggedContainers)
-        {
-            elem.Opacity = 1.0;
-        }
-        _draggedContainers.Clear();
+        ClearDraggedFlags();
 
         HideInsertionIndicator();
         InvalidateLayoutCache();
         _dragStartPoint = null;
         _draggedPage = null;
+    }
+
+    /// <summary>
+    /// ドラッグ中の半透明状態フラグをすべて解除します。
+    /// </summary>
+    private void ClearDraggedFlags()
+    {
+        foreach (var p in _draggedPages)
+        {
+            p.IsBeingDragged = false;
+        }
+        _draggedPages.Clear();
     }
 
     /// <summary>
@@ -466,6 +473,18 @@ public partial class GridView : UserControl
             return _layoutCache;
         }
 
+        var wrapPanel = FindWrapPanel();
+        var itemBounds = wrapPanel != null && wrapPanel.CurrentLayout.Count == count
+            ? wrapPanel.BuildAllItemBounds(ItemsHostGrid)
+            : CollectRealizedItemBounds(count);
+
+        _cachedLayoutDocument = vm.Document;
+        _layoutCache = GridLayoutCache.Build(itemBounds, signature);
+        return _layoutCache;
+    }
+
+    private List<GridItemBounds> CollectRealizedItemBounds(int count)
+    {
         var itemBounds = new List<GridItemBounds>(count);
         for (int i = 0; i < count; i++)
         {
@@ -475,10 +494,39 @@ public partial class GridView : UserControl
                 itemBounds.Add(new GridItemBounds(i, new Rect(pos, container.RenderSize)));
             }
         }
+        return itemBounds;
+    }
 
-        _cachedLayoutDocument = vm.Document;
-        _layoutCache = GridLayoutCache.Build(itemBounds, signature);
-        return _layoutCache;
+    private VirtualizingThumbnailWrapPanel? FindWrapPanel()
+    {
+        if (_wrapPanel != null && PresentationSource.FromVisual(_wrapPanel) != null)
+        {
+            return _wrapPanel;
+        }
+
+        _wrapPanel = FindVisualChild<VirtualizingThumbnailWrapPanel>(ThumbnailItemsControl);
+        return _wrapPanel;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject
+    {
+        if (parent == null) return null;
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var nested = FindVisualChild<T>(child);
+            if (nested != null)
+            {
+                return nested;
+            }
+        }
+        return null;
     }
 
     /// <summary>
