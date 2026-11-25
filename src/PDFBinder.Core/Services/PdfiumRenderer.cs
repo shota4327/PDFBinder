@@ -228,6 +228,26 @@ public class PdfiumRenderer : IPdfRenderer
         }
     }
 
+    private static readonly BitmapSource SingleWhitePixelBitmap = CreateSingleWhitePixelBitmap();
+
+    /// <summary>
+    /// 空白ページ描画のベースとなる 1×1 白色ピクセルのフリーズ済みビットマップを生成します。
+    /// </summary>
+    private static BitmapSource CreateSingleWhitePixelBitmap()
+    {
+        var bitmap = BitmapSource.Create(
+            1,
+            1,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            new byte[] { 255, 255, 255, 255 },
+            4);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     /// <inheritdoc/>
     public BitmapSource CreateBlankPageBitmap(int targetWidth, int targetHeight, PageRotation rotation)
     {
@@ -239,13 +259,14 @@ public class PdfiumRenderer : IPdfRenderer
             (w, h) = (h, w);
         }
 
-        var writeable = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
-        byte[] pixels = new byte[w * h * 4];
-        Array.Fill(pixels, (byte)255);
+        if (w == 1 && h == 1)
+        {
+            return SingleWhitePixelBitmap;
+        }
 
-        writeable.WritePixels(new Int32Rect(0, 0, w, h), pixels, w * 4, 0);
-        writeable.Freeze();
-        return writeable;
+        var scaled = new TransformedBitmap(SingleWhitePixelBitmap, new ScaleTransform(w, h));
+        scaled.Freeze();
+        return scaled;
     }
 
     /// <inheritdoc/>
@@ -779,6 +800,9 @@ public class PdfiumRenderer : IPdfRenderer
                string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// 画像ファイル（JPG/PNG）をストリームからターゲット解像度へ直接縮小デコードし、回転・スケーリングを適用して返却します。
+    /// </summary>
     private static BitmapSource? RenderImagePage(
         string filePath,
         int targetWidth,
@@ -787,16 +811,19 @@ public class PdfiumRenderer : IPdfRenderer
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        byte[] bytes = File.ReadAllBytes(filePath);
-        cancellationToken.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream(bytes);
-        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-        BitmapSource? bitmap = BitmapTransformHelper.CreateDetachedBitmap(decoder.Frames[0]);
+        // 90度/270度回転時は、回転前の元画像座標系に合わせてデコード幅・高さを入れ替える
+        bool swapDimensions = rotation is PageRotation.Rotate90 or PageRotation.Rotate270;
+        int decodeWidth = swapDimensions ? targetHeight : targetWidth;
+        int decodeHeight = swapDimensions ? targetWidth : targetHeight;
+
+        BitmapSource? bitmap = DecodeImageWithTargetSize(filePath, decodeWidth, decodeHeight);
         if (bitmap == null)
         {
             return null;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (rotation != PageRotation.Rotate0)
         {
@@ -818,6 +845,32 @@ public class PdfiumRenderer : IPdfRenderer
             bitmap.Freeze();
         }
         return bitmap;
+    }
+
+    /// <summary>
+    /// 画像ファイルを FileStream 経由で開き、WIC デコーダー段階でターゲット寸法へデコードしたフリーズ済みビットマップを生成します。
+    /// </summary>
+    private static BitmapSource? DecodeImageWithTargetSize(string filePath, int decodeWidth, int decodeHeight)
+    {
+        using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var bitmapImage = new BitmapImage();
+        bitmapImage.BeginInit();
+        bitmapImage.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+        bitmapImage.StreamSource = fs;
+
+        if (decodeWidth > 0)
+        {
+            bitmapImage.DecodePixelWidth = decodeWidth;
+        }
+        if (decodeHeight > 0)
+        {
+            bitmapImage.DecodePixelHeight = decodeHeight;
+        }
+
+        bitmapImage.EndInit();
+        bitmapImage.Freeze();
+        return bitmapImage;
     }
 
     /// <summary>

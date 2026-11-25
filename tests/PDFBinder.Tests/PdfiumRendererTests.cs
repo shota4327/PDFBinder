@@ -734,6 +734,119 @@ public class PdfiumRendererTests : IDisposable
         var ifaceEx = Record.Exception(() => interfaceRenderer.Warmup());
         Assert.Null(ifaceEx);
     }
+
+    [Fact]
+    public void CreateBlankPageBitmap_LargeDimensions_ReturnsWhiteFrozenBitmapWithoutHugeAllocation()
+    {
+        // Act: 高倍率ズーム相当（4096×4096 および 8192×8192）の白紙ビットマップを生成
+        var bmp4k = _renderer.CreateBlankPageBitmap(4096, 4096, PageRotation.Rotate0);
+        var bmp8k = _renderer.CreateBlankPageBitmap(8192, 8192, PageRotation.Rotate0);
+
+        // Assert: 寸法・フリーズ状態が正しく保持されていること
+        Assert.NotNull(bmp4k);
+        Assert.Equal(4096, bmp4k.PixelWidth);
+        Assert.Equal(4096, bmp4k.PixelHeight);
+        Assert.True(bmp4k.IsFrozen);
+
+        Assert.NotNull(bmp8k);
+        Assert.Equal(8192, bmp8k.PixelWidth);
+        Assert.Equal(8192, bmp8k.PixelHeight);
+        Assert.True(bmp8k.IsFrozen);
+
+        // 左上(0, 0)と右下(4095, 4095)の1ピクセルが完全な不透明白（BGRA = 255, 255, 255, 255）であること
+        byte[] topLeft = new byte[4];
+        byte[] bottomRight = new byte[4];
+        bmp4k.CopyPixels(new System.Windows.Int32Rect(0, 0, 1, 1), topLeft, 4, 0);
+        bmp4k.CopyPixels(new System.Windows.Int32Rect(4095, 4095, 1, 1), bottomRight, 4, 0);
+        Assert.Equal(new byte[] { 255, 255, 255, 255 }, topLeft);
+        Assert.Equal(new byte[] { 255, 255, 255, 255 }, bottomRight);
+
+        // 別スレッドからの回転変換もスレッドアフィニティ例外なく安全に動作すること
+        BitmapSource? rotated = null;
+        var thread = new Thread(() =>
+        {
+            rotated = BitmapTransformHelper.CreateRotatedBitmap(bmp4k, 90);
+        });
+        thread.Start();
+        thread.Join();
+
+        Assert.NotNull(rotated);
+        Assert.True(rotated.IsFrozen);
+        Assert.Equal(4096, rotated.PixelWidth);
+        Assert.Equal(4096, rotated.PixelHeight);
+    }
+
+    [Theory]
+    [InlineData(200, 300, PageRotation.Rotate0, 200, 300)]
+    [InlineData(200, 300, PageRotation.Rotate90, 300, 200)]
+    [InlineData(200, 300, PageRotation.Rotate180, 200, 300)]
+    [InlineData(200, 300, PageRotation.Rotate270, 300, 200)]
+    [InlineData(0, -10, PageRotation.Rotate0, 1, 1)]
+    [InlineData(1, 1, PageRotation.Rotate90, 1, 1)]
+    public void CreateBlankPageBitmap_AllRotationsAndEdgeDimensions_ReturnsExpectedDimensions(
+        int targetWidth,
+        int targetHeight,
+        PageRotation rotation,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        // Act
+        var bitmap = _renderer.CreateBlankPageBitmap(targetWidth, targetHeight, rotation);
+
+        // Assert
+        Assert.NotNull(bitmap);
+        Assert.True(bitmap.IsFrozen);
+        Assert.Equal(expectedWidth, bitmap.PixelWidth);
+        Assert.Equal(expectedHeight, bitmap.PixelHeight);
+    }
+
+    [Theory]
+    [InlineData("large_downscale.png", true, PageRotation.Rotate0, 150, 100)]
+    [InlineData("large_downscale_rot90.png", true, PageRotation.Rotate90, 100, 150)]
+    [InlineData("large_downscale_rot270.jpg", false, PageRotation.Rotate270, 100, 150)]
+    public async Task RenderPageAsync_LargeImageDownscaled_RendersTargetSizeWithoutFileLock(
+        string fileName,
+        bool isPng,
+        PageRotation rotation,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        // Arrange: 1200×800 の高解像度画像ファイルを作成
+        string imagePath = Path.Combine(_testDirectory, fileName);
+        var rtb = new RenderTargetBitmap(1200, 800, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        BitmapEncoder encoder = isPng ? new PngBitmapEncoder() : new JpegBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(imagePath))
+        {
+            encoder.Save(fs);
+        }
+
+        // Act: 縮小サイズ指定でレンダリング
+        var bitmap = await _renderer.RenderPageAsync(imagePath, 0, expectedWidth, expectedHeight, rotation);
+
+        // Assert: 指定通りの寸法でフリーズされていること
+        Assert.NotNull(bitmap);
+        Assert.True(bitmap.IsFrozen);
+        Assert.Equal(expectedWidth, bitmap.PixelWidth);
+        Assert.Equal(expectedHeight, bitmap.PixelHeight);
+
+        // 別スレッドからの追加回転変換もスレッドアフィニティ例外なく安全に動作すること
+        BitmapSource? furtherRotated = null;
+        var thread = new Thread(() =>
+        {
+            furtherRotated = BitmapTransformHelper.CreateRotatedBitmap(bitmap, 90);
+        });
+        thread.Start();
+        thread.Join();
+
+        Assert.NotNull(furtherRotated);
+        Assert.True(furtherRotated.IsFrozen);
+        Assert.Equal(expectedHeight, furtherRotated.PixelWidth);
+        Assert.Equal(expectedWidth, furtherRotated.PixelHeight);
+
+        // レンダリング直後にファイルロックが残らず上書き可能であること
+        File.WriteAllBytes(imagePath, File.ReadAllBytes(imagePath));
+    }
 }
 
 
