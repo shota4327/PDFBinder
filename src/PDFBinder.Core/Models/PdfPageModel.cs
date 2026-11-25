@@ -61,6 +61,10 @@ public partial class PdfPageModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    /// <summary>グリッドビューでドラッグ移動中であるかどうか（UI一時状態）</summary>
+    [ObservableProperty]
+    private bool _isBeingDragged;
+
     [ObservableProperty]
     private bool _isModified;
 

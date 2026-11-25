@@ -21,6 +21,7 @@ public partial class DetailEditorView : UserControl
     private readonly WheelPageTurnTracker _wheelTracker = new();
     private readonly DetailTouchTracker _touchTracker = new();
     private readonly DispatcherTimer _scrollDebounceTimer;
+    private VirtualizingPageStackPanel? _pageStackPanel;
 
     internal DetailTouchTracker TouchTracker => _touchTracker;
 
@@ -58,6 +59,7 @@ public partial class DetailEditorView : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _scrollDebounceTimer.Stop();
+        _pageStackPanel = null;
     }
 
     private void OnScrollDebounceTimerTick(object? sender, EventArgs e)
@@ -191,24 +193,94 @@ public partial class DetailEditorView : UserControl
 
     private void ScrollToPageInContinuousMode(PdfPageModel page, bool isRetry)
     {
-        var itemVm = ViewModel?.Pages.FirstOrDefault(p => p.Page == page);
-        if (itemVm == null) return;
+        if (ViewModel == null) return;
 
-        if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is FrameworkElement container)
+        int pageIndex = FindPageIndex(page);
+        if (pageIndex < 0) return;
+
+        DetailScrollViewer.UpdateLayout();
+        if (!isRetry && DetailScrollViewer.ExtentHeight <= 0 && ViewModel.Pages.Count > 1)
         {
-            var transform = container.TransformToVisual(DetailScrollViewer);
-            Point pt = transform.Transform(new Point(0, 0));
-            double targetOffset = DetailScrollViewer.VerticalOffset + pt.Y - DetailScrollViewer.Padding.Top;
-            DetailScrollViewer.ScrollToVerticalOffset(Math.Max(0.0, targetOffset));
-        }
-        else if (!isRetry)
-        {
-            // 非表示からの復帰直後等でコンテナが未生成の場合はレイアウト完了後に再試行
+            // 非表示からの復帰直後等でレイアウト未完了の場合はレンダリング後に再試行
             Dispatcher.InvokeAsync(() =>
             {
                 ScrollToPageInContinuousMode(page, isRetry: true);
-            }, System.Windows.Threading.DispatcherPriority.Render);
+            }, DispatcherPriority.Render);
+            return;
         }
+
+        double targetOffset = GetContinuousLayout().GetPageScrollOffset(
+            pageIndex,
+            ViewModel.Zoom,
+            DetailEditorViewModel.PageShadowMargin);
+
+        if (DetailScrollViewer.ScrollableHeight > 0)
+        {
+            targetOffset = Math.Clamp(targetOffset, 0.0, DetailScrollViewer.ScrollableHeight);
+        }
+
+        DetailScrollViewer.ScrollToVerticalOffset(Math.Max(0.0, targetOffset));
+    }
+
+    private int FindPageIndex(PdfPageModel page)
+    {
+        if (ViewModel == null) return -1;
+        for (int i = 0; i < ViewModel.Pages.Count; i++)
+        {
+            if (ViewModel.Pages[i].Page == page)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private ContinuousPageLayoutCalculator GetContinuousLayout()
+    {
+        if (ViewModel == null)
+        {
+            return ContinuousPageLayoutCalculator.Build(Array.Empty<PageSizeMetric>());
+        }
+
+        var panel = FindPageStackPanel();
+        if (panel != null && panel.CurrentLayout.Count == ViewModel.Pages.Count)
+        {
+            return panel.CurrentLayout;
+        }
+
+        return ContinuousPageLayoutCalculator.Build(ViewModel.Pages, pageSpacing: 30.0);
+    }
+
+    private VirtualizingPageStackPanel? FindPageStackPanel()
+    {
+        if (_pageStackPanel != null && PresentationSource.FromVisual(_pageStackPanel) != null)
+        {
+            return _pageStackPanel;
+        }
+
+        _pageStackPanel = FindVisualChild<VirtualizingPageStackPanel>(PagesItemsControl);
+        return _pageStackPanel;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject
+    {
+        if (parent == null) return null;
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var nested = FindVisualChild<T>(child);
+            if (nested != null)
+            {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private void OnPagePreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -267,7 +339,7 @@ public partial class DetailEditorView : UserControl
     }
 
     /// <summary>
-    /// 指定インデックスのページコンテナにおけるビューポート相対の垂直境界を取得します。
+    /// 指定インデックスのページにおけるビューポート相対の垂直境界を仮想化対応レイアウトから O(1) で取得します。
     /// </summary>
     private PageBounds? GetPageBounds(int index)
     {
@@ -276,20 +348,13 @@ public partial class DetailEditorView : UserControl
             return null;
         }
 
-        var itemVm = ViewModel.Pages[index];
-        if (PagesItemsControl.ItemContainerGenerator.ContainerFromItem(itemVm) is not FrameworkElement container)
-        {
-            return null;
-        }
-
-        if (container.ActualHeight <= 0)
-        {
-            return null;
-        }
-
-        var transform = container.TransformToVisual(DetailScrollViewer);
-        Point pt = transform.Transform(new Point(0, 0));
-        return new PageBounds(pt.Y, pt.Y + container.ActualHeight);
+        return GetContinuousLayout().GetViewportRelativeBounds(
+            index,
+            ViewModel.Zoom,
+            DetailScrollViewer.VerticalOffset,
+            DetailScrollViewer.ViewportHeight,
+            DetailEditorViewModel.PageShadowMargin,
+            bottomMargin: 62.0);
     }
 
     /// <summary>

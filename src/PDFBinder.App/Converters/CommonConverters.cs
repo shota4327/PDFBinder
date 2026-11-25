@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using PDFBinder.App.Controls;
+using PDFBinder.App.Helpers;
 
 namespace PDFBinder.App.Converters;
 
@@ -222,5 +223,49 @@ public class ColorToContrastingBrushConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         throw new NotSupportedException();
+    }
+}
+
+/// <summary>
+/// サムネイル基準幅およびページの表示寸法からアスペクト比を維持したサムネイル高さを算出するマルチバインディングコンバーター
+/// </summary>
+public class ThumbnailHeightConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length >= 3 &&
+            TryToDouble(values[0], out double thumbnailSize) &&
+            TryToDouble(values[1], out double displayWidth) &&
+            TryToDouble(values[2], out double displayHeight))
+        {
+            return ThumbnailGridLayoutCalculator.CalculateImageHeight(thumbnailSize, displayWidth, displayHeight);
+        }
+
+        return double.NaN;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+    {
+        throw new NotSupportedException();
+    }
+
+    private static bool TryToDouble(object? value, out double result)
+    {
+        if (value == null || value == DependencyProperty.UnsetValue)
+        {
+            result = 0;
+            return false;
+        }
+
+        try
+        {
+            result = System.Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            return !double.IsNaN(result) && !double.IsInfinity(result);
+        }
+        catch
+        {
+            result = 0;
+            return false;
+        }
     }
 }

@@ -3,10 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+             xmlns:controls="clr-namespace:PDFBinder.App.Controls"
              xmlns:models="clr-namespace:PDFBinder.Core.Models;assembly=PDFBinder.Core"
              xmlns:vm="clr-namespace:PDFBinder.App.ViewModels"
-             mc:Ignorable="d" 
+             mc:Ignorable="d po" 
              d:DesignHeight="600" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <!-- サムネイルカード用共有シャドウエフェクト（凍結済み） -->
+        <DropShadowEffect x:Key="ThumbnailCardNormalShadowEffect"
+                          po:Freeze="True"
+                          BlurRadius="8"
+                          ShadowDepth="2"
+                          Direction="270"
+                          Opacity="0.4"
+                          Color="#000000" />
+        <DropShadowEffect x:Key="ThumbnailCardSelectedShadowEffect"
+                          po:Freeze="True"
+                          BlurRadius="12"
+                          ShadowDepth="0"
+                          Opacity="0.8"
+                          Color="#007ACC" />
+    </UserControl.Resources>
     
     <Grid Background="{StaticResource AppBackgroundBrush}">
         <!-- 空白時のウェルカム表示 -->
@@ -45,52 +64,92 @@
                   Background="Transparent"
                   MinHeight="{Binding ViewportHeight, ElementName=GridScrollViewer}"
                   MinWidth="{Binding ViewportWidth, ElementName=GridScrollViewer}">
-                <ItemsControl x:Name="ThumbnailItemsControl" ItemsSource="{Binding Document.Pages}">
+                <ItemsControl x:Name="ThumbnailItemsControl"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="ItemsSource" Value="{x:Null}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsDetailViewActive}" Value="False">
+                                    <Setter Property="ItemsSource" Value="{Binding Document.Pages}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel x:Name="ThumbnailWrapPanel" Orientation="Horizontal" />
+                            <controls:VirtualizingThumbnailWrapPanel
+                                x:Name="ThumbnailWrapPanel"
+                                ThumbnailSize="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:PdfPageModel}">
-                            <Border x:Name="PageBorder"
-                                    Margin="10"
-                                    Background="White"
-                                    CornerRadius="4"
-                                    BorderThickness="5"
-                                    SnapsToDevicePixels="True"
-                                    Cursor="Hand"
-                                    MouseLeftButtonDown="OnPageMouseLeftButtonDown"
-                                    MouseLeftButtonUp="OnPageMouseLeftButtonUp"
-                                    MouseMove="OnPageMouseMove">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="BorderBrush" Value="#2E2E2E" />
-                                        <Setter Property="Effect">
-                                            <Setter.Value>
-                                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="270" Opacity="0.4" Color="#000000" />
-                                            </Setter.Value>
-                                        </Setter>
+                            <Grid Margin="10" SnapsToDevicePixels="True">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Opacity" Value="1.0" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                                <Setter Property="Effect">
-                                                    <Setter.Value>
-                                                        <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#007ACC" Opacity="0.8" />
-                                                    </Setter.Value>
-                                                </Setter>
+                                            <DataTrigger Binding="{Binding IsBeingDragged}" Value="True">
+                                                <Setter Property="Opacity" Value="0.4" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Border.Style>
+                                </Grid.Style>
 
-                                <!-- サムネイル画像（余計なコンテナ枠を排した純粋表示） -->
-                                <Image Source="{Binding Thumbnail}"
-                                       Width="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                       Stretch="Uniform"
-                                       SnapsToDevicePixels="True"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-                            </Border>
+                                <!-- 影専用の背面要素（子要素を持たないため、画像ごとのオフスクリーンブラー再計算を抑止） -->
+                                <Border CornerRadius="4"
+                                        Background="#2E2E2E"
+                                        IsHitTestVisible="False">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Effect" Value="{StaticResource ThumbnailCardNormalShadowEffect}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Effect" Value="{StaticResource ThumbnailCardSelectedShadowEffect}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+
+                                <Border x:Name="PageBorder"
+                                        Background="White"
+                                        CornerRadius="4"
+                                        BorderThickness="5"
+                                        SnapsToDevicePixels="True"
+                                        Cursor="Hand"
+                                        MouseLeftButtonDown="OnPageMouseLeftButtonDown"
+                                        MouseLeftButtonUp="OnPageMouseLeftButtonUp"
+                                        MouseMove="OnPageMouseMove">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="#2E2E2E" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+
+                                    <!-- サムネイル画像（アスペクト比に基づく事前高さバインドにより未生成時のレイアウトずれを防止） -->
+                                    <Image Source="{Binding Thumbnail}"
+                                           Width="{Binding DataContext.ThumbnailSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           Stretch="Uniform"
+                                           SnapsToDevicePixels="True"
+                                           RenderOptions.BitmapScalingMode="HighQuality">
+                                        <Image.Height>
+                                            <MultiBinding Converter="{StaticResource ThumbnailHeightConverter}">
+                                                <Binding Path="DataContext.ThumbnailSize" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                                <Binding Path="DisplayWidth" />
+                                                <Binding Path="DisplayHeight" />
+                                            </MultiBinding>
+                                        </Image.Height>
+                                    </Image>
+                                </Border>
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

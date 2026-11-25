@@ -235,10 +235,15 @@ public class EditorInkCanvas : InkCanvas
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        _parentScrollViewer = null;
         if (PageItem != null)
         {
             PageItem.Page.InkStrokes.StrokesChanged -= OnMasterStrokesChanged;
             PageItem.Page.InkStrokes.StrokesChanged += OnMasterStrokesChanged;
+            if (IsEraserOrSelectMode(ToolMode) || PageItem.Page.InkStrokes.Count > 0)
+            {
+                SyncStrokesWithCurrentMode();
+            }
         }
     }
 
@@ -248,6 +253,11 @@ public class EditorInkCanvas : InkCanvas
         {
             PageItem.Page.InkStrokes.StrokesChanged -= OnMasterStrokesChanged;
         }
+        _parentScrollViewer = null;
+        _isDrawingLine = false;
+        _lineStartPoint = null;
+        _currentLinePoint = null;
+        _panStartPoint = null;
     }
 
     private static void OnToolModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

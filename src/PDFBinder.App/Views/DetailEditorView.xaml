@@ -3,12 +3,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
              xmlns:controls="clr-namespace:PDFBinder.App.Controls"
              xmlns:vm="clr-namespace:PDFBinder.App.ViewModels"
-             mc:Ignorable="d" 
+             mc:Ignorable="d po" 
              d:DesignHeight="700" d:DesignWidth="900">
     
     <UserControl.Resources>
+        <!-- ページ影用共有シャドウエフェクト（凍結済み） -->
+        <DropShadowEffect x:Key="DetailPageShadowEffect"
+                          po:Freeze="True"
+                          BlurRadius="20"
+                          ShadowDepth="4"
+                          Direction="270"
+                          Opacity="0.5"
+                          Color="#000000" />
+
         <!-- ページ描画用共通データテンプレート -->
         <DataTemplate x:Key="DetailPageItemTemplate" DataType="{x:Type vm:DetailPageItemViewModel}">
             <!-- 影とページコンテンツを分離したレイアウトコンテナ -->
@@ -18,11 +28,8 @@
                 <Border Background="White"
                         CornerRadius="4"
                         BorderThickness="1"
-                        BorderBrush="{StaticResource SurfaceBorderBrush}">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Opacity="0.5" Color="#000000" />
-                    </Border.Effect>
-                </Border>
+                        BorderBrush="{StaticResource SurfaceBorderBrush}"
+                        Effect="{StaticResource DetailPageShadowEffect}" />
 
                 <!-- ページ描画コンテナ（Effectがかかっていないため超高速描画） -->
                 <Grid Width="{Binding Page.DisplayWidth}" Height="{Binding Page.DisplayHeight}" ClipToBounds="True">
@@ -127,26 +134,31 @@
                     </ContentControl.Style>
                 </ContentControl>
 
-                <!-- 連続表示（縦連続スクロール表示） -->
+                <!-- 連続表示（縦連続スクロール表示：IsContinuousMode時のみバインド＋UI仮想化） -->
                 <ItemsControl x:Name="PagesItemsControl"
-                              ItemsSource="{Binding Pages}"
                               ItemTemplate="{StaticResource DetailPageItemTemplate}"
-                              HorizontalAlignment="Center"
-                              Visibility="{Binding PageViewMode, Converter={StaticResource EqualityToVisibilityConverter}, ConverterParameter=Continuous}">
-                    <ItemsControl.ItemContainerStyle>
-                        <Style TargetType="ContentPresenter">
-                            <!-- 先頭ページ上部および最終ページ下部の余白を除去し、中間ページ間余白のみを30pxに統一 -->
-                            <Setter Property="Margin" Value="0,0,0,30" />
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              HorizontalAlignment="Center">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="ItemsSource" Value="{x:Null}" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsLastPage}" Value="True">
-                                    <Setter Property="Margin" Value="0" />
+                                <DataTrigger Binding="{Binding IsContinuousMode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="ItemsSource" Value="{Binding Pages}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </ItemsControl.ItemContainerStyle>
+                    </ItemsControl.Style>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" />
+                            <controls:VirtualizingPageStackPanel
+                                PageSpacing="30"
+                                TopMargin="20"
+                                BottomMargin="62"
+                                Zoom="{Binding DataContext.Zoom, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>

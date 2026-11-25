@@ -103,10 +103,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public Func<int, Task>? PipelineExecutionHandler { get; set; }
 
+    private readonly BulkObservableCollection<DetailPageItemViewModel> _pages = new();
+
     /// <summary>
     /// 全ページの表示状態を管理するコレクション
     /// </summary>
-    public ObservableCollection<DetailPageItemViewModel> Pages { get; } = new();
+    public ObservableCollection<DetailPageItemViewModel> Pages => _pages;
 
     /// <summary>
     /// 現在表示中・操作対象のページ
@@ -306,7 +308,13 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// 現在のページ表示モード（単一ページ表示 / 連続表示）
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsContinuousMode))]
     private DetailPageViewMode _pageViewMode = DetailPageViewMode.SinglePage;
+
+    /// <summary>
+    /// 現在連続スクロール表示モードであるかどうかを取得します。
+    /// </summary>
+    public bool IsContinuousMode => PageViewMode == DetailPageViewMode.Continuous;
 
     partial void OnPageViewModeChanged(DetailPageViewMode value)
     {
@@ -422,29 +430,35 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         var previousIndex = CurrentPageIndex;
         SavedVerticalOffset = 0;
         SavedHorizontalOffset = 0;
-        ClearPageItems();
-        foreach (var page in document.Pages)
+        DisposePageItemsWithoutClear();
+
+        var newItems = new List<DetailPageItemViewModel>(document.Pages.Count);
+        for (int i = 0; i < document.Pages.Count; i++)
         {
-            AddPageItem(new DetailPageItemViewModel(page));
+            var item = new DetailPageItemViewModel(document.Pages[i]);
+            item.PageJumpRequested += OnPageJumpRequested;
+            newItems.Add(item);
         }
 
         var targetPage = ResolveTargetPage(document, preferredPage, previousPage, previousIndex);
+        for (int i = 0; i < newItems.Count; i++)
+        {
+            newItems[i].IsCurrent = (newItems[i].Page == targetPage);
+            newItems[i].IsFirstPage = (i == 0);
+            newItems[i].IsLastPage = (i == newItems.Count - 1);
+        }
+
+        _pages.ReplaceAll(newItems);
 
         // プロパティ変更通知を確実に発火させ、UIバインディング（CurrentPageItem等）の更新を保証
         CurrentPage = null;
         CurrentPage = targetPage;
-
-        foreach (var item in Pages)
-        {
-            item.IsCurrent = (item.Page == targetPage);
-        }
 
         OnPropertyChanged(nameof(CurrentPageItem));
         OnPropertyChanged(nameof(PageBackground));
         OnPropertyChanged(nameof(CurrentPageIndex));
         OnPropertyChanged(nameof(CurrentPageNumber));
 
-        UpdatePageEdgeFlags();
         if (preferredFitMode.HasValue && FitMode != preferredFitMode.Value)
         {
             FitMode = preferredFitMode.Value;
@@ -509,12 +523,20 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     private void ClearPageItems()
     {
-        foreach (var item in Pages)
+        DisposePageItemsWithoutClear();
+        _pages.Clear();
+    }
+
+    /// <summary>
+    /// 全ページアイテムのイベント購読解除およびリソース解放のみを行います（コレクションのクリアは呼び出し元で実施）。
+    /// </summary>
+    private void DisposePageItemsWithoutClear()
+    {
+        foreach (var item in _pages)
         {
             item.PageJumpRequested -= OnPageJumpRequested;
             item.Dispose();
         }
-        Pages.Clear();
     }
 
     /// <summary>

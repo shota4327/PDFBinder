@@ -18,6 +18,7 @@
             <converters:DoubleEqualsToBooleanConverter x:Key="DoubleEqualsToBooleanConverter" />
             <converters:ColorEqualsToVisibilityConverter x:Key="ColorEqualsToVisibilityConverter" />
             <converters:ColorToContrastingBrushConverter x:Key="ColorToContrastingBrushConverter" />
+            <converters:ThumbnailHeightConverter x:Key="ThumbnailHeightConverter" />
 
             <!-- アイコンフォント（Material Symbols Outlined - 埋め込みリソース） -->
             <FontFamily x:Key="IconFontFamily">pack://application:,,,/PDFBinder;component/Assets/Fonts/#Material Symbols Outlined</FontFamily>
