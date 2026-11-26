@@ -22,6 +22,7 @@ public partial class DetailEditorView : UserControl
     private readonly DetailTouchTracker _touchTracker = new();
     private readonly DispatcherTimer _scrollDebounceTimer;
     private VirtualizingPageStackPanel? _pageStackPanel;
+    private VirtualizingPageStackPanel? _spreadStackPanel;
 
     internal DetailTouchTracker TouchTracker => _touchTracker;
 
@@ -41,6 +42,8 @@ public partial class DetailEditorView : UserControl
         DetailScrollViewer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         PagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
         SinglePageContainer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+        SingleSpreadContainer.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
+        SpreadPagesItemsControl.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler(OnRequestBringIntoView), true);
 
         AttachScrollViewerTouchHandlers();
 
@@ -60,6 +63,7 @@ public partial class DetailEditorView : UserControl
     {
         _scrollDebounceTimer.Stop();
         _pageStackPanel = null;
+        _spreadStackPanel = null;
     }
 
     private void OnScrollDebounceTimerTick(object? sender, EventArgs e)
@@ -140,7 +144,7 @@ public partial class DetailEditorView : UserControl
             try
             {
                 DetailScrollViewer.UpdateLayout();
-                if (newVm.PageViewMode == DetailPageViewMode.Continuous)
+                if (newVm.IsContinuousLayoutMode)
                 {
                     if (newVm.SavedVerticalOffset > 0 || newVm.SavedHorizontalOffset > 0)
                     {
@@ -149,7 +153,7 @@ public partial class DetailEditorView : UserControl
                     }
                     else if (newVm.CurrentPage != null)
                     {
-                        ScrollToPageInContinuousMode(newVm.CurrentPage, isRetry: false);
+                        ScrollToPageInContinuousLayout(newVm.CurrentPage, isRetry: false);
                     }
                 }
                 else
@@ -179,38 +183,59 @@ public partial class DetailEditorView : UserControl
     {
         Dispatcher.InvokeAsync(() =>
         {
-            if (_isRestoringScroll) return;
+            if (_isRestoringScroll || ViewModel == null) return;
 
-            if (ViewModel?.PageViewMode == DetailPageViewMode.SinglePage)
+            if (!ViewModel.IsContinuousLayoutMode)
             {
                 DetailScrollViewer.ScrollToTop();
                 return;
             }
 
-            ScrollToPageInContinuousMode(page, isRetry: false);
+            ScrollToPageInContinuousLayout(page, isRetry: false);
         }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
-    private void ScrollToPageInContinuousMode(PdfPageModel page, bool isRetry)
+    private void ScrollToPageInContinuousLayout(PdfPageModel page, bool isRetry)
     {
         if (ViewModel == null) return;
+
+        if (ViewModel.IsTwoPageContinuousMode)
+        {
+            int rowIndex = FindSpreadRowIndex(page);
+            if (rowIndex < 0) return;
+
+            ScrollToIndexInLayout(GetSpreadContinuousLayout(), rowIndex, ViewModel.SpreadRows.Count, page, isRetry);
+            return;
+        }
 
         int pageIndex = FindPageIndex(page);
         if (pageIndex < 0) return;
 
+        ScrollToIndexInLayout(GetContinuousLayout(), pageIndex, ViewModel.Pages.Count, page, isRetry);
+    }
+
+    private void ScrollToIndexInLayout(
+        ContinuousPageLayoutCalculator layout,
+        int itemIndex,
+        int itemCount,
+        PdfPageModel page,
+        bool isRetry)
+    {
+        if (ViewModel == null) return;
+
         DetailScrollViewer.UpdateLayout();
-        if (!isRetry && DetailScrollViewer.ExtentHeight <= 0 && ViewModel.Pages.Count > 1)
+        if (!isRetry && DetailScrollViewer.ExtentHeight <= 0 && itemCount > 1)
         {
             // 非表示からの復帰直後等でレイアウト未完了の場合はレンダリング後に再試行
             Dispatcher.InvokeAsync(() =>
             {
-                ScrollToPageInContinuousMode(page, isRetry: true);
+                ScrollToPageInContinuousLayout(page, isRetry: true);
             }, DispatcherPriority.Render);
             return;
         }
 
-        double targetOffset = GetContinuousLayout().GetPageScrollOffset(
-            pageIndex,
+        double targetOffset = layout.GetPageScrollOffset(
+            itemIndex,
             ViewModel.Zoom,
             DetailEditorViewModel.PageShadowMargin);
 
@@ -235,6 +260,19 @@ public partial class DetailEditorView : UserControl
         return -1;
     }
 
+    private int FindSpreadRowIndex(PdfPageModel page)
+    {
+        if (ViewModel == null) return -1;
+        for (int i = 0; i < ViewModel.SpreadRows.Count; i++)
+        {
+            if (ViewModel.SpreadRows[i].ContainsPage(page))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private ContinuousPageLayoutCalculator GetContinuousLayout()
     {
         if (ViewModel == null)
@@ -251,6 +289,28 @@ public partial class DetailEditorView : UserControl
         return ContinuousPageLayoutCalculator.Build(ViewModel.Pages, pageSpacing: 30.0);
     }
 
+    private ContinuousPageLayoutCalculator GetSpreadContinuousLayout()
+    {
+        if (ViewModel == null || ViewModel.SpreadRows.Count == 0)
+        {
+            return ContinuousPageLayoutCalculator.Build(Array.Empty<PageSizeMetric>());
+        }
+
+        var panel = FindSpreadStackPanel();
+        if (panel != null && panel.CurrentLayout.Count == ViewModel.SpreadRows.Count)
+        {
+            return panel.CurrentLayout;
+        }
+
+        var metrics = new PageSizeMetric[ViewModel.SpreadRows.Count];
+        for (int i = 0; i < ViewModel.SpreadRows.Count; i++)
+        {
+            var row = ViewModel.SpreadRows[i];
+            metrics[i] = new PageSizeMetric(row.DisplayWidth, row.DisplayHeight);
+        }
+        return ContinuousPageLayoutCalculator.Build(metrics, pageSpacing: 30.0);
+    }
+
     private VirtualizingPageStackPanel? FindPageStackPanel()
     {
         if (_pageStackPanel != null && PresentationSource.FromVisual(_pageStackPanel) != null)
@@ -260,6 +320,17 @@ public partial class DetailEditorView : UserControl
 
         _pageStackPanel = FindVisualChild<VirtualizingPageStackPanel>(PagesItemsControl);
         return _pageStackPanel;
+    }
+
+    private VirtualizingPageStackPanel? FindSpreadStackPanel()
+    {
+        if (_spreadStackPanel != null && PresentationSource.FromVisual(_spreadStackPanel) != null)
+        {
+            return _spreadStackPanel;
+        }
+
+        _spreadStackPanel = FindVisualChild<VirtualizingPageStackPanel>(SpreadPagesItemsControl);
+        return _spreadStackPanel;
     }
 
     private static T? FindVisualChild<T>(DependencyObject? parent) where T : DependencyObject
@@ -299,8 +370,8 @@ public partial class DetailEditorView : UserControl
     {
         if (_isRestoringScroll) return;
 
-        // 連続表示時のみ、スクロール位置に応じた現在ページ判定を実施
-        if (ViewModel == null || ViewModel.Pages.Count == 0 || ViewModel.PageViewMode != DetailPageViewMode.Continuous) return;
+        // 連続表示系モード時のみ、スクロール位置に応じた現在ページ判定を実施
+        if (ViewModel == null || ViewModel.Pages.Count == 0 || !ViewModel.IsContinuousLayoutMode) return;
 
         UpdateCurrentPageFromScroll();
 
@@ -316,6 +387,12 @@ public partial class DetailEditorView : UserControl
     {
         if (ViewModel == null || DetailScrollViewer.ViewportHeight <= 0) return;
 
+        if (ViewModel.IsTwoPageContinuousMode)
+        {
+            UpdateCurrentPageFromSpreadScroll();
+            return;
+        }
+
         var visibleItems = ViewportLayoutHelper.FindVisibleItems(
             ViewModel.Pages.Count,
             DetailScrollViewer.ViewportHeight,
@@ -326,15 +403,40 @@ public partial class DetailEditorView : UserControl
 
         if (bestIndex.HasValue && bestIndex.Value >= 0 && bestIndex.Value < ViewModel.Pages.Count)
         {
-            var bestMatch = ViewModel.Pages[bestIndex.Value];
-            if (ViewModel.CurrentPage != bestMatch.Page)
+            SetCurrentPageItemFromScroll(ViewModel.Pages[bestIndex.Value]);
+        }
+    }
+
+    private void UpdateCurrentPageFromSpreadScroll()
+    {
+        if (ViewModel == null || ViewModel.SpreadRows.Count == 0) return;
+
+        var visibleRows = ViewportLayoutHelper.FindVisibleItems(
+            ViewModel.SpreadRows.Count,
+            DetailScrollViewer.ViewportHeight,
+            GetSpreadRowBounds);
+
+        double targetCenterY = DetailScrollViewer.ViewportHeight / 2.0;
+        int? bestIndex = ViewportLayoutHelper.FindBestMatchingIndex(visibleRows, targetCenterY);
+
+        if (bestIndex.HasValue && bestIndex.Value >= 0 && bestIndex.Value < ViewModel.SpreadRows.Count)
+        {
+            var row = ViewModel.SpreadRows[bestIndex.Value];
+            if (!row.ContainsPage(ViewModel.CurrentPage))
             {
-                ViewModel.CurrentPage = bestMatch.Page;
-                foreach (var p in ViewModel.Pages)
-                {
-                    p.IsCurrent = (p == bestMatch);
-                }
+                SetCurrentPageItemFromScroll(row.PrimaryPage);
             }
+        }
+    }
+
+    private void SetCurrentPageItemFromScroll(DetailPageItemViewModel bestMatch)
+    {
+        if (ViewModel == null || ViewModel.CurrentPage == bestMatch.Page) return;
+
+        ViewModel.CurrentPage = bestMatch.Page;
+        foreach (var p in ViewModel.Pages)
+        {
+            p.IsCurrent = (p == bestMatch);
         }
     }
 
@@ -342,13 +444,23 @@ public partial class DetailEditorView : UserControl
     /// 指定インデックスのページにおけるビューポート相対の垂直境界を仮想化対応レイアウトから O(1) で取得します。
     /// </summary>
     private PageBounds? GetPageBounds(int index)
-    {
-        if (ViewModel == null || index < 0 || index >= ViewModel.Pages.Count)
-        {
-            return null;
-        }
+        => ViewModel != null && index >= 0 && index < ViewModel.Pages.Count
+            ? GetBoundsFromLayout(GetContinuousLayout(), index)
+            : null;
 
-        return GetContinuousLayout().GetViewportRelativeBounds(
+    /// <summary>
+    /// 指定インデックスの見開き行におけるビューポート相対の垂直境界を O(1) で取得します。
+    /// </summary>
+    private PageBounds? GetSpreadRowBounds(int index)
+        => ViewModel != null && index >= 0 && index < ViewModel.SpreadRows.Count
+            ? GetBoundsFromLayout(GetSpreadContinuousLayout(), index)
+            : null;
+
+    private PageBounds? GetBoundsFromLayout(ContinuousPageLayoutCalculator layout, int index)
+    {
+        if (ViewModel == null) return null;
+
+        return layout.GetViewportRelativeBounds(
             index,
             ViewModel.Zoom,
             DetailScrollViewer.VerticalOffset,
@@ -365,6 +477,24 @@ public partial class DetailEditorView : UserControl
         if (ViewModel == null || DetailScrollViewer.ViewportHeight <= 0)
         {
             return Enumerable.Empty<DetailPageItemViewModel>();
+        }
+
+        if (ViewModel.IsTwoPageContinuousMode)
+        {
+            var visibleRows = ViewportLayoutHelper.FindVisibleItems(
+                ViewModel.SpreadRows.Count,
+                DetailScrollViewer.ViewportHeight,
+                GetSpreadRowBounds);
+
+            var spreadResult = new List<DetailPageItemViewModel>(visibleRows.Count * 2);
+            foreach (var item in visibleRows)
+            {
+                if (item.Index >= 0 && item.Index < ViewModel.SpreadRows.Count)
+                {
+                    spreadResult.AddRange(ViewModel.SpreadRows[item.Index].GetPages());
+                }
+            }
+            return spreadResult;
         }
 
         var visibleItems = ViewportLayoutHelper.FindVisibleItems(
@@ -402,7 +532,7 @@ public partial class DetailEditorView : UserControl
             return;
         }
 
-        if (ViewModel.PageViewMode == DetailPageViewMode.SinglePage)
+        if (!ViewModel.IsContinuousLayoutMode)
         {
             HandleSinglePageWheelTurn(e);
         }

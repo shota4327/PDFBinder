@@ -45,11 +45,25 @@ public partial class DocumentSession : ObservableObject, IDisposable
         set => DetailEditor.SetFitMode(value);
     }
 
-    /// <summary>詳細エディタの表示レイアウトモード（単一ページ vs 連続スクロール）</summary>
+    /// <summary>詳細エディタの表示レイアウトモード（単一 / 連続 / 見開き / 見開き連続）</summary>
     public DetailPageViewMode PageViewMode
     {
         get => DetailEditor.PageViewMode;
         set => DetailEditor.SetPageViewMode(value);
+    }
+
+    /// <summary>見開き表示時に1ページ目（表紙）を単独表示するかどうか</summary>
+    public bool ShowCoverPageSeparately
+    {
+        get => DetailEditor.ShowCoverPageSeparately;
+        set => DetailEditor.ShowCoverPageSeparately = value;
+    }
+
+    /// <summary>見開き表示時の綴じ方向（左綴じ / 右綴じ）</summary>
+    public PdfReadingDirection ReadingDirection
+    {
+        get => DetailEditor.ReadingDirection;
+        set => DetailEditor.ReadingDirection = value;
     }
 
     /// <summary>保持している垂直スクロール位置（px）</summary>
@@ -125,6 +139,14 @@ public partial class DocumentSession : ObservableObject, IDisposable
         else if (e.PropertyName == nameof(DetailEditorViewModel.PageViewMode))
         {
             OnPropertyChanged(nameof(PageViewMode));
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.ShowCoverPageSeparately))
+        {
+            OnPropertyChanged(nameof(ShowCoverPageSeparately));
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.ReadingDirection))
+        {
+            OnPropertyChanged(nameof(ReadingDirection));
         }
     }
 

@@ -28,6 +28,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _renderCts;
     private long _renderGeneration;
     private bool _isDisposed;
+    private bool _suppressDisplayModeChangedSideEffects;
 
     /// <summary>
     /// ズーム操作後の動的レンダリング遅延（デバウンス）時間（ミリ秒）
@@ -103,12 +104,32 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public Func<int, Task>? PipelineExecutionHandler { get; set; }
 
+    /// <summary>見開き表示時の左右ページ間余白（論理DIP）</summary>
+    public const double SpreadPageGap = DetailSpreadRowViewModel.DefaultPageGap;
+
     private readonly BulkObservableCollection<DetailPageItemViewModel> _pages = new();
+    private readonly BulkObservableCollection<DetailSpreadRowViewModel> _spreadRows = new();
 
     /// <summary>
     /// 全ページの表示状態を管理するコレクション
     /// </summary>
     public ObservableCollection<DetailPageItemViewModel> Pages => _pages;
+
+    /// <summary>
+    /// 見開き表示用の行コレクション（最大2ページ/行）
+    /// </summary>
+    public ObservableCollection<DetailSpreadRowViewModel> SpreadRows => _spreadRows;
+
+    private DetailSpreadRowViewModel? _currentSpreadRow;
+
+    /// <summary>
+    /// 現在表示・選択中のページが属する見開き行を取得します。
+    /// </summary>
+    public DetailSpreadRowViewModel? CurrentSpreadRow
+    {
+        get => _currentSpreadRow;
+        private set => SetProperty(ref _currentSpreadRow, value);
+    }
 
     /// <summary>
     /// 現在表示中・操作対象のページ
@@ -268,12 +289,16 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// 前のページへ移動可能かどうかを取得します。
     /// </summary>
-    public bool CanGoToPreviousPage => CurrentPageIndex > 0 || (Pages.Count <= 1 && HasPreviousPage);
+    public bool CanGoToPreviousPage => IsTwoPageMode
+        ? SpreadLayoutHelper.GetPreviousSpreadPageIndex(CurrentPageIndex, Pages.Count, ShowCoverPageSeparately) >= 0
+        : CurrentPageIndex > 0 || (Pages.Count <= 1 && HasPreviousPage);
 
     /// <summary>
     /// 次のページへ移動可能かどうかを取得します。
     /// </summary>
-    public bool CanGoToNextPage => (CurrentPageIndex >= 0 && CurrentPageIndex < Pages.Count - 1) || (Pages.Count <= 1 && HasNextPage);
+    public bool CanGoToNextPage => IsTwoPageMode
+        ? SpreadLayoutHelper.GetNextSpreadPageIndex(CurrentPageIndex, Pages.Count, ShowCoverPageSeparately) >= 0
+        : (CurrentPageIndex >= 0 && CurrentPageIndex < Pages.Count - 1) || (Pages.Count <= 1 && HasNextPage);
 
     /// <summary>
     /// 現在のページ番号（1-based）を取得または設定します。
@@ -305,19 +330,73 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 現在のページ表示モード（単一ページ表示 / 連続表示）
+    /// 現在のページ表示モード（単一 / 連続 / 見開き / 見開き連続）
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsContinuousMode))]
+    [NotifyPropertyChangedFor(nameof(IsTwoPageMode))]
+    [NotifyPropertyChangedFor(nameof(IsSingleSpreadMode))]
+    [NotifyPropertyChangedFor(nameof(IsTwoPageContinuousMode))]
+    [NotifyPropertyChangedFor(nameof(IsContinuousLayoutMode))]
+    [NotifyPropertyChangedFor(nameof(CanGoToPreviousPage))]
+    [NotifyPropertyChangedFor(nameof(CanGoToNextPage))]
     private DetailPageViewMode _pageViewMode = DetailPageViewMode.SinglePage;
 
     /// <summary>
-    /// 現在連続スクロール表示モードであるかどうかを取得します。
+    /// 見開き表示時に1ページ目（表紙）を単独で表示するかどうか
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanGoToPreviousPage))]
+    [NotifyPropertyChangedFor(nameof(CanGoToNextPage))]
+    private bool _showCoverPageSeparately = true;
+
+    /// <summary>
+    /// 見開き表示時の綴じ方向（左綴じ / 右綴じ）
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRightToLeft))]
+    private PdfReadingDirection _readingDirection = PdfReadingDirection.LeftToRight;
+
+    /// <summary>
+    /// 右綴じ（右から左）見開きであるかどうかを取得または設定します。
+    /// </summary>
+    public bool IsRightToLeft
+    {
+        get => ReadingDirection == PdfReadingDirection.RightToLeft;
+        set => ReadingDirection = value ? PdfReadingDirection.RightToLeft : PdfReadingDirection.LeftToRight;
+    }
+
+    /// <summary>
+    /// 現在縦1列の連続スクロール表示モードであるかどうかを取得します。
     /// </summary>
     public bool IsContinuousMode => PageViewMode == DetailPageViewMode.Continuous;
 
+    /// <summary>
+    /// 見開き表示モード（見開きまたは見開き連続）であるかどうかを取得します。
+    /// </summary>
+    public bool IsTwoPageMode => PageViewMode is DetailPageViewMode.TwoPage or DetailPageViewMode.TwoPageContinuous;
+
+    /// <summary>
+    /// 単一見開き表示モード（見開き単位で切り替え）であるかどうかを取得します。
+    /// </summary>
+    public bool IsSingleSpreadMode => PageViewMode == DetailPageViewMode.TwoPage;
+
+    /// <summary>
+    /// 見開き連続表示モードであるかどうかを取得します。
+    /// </summary>
+    public bool IsTwoPageContinuousMode => PageViewMode == DetailPageViewMode.TwoPageContinuous;
+
+    /// <summary>
+    /// 連続スクロール系の表示モード（連続または見開き連続）であるかどうかを取得します。
+    /// </summary>
+    public bool IsContinuousLayoutMode => PageViewMode is DetailPageViewMode.Continuous or DetailPageViewMode.TwoPageContinuous;
+
     partial void OnPageViewModeChanged(DetailPageViewMode value)
     {
+        if (_suppressDisplayModeChangedSideEffects) return;
+
+        RebuildSpreadRows();
+
         // モード切り替え時は現在のFitModeに合わせて拡大率を再計算
         if (FitMode != DetailViewFitMode.None)
         {
@@ -325,7 +404,42 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         }
 
         // 連続表示へ切り替えた場合は、現在ページ位置へスクロール移動
-        if (value == DetailPageViewMode.Continuous && CurrentPage != null)
+        if (IsContinuousLayoutMode && CurrentPage != null)
+        {
+            ScrollToPageRequested?.Invoke(CurrentPage);
+        }
+
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
+        _ = ScheduleDynamicRender(immediate: true);
+    }
+
+    partial void OnShowCoverPageSeparatelyChanged(bool value)
+    {
+        RefreshSpreadLayoutAfterOptionChange();
+    }
+
+    partial void OnReadingDirectionChanged(PdfReadingDirection value)
+    {
+        RefreshSpreadLayoutAfterOptionChange();
+    }
+
+    private void RefreshSpreadLayoutAfterOptionChange()
+    {
+        if (_suppressDisplayModeChangedSideEffects) return;
+
+        RebuildSpreadRows();
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
+
+        if (!IsTwoPageMode) return;
+
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
+        }
+
+        if (IsTwoPageContinuousMode && CurrentPage != null)
         {
             ScrollToPageRequested?.Invoke(CurrentPage);
         }
@@ -373,7 +487,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         IPdfRenderer pdfRenderer,
         PdfDocumentModel? document = null,
         IStrokeCacheService? strokeCacheService = null,
-        bool autoLoadBackground = true)
+        bool autoLoadBackground = true,
+        bool applyDocumentDisplaySettings = false)
     {
         _pdfRenderer = pdfRenderer;
         _strokeCacheService = strokeCacheService ?? new StrokeCacheService();
@@ -385,7 +500,10 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         if (document != null && document.Pages.Count > 0)
         {
-            InitializeDocument(document, autoLoadBackground: autoLoadBackground);
+            InitializeDocument(
+                document,
+                autoLoadBackground: autoLoadBackground,
+                applyDocumentDisplaySettings: applyDocumentDisplaySettings);
         }
     }
 
@@ -408,6 +526,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
         AddPageItem(new DetailPageItemViewModel(initialPage) { IsCurrent = true });
         UpdatePageEdgeFlags();
+        RebuildSpreadRows();
 
         UpdateThicknessPresets(_selectedTool);
         _ = LoadPageBackgroundAsync();
@@ -420,17 +539,24 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <param name="preferredPage">優先してカレントページに設定するページ（省略時は直前のページやインデックスを維持）</param>
     /// <param name="preferredFitMode">適用する表示フィットモード（省略時は現在のFitModeを維持）</param>
     /// <param name="autoLoadBackground">パイプラインハンドラー不在時に即座に背景画像を先行読み込みするかどうか（既定: true）</param>
+    /// <param name="applyDocumentDisplaySettings">元PDFの/PageLayout・/Directionを初期表示設定へ反映するかどうか（既定: false）</param>
     public void InitializeDocument(
         PdfDocumentModel document,
         PdfPageModel? preferredPage = null,
         DetailViewFitMode? preferredFitMode = null,
-        bool autoLoadBackground = true)
+        bool autoLoadBackground = true,
+        bool applyDocumentDisplaySettings = false)
     {
         var previousPage = CurrentPage;
         var previousIndex = CurrentPageIndex;
         SavedVerticalOffset = 0;
         SavedHorizontalOffset = 0;
         DisposePageItemsWithoutClear();
+
+        if (applyDocumentDisplaySettings)
+        {
+            ApplyDocumentDisplaySettingsToBackingFields(document);
+        }
 
         var newItems = new List<DetailPageItemViewModel>(document.Pages.Count);
         for (int i = 0; i < document.Pages.Count; i++)
@@ -449,10 +575,16 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         }
 
         _pages.ReplaceAll(newItems);
+        RebuildSpreadRows();
 
         // プロパティ変更通知を確実に発火させ、UIバインディング（CurrentPageItem等）の更新を保証
         CurrentPage = null;
         CurrentPage = targetPage;
+
+        if (applyDocumentDisplaySettings)
+        {
+            NotifyDisplayModePropertiesChanged();
+        }
 
         OnPropertyChanged(nameof(CurrentPageItem));
         OnPropertyChanged(nameof(PageBackground));
@@ -476,6 +608,125 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         {
             ScrollToPageRequested?.Invoke(targetPage);
         }
+    }
+
+    /// <summary>
+    /// PDFドキュメントに記録されている初期表示フラグ（/PageLayout・/Direction）を現在の表示設定へ反映します。
+    /// </summary>
+    public void ApplyDocumentDisplaySettings(PdfDocumentModel document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ApplyDocumentDisplaySettingsToBackingFields(document);
+        RebuildSpreadRows();
+        NotifyDisplayModePropertiesChanged();
+
+        if (FitMode != DetailViewFitMode.None)
+        {
+            ApplyFitMode();
+        }
+
+        if (IsContinuousLayoutMode && CurrentPage != null)
+        {
+            ScrollToPageRequested?.Invoke(CurrentPage);
+        }
+
+        _ = ScheduleDynamicRender(immediate: true);
+    }
+
+    private void ApplyDocumentDisplaySettingsToBackingFields(PdfDocumentModel document)
+    {
+        _suppressDisplayModeChangedSideEffects = true;
+        try
+        {
+            if (document.IsImage)
+            {
+                PageViewMode = DetailPageViewMode.SinglePage;
+                ShowCoverPageSeparately = true;
+                ReadingDirection = PdfReadingDirection.LeftToRight;
+                return;
+            }
+
+            var (viewMode, showCover, direction) = SpreadLayoutHelper.ResolveInitialDisplaySettings(
+                document.InitialPageLayout,
+                document.ReadingDirection);
+            PageViewMode = viewMode;
+            ShowCoverPageSeparately = showCover;
+            ReadingDirection = direction;
+        }
+        finally
+        {
+            _suppressDisplayModeChangedSideEffects = false;
+        }
+    }
+
+    private void NotifyDisplayModePropertiesChanged()
+    {
+        OnPropertyChanged(nameof(PageViewMode));
+        OnPropertyChanged(nameof(IsContinuousMode));
+        OnPropertyChanged(nameof(IsTwoPageMode));
+        OnPropertyChanged(nameof(IsSingleSpreadMode));
+        OnPropertyChanged(nameof(IsTwoPageContinuousMode));
+        OnPropertyChanged(nameof(IsContinuousLayoutMode));
+        OnPropertyChanged(nameof(ShowCoverPageSeparately));
+        OnPropertyChanged(nameof(ReadingDirection));
+        OnPropertyChanged(nameof(IsRightToLeft));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(CanGoToNextPage));
+        GoToPreviousPageCommand.NotifyCanExecuteChanged();
+        GoToNextPageCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// 現在のページ一覧・表紙単独設定・綴じ方向から見開き行コレクションを再構築します。
+    /// </summary>
+    public void RebuildSpreadRows()
+    {
+        DisposeSpreadRowsWithoutClear();
+
+        var definitions = SpreadLayoutHelper.BuildRows(_pages.Count, ShowCoverPageSeparately, ReadingDirection);
+        var rows = new List<DetailSpreadRowViewModel>(definitions.Count);
+        bool alignToSpine = IsTwoPageContinuousMode;
+
+        foreach (var def in definitions)
+        {
+            var left = def.LeftPageIndex.HasValue ? _pages[def.LeftPageIndex.Value] : null;
+            var right = def.RightPageIndex.HasValue ? _pages[def.RightPageIndex.Value] : null;
+            var primary = _pages[def.PrimaryPageIndex];
+            rows.Add(new DetailSpreadRowViewModel(def.RowIndex, left, right, primary, alignToSpine));
+        }
+
+        _spreadRows.ReplaceAll(rows);
+        UpdateCurrentSpreadRow();
+    }
+
+    private void DisposeSpreadRowsWithoutClear()
+    {
+        foreach (var row in _spreadRows)
+        {
+            row.Dispose();
+        }
+    }
+
+    private void UpdateCurrentSpreadRow()
+    {
+        if (_spreadRows.Count == 0)
+        {
+            CurrentSpreadRow = null;
+            return;
+        }
+
+        int idx = CurrentPageIndex;
+        if (idx >= 0)
+        {
+            int rowIndex = SpreadLayoutHelper.GetRowIndexForPage(idx, _pages.Count, ShowCoverPageSeparately);
+            if (rowIndex >= 0 && rowIndex < _spreadRows.Count)
+            {
+                CurrentSpreadRow = _spreadRows[rowIndex];
+                return;
+            }
+        }
+
+        CurrentSpreadRow = _spreadRows[0];
     }
 
     /// <summary>
@@ -626,6 +877,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
 
     partial void OnCurrentPageChanged(PdfPageModel? oldValue, PdfPageModel? newValue)
     {
+        var previousSpreadRow = CurrentSpreadRow;
         _isCurrentPageCacheValid = false;
         if (oldValue != null)
         {
@@ -636,19 +888,26 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             newValue.PropertyChanged += OnCurrentPagePropertyChanged;
         }
 
+        UpdateCurrentSpreadRow();
+        bool spreadRowChanged = !ReferenceEquals(previousSpreadRow, CurrentSpreadRow);
+
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(CanGoToNextPage));
         GoToPreviousPageCommand.NotifyCanExecuteChanged();
         GoToNextPageCommand.NotifyCanExecuteChanged();
 
-        // 単一ページ表示時のみ、FitModeが有効であれば新しいページの寸法に合わせて拡大率を再計算
-        // 連続表示時はスクロール途中で拡大率を変更しない
-        if (PageViewMode == DetailPageViewMode.SinglePage && FitMode != DetailViewFitMode.None)
+        bool shouldRefitAndRender = PageViewMode == DetailPageViewMode.SinglePage ||
+                                    (PageViewMode == DetailPageViewMode.TwoPage && spreadRowChanged);
+
+        // 単一ページまたは見開き行が切り替わった場合のみ、FitMode再計算・動的レンダリングを実行
+        if (shouldRefitAndRender && FitMode != DetailViewFitMode.None)
         {
             ApplyFitMode();
         }
 
-        if (PageViewMode == DetailPageViewMode.SinglePage && newValue != null)
+        if (shouldRefitAndRender && newValue != null)
         {
             _ = ScheduleDynamicRender(immediate: false, isInitialLoad: false, isPageSwitch: true);
         }
@@ -674,7 +933,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     {
         var item = Pages.FirstOrDefault(p => p.Page == page);
         item?.ApplyInstantRotation(deltaDegrees);
-        if (item == CurrentPageItem)
+        if (item == CurrentPageItem || (IsTwoPageMode && CurrentSpreadRow?.ContainsPage(page) == true))
         {
             OnPropertyChanged(nameof(PageBackground));
             OnPageDimensionsChanged();
@@ -768,87 +1027,123 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     /// <param name="immediate">即座にレンダリングを開始するかどうか（既定: true）</param>
     public void ScheduleContinuousScrollRender(bool immediate = true)
     {
-        if (PageViewMode == DetailPageViewMode.Continuous)
+        if (IsContinuousLayoutMode)
         {
             _ = ScheduleDynamicRender(immediate: immediate, isInitialLoad: false);
         }
     }
 
     /// <summary>
-    /// 現在の表示モードにおける最優先レンダリング対象ページ（Step 1: 単一表示時はカレントページ、連続表示時は可視ページ群）を取得します。
+    /// 現在の表示モードにおける最優先レンダリング対象ページ（Step 1）を取得します。
     /// </summary>
     public List<DetailPageItemViewModel> GetPrimaryPagesToRender()
     {
         if (Pages.Count == 0) return new List<DetailPageItemViewModel>();
 
-        if (PageViewMode == DetailPageViewMode.Continuous)
+        return PageViewMode switch
         {
-            return GetContinuousModeTargetPages();
-        }
+            DetailPageViewMode.Continuous or DetailPageViewMode.TwoPageContinuous => GetContinuousModeTargetPages(),
+            DetailPageViewMode.TwoPage => GetCurrentSpreadPages(),
+            _ => GetCurrentSinglePageList()
+        };
+    }
 
+    private List<DetailPageItemViewModel> GetCurrentSinglePageList()
+    {
         var result = new List<DetailPageItemViewModel>();
+        if (CurrentPageItem != null)
+        {
+            result.Add(CurrentPageItem);
+        }
+        return result;
+    }
+
+    private List<DetailPageItemViewModel> GetCurrentSpreadPages()
+    {
+        var result = new List<DetailPageItemViewModel>(2);
         var current = CurrentPageItem;
         if (current != null)
         {
             result.Add(current);
         }
+
+        if (CurrentSpreadRow != null)
+        {
+            foreach (var pageItem in CurrentSpreadRow.GetPages())
+            {
+                if (pageItem != current)
+                {
+                    result.Add(pageItem);
+                }
+            }
+        }
         return result;
     }
 
     /// <summary>
-    /// 現在の表示モードにおける周辺先読みレンダリング対象ページ（Step 3: 単一表示時はカレント前後1ページ、連続表示時は可視外側前後1ページ）を取得します。
+    /// 現在の表示モードにおける周辺先読みレンダリング対象ページ（Step 3）を取得します。
     /// </summary>
     public List<DetailPageItemViewModel> GetSecondaryNeighborPagesToRender()
     {
         var result = new List<DetailPageItemViewModel>();
         if (Pages.Count == 0) return result;
 
-        if (PageViewMode == DetailPageViewMode.Continuous)
+        if (IsContinuousLayoutMode)
         {
-            var visible = VisiblePagesProvider?.Invoke() ?? Enumerable.Empty<DetailPageItemViewModel>();
-            var visibleList = visible.Where(p => Pages.Contains(p)).ToList();
-            if (visibleList.Count == 0 && CurrentPageItem != null)
-            {
-                visibleList.Add(CurrentPageItem);
-            }
-
-            int minIdx = int.MaxValue;
-            int maxIdx = int.MinValue;
-            foreach (var item in visibleList)
-            {
-                int idx = Pages.IndexOf(item);
-                if (idx >= 0)
-                {
-                    minIdx = Math.Min(minIdx, idx);
-                    maxIdx = Math.Max(maxIdx, idx);
-                }
-            }
-
-            if (minIdx <= maxIdx)
-            {
-                if (minIdx > 0) result.Add(Pages[minIdx - 1]);
-                if (maxIdx < Pages.Count - 1) result.Add(Pages[maxIdx + 1]);
-            }
+            AddContinuousNeighborPages(result);
             return result;
         }
 
-        var current = CurrentPageItem;
-        if (current == null) return result;
-
         if (Zoom <= SelectiveRenderZoomThreshold)
         {
-            int idx = Pages.IndexOf(current);
-            if (idx > 0)
+            if (IsSingleSpreadMode)
             {
-                result.Add(Pages[idx - 1]);
+                AddSingleSpreadNeighborPages(result);
             }
-            if (idx >= 0 && idx < Pages.Count - 1)
+            else if (CurrentPageItem != null)
             {
-                result.Add(Pages[idx + 1]);
+                int idx = Pages.IndexOf(CurrentPageItem);
+                if (idx > 0) result.Add(Pages[idx - 1]);
+                if (idx >= 0 && idx < Pages.Count - 1) result.Add(Pages[idx + 1]);
             }
         }
 
         return result;
+    }
+
+    private void AddContinuousNeighborPages(List<DetailPageItemViewModel> result)
+    {
+        var visible = VisiblePagesProvider?.Invoke() ?? Enumerable.Empty<DetailPageItemViewModel>();
+        var visibleList = visible.Where(p => Pages.Contains(p)).ToList();
+        if (visibleList.Count == 0 && CurrentPageItem != null)
+        {
+            visibleList.Add(CurrentPageItem);
+        }
+
+        if (!TryGetIndexRange(visibleList, out int minIdx, out int maxIdx)) return;
+
+        int neighborCount = IsTwoPageMode ? 2 : 1;
+        for (int offset = 1; offset <= neighborCount; offset++)
+        {
+            if (minIdx - offset >= 0) result.Add(Pages[minIdx - offset]);
+            if (maxIdx + offset < Pages.Count) result.Add(Pages[maxIdx + offset]);
+        }
+    }
+
+    private void AddSingleSpreadNeighborPages(List<DetailPageItemViewModel> result)
+    {
+        var row = CurrentSpreadRow;
+        if (row == null) return;
+
+        int rowIndex = row.RowIndex;
+        if (rowIndex > 0 && rowIndex - 1 < SpreadRows.Count)
+        {
+            result.AddRange(SpreadRows[rowIndex - 1].GetPages());
+        }
+        if (rowIndex >= 0 && rowIndex + 1 < SpreadRows.Count)
+        {
+            result.AddRange(SpreadRows[rowIndex + 1].GetPages());
+        }
     }
 
     /// <summary>
@@ -864,9 +1159,12 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             return GetInitialLoadPages();
         }
 
-        return PageViewMode == DetailPageViewMode.Continuous
-            ? GetContinuousModeTargetPages()
-            : GetSinglePageModeTargetPages();
+        return PageViewMode switch
+        {
+            DetailPageViewMode.Continuous or DetailPageViewMode.TwoPageContinuous => GetContinuousModeTargetPages(),
+            DetailPageViewMode.TwoPage => GetSingleSpreadTargetPages(),
+            _ => GetSinglePageModeTargetPages()
+        };
     }
 
     /// <summary>
@@ -889,6 +1187,19 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             }
         }
 
+        return result;
+    }
+
+    /// <summary>
+    /// 単一見開き表示モード時のレンダリング対象ページを取得します。
+    /// </summary>
+    private List<DetailPageItemViewModel> GetSingleSpreadTargetPages()
+    {
+        var result = GetCurrentSpreadPages();
+        if (Zoom <= SelectiveRenderZoomThreshold)
+        {
+            AddSingleSpreadNeighborPages(result);
+        }
         return result;
     }
 
@@ -973,15 +1284,39 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     private HashSet<DetailPageItemViewModel> GetPagesToKeepInMemory()
     {
         var keepSet = new HashSet<DetailPageItemViewModel>();
-        if (PageViewMode == DetailPageViewMode.Continuous)
+        if (IsContinuousLayoutMode)
         {
             AddContinuousKeepPages(keepSet);
+        }
+        else if (IsSingleSpreadMode)
+        {
+            AddSingleSpreadKeepPages(keepSet);
         }
         else
         {
             AddSinglePageKeepPages(keepSet);
         }
         return keepSet;
+    }
+
+    private void AddSingleSpreadKeepPages(HashSet<DetailPageItemViewModel> keepSet)
+    {
+        var row = CurrentSpreadRow;
+        if (row == null)
+        {
+            AddSinglePageKeepPages(keepSet);
+            return;
+        }
+
+        int startRow = Math.Max(0, row.RowIndex - BackgroundEvictionPageRadius);
+        int endRow = Math.Min(SpreadRows.Count - 1, row.RowIndex + BackgroundEvictionPageRadius);
+        for (int r = startRow; r <= endRow; r++)
+        {
+            foreach (var pageItem in SpreadRows[r].GetPages())
+            {
+                keepSet.Add(pageItem);
+            }
+        }
     }
 
     /// <summary>
@@ -1004,7 +1339,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 連続表示モードにおける背景保持対象ページ（可視ページ群および前後3ページ）をセットに追加します。
+    /// 連続表示モードにおける背景保持対象ページ（可視ページ群および前後3ページ／見開き時は3行相当）をセットに追加します。
     /// </summary>
     private void AddContinuousKeepPages(HashSet<DetailPageItemViewModel> keepSet)
     {
@@ -1016,10 +1351,22 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             visibleList.Add(CurrentPageItem);
         }
 
-        int minIdx = int.MaxValue;
-        int maxIdx = int.MinValue;
+        if (!TryGetIndexRange(visibleList, out int minIdx, out int maxIdx)) return;
 
-        foreach (var item in visibleList)
+        int radius = IsTwoPageMode ? BackgroundEvictionPageRadius * 2 : BackgroundEvictionPageRadius;
+        int start = Math.Max(0, minIdx - radius);
+        int end = Math.Min(Pages.Count - 1, maxIdx + radius);
+        for (int i = start; i <= end; i++)
+        {
+            keepSet.Add(Pages[i]);
+        }
+    }
+
+    private bool TryGetIndexRange(IEnumerable<DetailPageItemViewModel> items, out int minIdx, out int maxIdx)
+    {
+        minIdx = int.MaxValue;
+        maxIdx = int.MinValue;
+        foreach (var item in items)
         {
             int idx = Pages.IndexOf(item);
             if (idx >= 0)
@@ -1028,16 +1375,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 maxIdx = Math.Max(maxIdx, idx);
             }
         }
-
-        if (minIdx <= maxIdx)
-        {
-            int start = Math.Max(0, minIdx - BackgroundEvictionPageRadius);
-            int end = Math.Min(Pages.Count - 1, maxIdx + BackgroundEvictionPageRadius);
-            for (int i = start; i <= end; i++)
-            {
-                keepSet.Add(Pages[i]);
-            }
-        }
+        return minIdx <= maxIdx;
     }
 
     /// <summary>
@@ -1424,42 +1762,53 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var page = CurrentPage ?? Pages.FirstOrDefault()?.Page;
-        if (page == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
+        var (refWidth, refHeight) = GetFitReferenceSize();
+        if (refWidth <= 0 || refHeight <= 0 || ViewportWidth <= 0 || ViewportHeight <= 0) return;
 
         double availableWidth = Math.Max(50.0, ViewportWidth - TotalHorizontalMargin - SafetyBuffer);
 
         if (FitMode == DetailViewFitMode.FitToWindow)
         {
-            double verticalMargin = PageViewMode == DetailPageViewMode.SinglePage
-                ? SinglePageTotalVerticalMargin
-                : TotalVerticalMargin;
+            double verticalMargin = IsContinuousLayoutMode
+                ? TotalVerticalMargin
+                : SinglePageTotalVerticalMargin;
             double availableHeight = Math.Max(50.0, ViewportHeight - verticalMargin - SafetyBuffer);
-            ApplyFitToWindow(page, availableWidth, availableHeight);
+            ApplyFitToWindow(refWidth, refHeight, availableWidth, availableHeight);
         }
         else if (FitMode == DetailViewFitMode.FitToWidth)
         {
             double availableHeight = Math.Max(50.0, ViewportHeight - TotalVerticalMargin - SafetyBuffer);
-            ApplyFitToWidth(page, availableWidth, availableHeight);
+            ApplyFitToWidth(refWidth, refHeight, availableWidth, availableHeight);
         }
     }
 
-    private void ApplyFitToWindow(PdfPageModel page, double availableWidth, double availableHeight)
+    private (double Width, double Height) GetFitReferenceSize()
     {
-        double scaleX = availableWidth / page.DisplayWidth;
-        double scaleY = availableHeight / page.DisplayHeight;
+        if (IsTwoPageMode && CurrentSpreadRow != null)
+        {
+            return (CurrentSpreadRow.DisplayWidth, CurrentSpreadRow.DisplayHeight);
+        }
+
+        var page = CurrentPage ?? Pages.FirstOrDefault()?.Page;
+        return page != null ? (page.DisplayWidth, page.DisplayHeight) : (0.0, 0.0);
+    }
+
+    private void ApplyFitToWindow(double refWidth, double refHeight, double availableWidth, double availableHeight)
+    {
+        double scaleX = availableWidth / refWidth;
+        double scaleY = availableHeight / refHeight;
         SetZoomInternal(Math.Min(scaleX, scaleY));
     }
 
-    private void ApplyFitToWidth(PdfPageModel page, double availableWidth, double availableHeight)
+    private void ApplyFitToWidth(double refWidth, double refHeight, double availableWidth, double availableHeight)
     {
-        double testScale = availableWidth / page.DisplayWidth;
-        bool hasVerticalScroll = CheckVerticalScrollOverflow(page, testScale, availableHeight);
+        double testScale = availableWidth / refWidth;
+        bool hasVerticalScroll = CheckVerticalScrollOverflow(refHeight, testScale, availableHeight);
 
         if (hasVerticalScroll)
         {
             double widthWithScrollbar = Math.Max(50.0, availableWidth - ScrollBarWidth);
-            SetZoomInternal(widthWithScrollbar / page.DisplayWidth);
+            SetZoomInternal(widthWithScrollbar / refWidth);
         }
         else
         {
@@ -1467,7 +1816,7 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CheckVerticalScrollOverflow(PdfPageModel page, double scale, double availableHeight)
+    private bool CheckVerticalScrollOverflow(double refHeight, double scale, double availableHeight)
     {
         if (PageViewMode == DetailPageViewMode.Continuous && Pages.Count > 1)
         {
@@ -1483,7 +1832,22 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
             }
             return false;
         }
-        return (page.DisplayHeight * scale) > availableHeight;
+
+        if (PageViewMode == DetailPageViewMode.TwoPageContinuous && SpreadRows.Count > 1)
+        {
+            double accumulatedHeight = (SpreadRows.Count - 1) * 30.0;
+            for (int i = 0; i < SpreadRows.Count; i++)
+            {
+                accumulatedHeight += SpreadRows[i].DisplayHeight;
+                if (accumulatedHeight * scale > availableHeight)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return (refHeight * scale) > availableHeight;
     }
 
     /// <summary>
@@ -1533,11 +1897,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 1つ前のページへスクロール移動します。
+    /// 1つ前のページ（見開きモード時は1つ前の見開き）へ移動します。
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanGoToPreviousPage))]
     public void GoToPreviousPage()
     {
+        if (IsTwoPageMode)
+        {
+            int prevSpreadIdx = SpreadLayoutHelper.GetPreviousSpreadPageIndex(CurrentPageIndex, Pages.Count, ShowCoverPageSeparately);
+            if (prevSpreadIdx >= 0)
+            {
+                ScrollToPage(Pages[prevSpreadIdx].Page);
+            }
+            return;
+        }
+
         int idx = CurrentPageIndex;
         if (idx > 0)
         {
@@ -1555,11 +1929,21 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 1つ次のページへスクロール移動します。
+    /// 1つ次のページ（見開きモード時は1つ次の見開き）へ移動します。
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanGoToNextPage))]
     public void GoToNextPage()
     {
+        if (IsTwoPageMode)
+        {
+            int nextSpreadIdx = SpreadLayoutHelper.GetNextSpreadPageIndex(CurrentPageIndex, Pages.Count, ShowCoverPageSeparately);
+            if (nextSpreadIdx >= 0)
+            {
+                ScrollToPage(Pages[nextSpreadIdx].Page);
+            }
+            return;
+        }
+
         int idx = CurrentPageIndex;
         if (idx >= 0 && idx < Pages.Count - 1)
         {
@@ -1606,6 +1990,8 @@ public partial class DetailEditorViewModel : ObservableObject, IDisposable
                 _renderCts?.Cancel();
                 _renderCts?.Dispose();
                 _renderCts = null;
+                DisposeSpreadRowsWithoutClear();
+                _spreadRows.Clear();
                 ClearPageItems();
             }
             _isDisposed = true;

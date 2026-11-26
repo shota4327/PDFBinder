@@ -38,6 +38,12 @@ public partial class PdfDocumentModel : ObservableObject
     /// <summary>ドキュメント保存時に適用するパスワード（パスワード保護されている場合）</summary>
     public string? DocumentPassword { get; set; }
 
+    /// <summary>元PDFのカタログ（/PageLayout）から読み取った初期ページ配置モード</summary>
+    public PdfPageLayout InitialPageLayout { get; set; } = PdfPageLayout.Default;
+
+    /// <summary>元PDFのビューワー設定（/ViewerPreferences /Direction）から読み取った綴じ方向</summary>
+    public PdfReadingDirection ReadingDirection { get; set; } = PdfReadingDirection.LeftToRight;
+
     /// <summary>ドキュメント内の全ページコレクション</summary>
     public ObservableCollection<PdfPageModel> Pages { get; } = new();
 
@@ -172,6 +178,8 @@ public partial class PdfDocumentModel : ObservableObject
         }
         Pages.Clear();
         FilePath = null;
+        InitialPageLayout = PdfPageLayout.Default;
+        ReadingDirection = PdfReadingDirection.LeftToRight;
         ResetModifiedState();
     }
 }

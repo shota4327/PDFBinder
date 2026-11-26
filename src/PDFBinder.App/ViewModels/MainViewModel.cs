@@ -481,8 +481,11 @@ public partial class MainViewModel : ObservableObject
     /// <summary>詳細/グリッド表示モードを切り替え可能かどうかを取得します。</summary>
     public bool CanToggleViewMode => !IsImageDocumentActive;
 
-    /// <summary>連続スクロール表示を切り替え可能かどうかを取得します。</summary>
+    /// <summary>連続スクロールおよび見開き表示を切り替え可能かどうかを取得します。</summary>
     public bool CanToggleContinuousScroll => !IsImageDocumentActive;
+
+    /// <summary>見開きオプション（表紙単独・右綴じ）を操作可能かどうかを取得します。</summary>
+    public bool CanConfigureSpreadOptions => CanToggleContinuousScroll && (DetailEditor?.IsTwoPageMode ?? false);
 
     /// <summary>
     /// 現在表示中のページ番号（1-based）を取得または設定します。
@@ -589,7 +592,11 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     private DocumentSession CreateDocumentSession(PdfDocumentModel document, IUndoRedoService? undoRedoService = null)
     {
-        var editor = new DetailEditorViewModel(_pdfRenderer, document);
+        var editor = new DetailEditorViewModel(
+            _pdfRenderer,
+            document,
+            autoLoadBackground: false,
+            applyDocumentDisplaySettings: true);
         if (DetailEditor != null && DetailEditor.ViewportWidth > 0 && DetailEditor.ViewportHeight > 0)
         {
             editor.UpdateViewportSize(DetailEditor.ViewportWidth, DetailEditor.ViewportHeight);
@@ -624,6 +631,10 @@ public partial class MainViewModel : ObservableObject
         else if (e.PropertyName == nameof(DetailEditorViewModel.CurrentPageNumber))
         {
             OnPropertyChanged(nameof(CurrentPageNumber));
+        }
+        else if (e.PropertyName == nameof(DetailEditorViewModel.PageViewMode))
+        {
+            OnPropertyChanged(nameof(CanConfigureSpreadOptions));
         }
     }
 
@@ -733,6 +744,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CanDeleteSelectedPages));
         OnPropertyChanged(nameof(CanToggleViewMode));
         OnPropertyChanged(nameof(CanToggleContinuousScroll));
+        OnPropertyChanged(nameof(CanConfigureSpreadOptions));
         OnPropertyChanged(nameof(CanGoToPreviousPage));
         OnPropertyChanged(nameof(CanGoToNextPage));
         OnPropertyChanged(nameof(CanNavigatePages));

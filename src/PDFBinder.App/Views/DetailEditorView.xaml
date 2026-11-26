@@ -73,6 +73,38 @@
                 </Grid>
             </Grid>
         </DataTemplate>
+
+        <!-- 見開き1行（最大2ページ）描画用データテンプレート -->
+        <DataTemplate x:Key="DetailSpreadRowTemplate" DataType="{x:Type vm:DetailSpreadRowViewModel}">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <!-- 左空欄プレースホルダー（見開き連続表示の綴じ目揃え用） -->
+                <Border Width="{Binding LeftPlaceholderWidth}"
+                        Background="Transparent" />
+
+                <!-- 左ページ -->
+                <ContentControl Content="{Binding LeftPage}"
+                                ContentTemplate="{StaticResource DetailPageItemTemplate}"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding LeftPage, Converter={StaticResource NullToVisibilityConverter}}" />
+
+                <!-- 左右ページ間の余白 -->
+                <Border Width="{Binding PageGap}"
+                        Background="Transparent"
+                        Visibility="{Binding ShowMiddleGap, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <!-- 右ページ -->
+                <ContentControl Content="{Binding RightPage}"
+                                ContentTemplate="{StaticResource DetailPageItemTemplate}"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding RightPage, Converter={StaticResource NullToVisibilityConverter}}" />
+
+                <!-- 右空欄プレースホルダー（見開き連続表示の綴じ目揃え用） -->
+                <Border Width="{Binding RightPlaceholderWidth}"
+                        Background="Transparent" />
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid Background="{StaticResource AppBackgroundBrush}">
@@ -148,6 +180,56 @@
                                 <DataTrigger Binding="{Binding IsContinuousMode}" Value="True">
                                     <Setter Property="Visibility" Value="Visible" />
                                     <Setter Property="ItemsSource" Value="{Binding Pages}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <controls:VirtualizingPageStackPanel
+                                PageSpacing="30"
+                                TopMargin="20"
+                                BottomMargin="62"
+                                Zoom="{Binding DataContext.Zoom, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <!-- 単一見開き表示（見開き単位で切り替え） -->
+                <ContentControl x:Name="SingleSpreadContainer"
+                                Content="{Binding CurrentSpreadRow}"
+                                ContentTemplate="{StaticResource DetailSpreadRowTemplate}"
+                                HorizontalAlignment="Center">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSingleSpreadMode}" Value="True" />
+                                        <Condition Binding="{Binding CurrentSpreadRow, Converter={StaticResource NullToVisibilityConverter}}" Value="Visible" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
+
+                <!-- 見開き連続表示（2ページ行の縦連続スクロール表示＋UI仮想化） -->
+                <ItemsControl x:Name="SpreadPagesItemsControl"
+                              ItemTemplate="{StaticResource DetailSpreadRowTemplate}"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              HorizontalAlignment="Center">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="ItemsSource" Value="{x:Null}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTwoPageContinuousMode}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="ItemsSource" Value="{Binding SpreadRows}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

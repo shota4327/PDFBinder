@@ -71,11 +71,14 @@ public class PdfService : IPdfService
 
         using (pdfDoc)
         {
+            var (initialPageLayout, readingDirection) = PdfMetadataHelper.ReadDisplaySettings(pdfDoc);
             var model = new PdfDocumentModel
             {
                 FilePath = filePath,
                 DocumentPassword = password,
-                IsModified = false
+                IsModified = false,
+                InitialPageLayout = initialPageLayout,
+                ReadingDirection = readingDirection
             };
 
             for (int i = 0; i < pdfDoc.PageCount; i++)

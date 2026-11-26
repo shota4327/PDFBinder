@@ -3,6 +3,8 @@ using PDFBinder.Core.Models;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Advanced;
+using PdfPageLayout = PDFBinder.Core.Models.PdfPageLayout;
+using PdfReadingDirection = PDFBinder.Core.Models.PdfReadingDirection;
 
 namespace PDFBinder.Core.Helpers;
 
@@ -75,6 +77,51 @@ internal static class PdfMetadataHelper
             dstInfo.CreationDate = srcInfo.CreationDate;
         }
         dstInfo.ModificationDate = DateTime.Now;
+    }
+
+    /// <summary>
+    /// 元PDFドキュメントのカタログから初期ページ配置（/PageLayout）および綴じ方向（/ViewerPreferences /Direction）を読み取ります。
+    /// </summary>
+    internal static (PdfPageLayout PageLayout, PdfReadingDirection ReadingDirection) ReadDisplaySettings(PdfDocument sourceDoc)
+    {
+        ArgumentNullException.ThrowIfNull(sourceDoc);
+
+        var catalog = sourceDoc.Internals.Catalog;
+        if (catalog == null)
+        {
+            return (PdfPageLayout.Default, PdfReadingDirection.LeftToRight);
+        }
+
+        return (ParsePageLayout(catalog), ParseReadingDirection(catalog));
+    }
+
+    private static PdfPageLayout ParsePageLayout(PdfDictionary catalog)
+    {
+        string rawLayout = catalog.Elements.GetName("/PageLayout").TrimStart('/');
+        return rawLayout switch
+        {
+            "SinglePage" => PdfPageLayout.SinglePage,
+            "OneColumn" => PdfPageLayout.OneColumn,
+            "TwoColumnLeft" => PdfPageLayout.TwoColumnLeft,
+            "TwoColumnRight" => PdfPageLayout.TwoColumnRight,
+            "TwoPageLeft" => PdfPageLayout.TwoPageLeft,
+            "TwoPageRight" => PdfPageLayout.TwoPageRight,
+            _ => PdfPageLayout.Default
+        };
+    }
+
+    private static PdfReadingDirection ParseReadingDirection(PdfDictionary catalog)
+    {
+        var viewerPrefs = catalog.Elements.GetDictionary("/ViewerPreferences");
+        if (viewerPrefs == null && catalog.Elements["/ViewerPreferences"] is PdfReference { Value: PdfDictionary refDict })
+        {
+            viewerPrefs = refDict;
+        }
+
+        string rawDirection = viewerPrefs?.Elements.GetName("/Direction").TrimStart('/') ?? string.Empty;
+        return string.Equals(rawDirection, "R2L", StringComparison.OrdinalIgnoreCase)
+            ? PdfReadingDirection.RightToLeft
+            : PdfReadingDirection.LeftToRight;
     }
 
     /// <summary>

@@ -581,6 +581,39 @@
                                     <TextBlock Text="連続" FontSize="11" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
+                            <RadioButton GroupName="RibbonPageLayoutGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="見開き表示 (左右に2ページ並べて表示)"
+                                         IsEnabled="{Binding CanToggleContinuousScroll}"
+                                         IsChecked="{Binding DetailEditor.PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=TwoPage, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xEA19;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="見開き" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton GroupName="RibbonPageLayoutGroup" Style="{StaticResource RibbonToolRadioStyle}" ToolTip="見開き連続表示 (見開きを縦に連続表示)"
+                                         IsEnabled="{Binding CanToggleContinuousScroll}"
+                                         IsChecked="{Binding DetailEditor.PageViewMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=TwoPageContinuous, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE666;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="見開き連続" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="表紙を単独で表示 (1ページ目を単独配置)"
+                                          IsEnabled="{Binding CanConfigureSpreadOptions}"
+                                          IsChecked="{Binding DetailEditor.ShowCoverPageSeparately, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE86D;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="表紙単独" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource RibbonToolToggleStyle}" ToolTip="右綴じ見開き (オン: 右から左 / オフ: 左から右)"
+                                          IsEnabled="{Binding CanConfigureSpreadOptions}"
+                                          IsChecked="{Binding DetailEditor.IsRightToLeft, Mode=TwoWay}">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE248;" FontFamily="{StaticResource IconFontFamily}" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,1" />
+                                    <TextBlock Text="右綴じ" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
 
                             <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,4" />
 

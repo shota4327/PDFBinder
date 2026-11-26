@@ -270,7 +270,19 @@ public partial class MainWindow : Window
     private static bool HandlePageNavigationKeyDown(MainViewModel vm, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (HandlePageNavigation(vm, key, Keyboard.Modifiers))
+        var modifiers = Keyboard.Modifiers;
+        if (HandlePageNavigation(vm, key, modifiers))
+        {
+            e.Handled = true;
+            return true;
+        }
+
+        // 右綴じ見開き時は Left/Right の意味が Window.InputBindings の既定方向と逆になるため、
+        // 端ページ到達で移動不可の場合も InputBindings へフォールバックさせずに消費する
+        if (vm.IsDetailViewActive &&
+            modifiers == ModifierKeys.None &&
+            vm.DetailEditor is { IsTwoPageMode: true, IsRightToLeft: true } &&
+            key is Key.Left or Key.Right)
         {
             e.Handled = true;
             return true;
@@ -281,26 +293,30 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 指定されたキーおよび修飾キーをもとにページ移動コマンドを実行可能か判定し、実行します（テスト可能な静的ヘルパー）。
+    /// 右綴じ見開き時は左右矢印キー（← / →）の移動方向を読み順に合わせて反転します。
     /// </summary>
     internal static bool HandlePageNavigation(MainViewModel vm, Key key, ModifierKeys modifiers)
     {
         if (modifiers != ModifierKeys.None) return false;
 
-        if (key is Key.PageUp or Key.Up or Key.Left)
+        bool reverseLeftRight = vm.DetailEditor is { IsTwoPageMode: true, IsRightToLeft: true };
+        bool requestPrevious = key is Key.PageUp or Key.Up ||
+                               (key == Key.Left && !reverseLeftRight) ||
+                               (key == Key.Right && reverseLeftRight);
+        bool requestNext = key is Key.PageDown or Key.Down ||
+                           (key == Key.Right && !reverseLeftRight) ||
+                           (key == Key.Left && reverseLeftRight);
+
+        if (requestPrevious && vm.CanGoToPreviousPage)
         {
-            if (vm.CanGoToPreviousPage)
-            {
-                vm.GoToPreviousPageCommand.Execute(null);
-                return true;
-            }
+            vm.GoToPreviousPageCommand.Execute(null);
+            return true;
         }
-        else if (key is Key.PageDown or Key.Down or Key.Right)
+
+        if (requestNext && vm.CanGoToNextPage)
         {
-            if (vm.CanGoToNextPage)
-            {
-                vm.GoToNextPageCommand.Execute(null);
-                return true;
-            }
+            vm.GoToNextPageCommand.Execute(null);
+            return true;
         }
 
         return false;
