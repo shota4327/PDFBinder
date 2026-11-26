@@ -90,6 +90,7 @@
 | **F81** | パフォーマンス / 起動 | PDFiumネイティブライブラリのコールドスタート遅延解消（事前初期化・バックグラウンドプリウォーム、初回PDFオープン時の1ページ目表示高速化） | **完了** | Issue #215 / PdfiumRenderer, IPdfRenderer, App.xaml.cs |
 | **F84** | UI・ウィンドウ管理 | アクティブウィンドウへのOSアクセントカラー連動縁取り（DWM API/レジストリ自動取得、設定変更リアルタイム追従、非アクティブ時枠線切替、最大化時0px非表示） | **完了** | Issue #236 / SystemAccentColorHelper & MainWindow |
 | **F85** | PDF操作コア / UI | 画像書き出し時のPNG出力において白背景を原則化し「背景を透過にする」オプションを追加（デフォルト白背景合成、透過PNG選択可能、JPEG連動無効化、プレビュー用紙の市松模様表示） | **完了** | Issue #243 / ImageExportService, ImageExportSettings, ExportImagesViewModel, MainWindow |
+| **F86** | UI・印刷 / パフォーマンス | 印刷の大幅高速化（Win32 GDI + PDFium 直接ベクター印刷と 24bpp 非透過 GDI ラスター印刷のハイブリッド化、「画像として印刷」オプション、インク付きページ自動ラスター切替＆ベクター失敗時自動フォールバック、即時プレビュークローズ＆1シート単位ストリーミング送信、シート進捗リアルタイム表示） | **完了** | Issue #249 / GdiPrintService, PdfiumNativePrint, GdiBitmapConverter, PrinterDevModeHelper, BackgroundPrintQueueService, PrintViewModel, MainViewModel |
 
 ---
 

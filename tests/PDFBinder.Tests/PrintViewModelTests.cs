@@ -45,6 +45,8 @@ public class FakePrintService : IPrintService
         return Task.FromResult<IReadOnlyList<PrintPreparedSheet>>(result);
     }
 
+    public int PrepareSheetsCallCount { get; private set; }
+
     public Task<IReadOnlyList<PrintPreparedSheet>> PrepareSheetsAsync(
         Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPageFunc,
         IReadOnlyList<PrintSheetLayout> sheets,
@@ -52,6 +54,7 @@ public class FakePrintService : IPrintService
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        PrepareSheetsCallCount++;
         LastPageDimensionsPassed = pageDimensions;
         var result = sheets.Select(s => new PrintPreparedSheet(
             s.Placements.Select(p => new PrintPreparedPlacement(null, p.NormalizedBounds)).ToList(),
@@ -74,6 +77,17 @@ public class FakePrintService : IPrintService
         PrintSettings settings,
         IReadOnlyList<PrintSheetLayout> sheets,
         string jobName = "PDFBinder",
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(PrintResult);
+    }
+
+    public Task<bool> PrintStreamingAsync(
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<PrintPageSource> pageSources,
+        PrintSettings settings,
+        string jobName,
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -335,5 +349,44 @@ public class PrintViewModelTests
         Assert.Equal(2, _fakePrintService.LastPageDimensionsPassed.Count);
         Assert.Equal(595, _fakePrintService.LastPageDimensionsPassed[0].width);
         Assert.Equal(842, _fakePrintService.LastPageDimensionsPassed[0].height);
+    }
+
+    [Fact]
+    public async Task ExecutePrint_WithPageSourcesFactory_SkipsPrepareSheetsAndEmitsStreamingEvent()
+    {
+        var settings = new PrintSettings { PrintAsImage = true };
+        var pageSources = new List<PrintPageSource>
+        {
+            new("sample.pdf", 0, null, 595, 842, PageRotation.Rotate0, false, false, false, null),
+            new("sample.pdf", 1, null, 595, 842, PageRotation.Rotate90, false, false, false, null)
+        };
+
+        var vm = new PrintViewModel(
+            _fakePrintService,
+            settings,
+            2,
+            0,
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            (idx, w, h, ct) => Task.FromResult<BitmapSource?>(null),
+            null,
+            "stream_test.pdf",
+            () => pageSources);
+
+        PrintSpoolEventArgs? spoolArgs = null;
+        vm.SpoolRequested += (s, e) => spoolArgs = e;
+
+        bool? closeResult = null;
+        vm.RequestClose += r => closeResult = r;
+
+        await vm.ExecutePrintCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, _fakePrintService.PrepareSheetsCallCount);
+        Assert.True(closeResult);
+        Assert.NotNull(spoolArgs);
+        Assert.True(spoolArgs.IsStreamingJob);
+        Assert.True(spoolArgs.Settings.PrintAsImage);
+        Assert.Equal("stream_test - PDFBinder", spoolArgs.JobName);
+        Assert.Equal(2, spoolArgs.Sheets?.Count);
+        Assert.Equal(2, spoolArgs.PageSources?.Count);
     }
 }

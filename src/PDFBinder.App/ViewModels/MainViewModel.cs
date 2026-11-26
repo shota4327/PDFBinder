@@ -552,12 +552,13 @@ public partial class MainViewModel : ObservableObject
         _pdfRenderer = pdfRenderer ?? new PdfiumRenderer();
         _pdfService = pdfService ?? new PdfService(_pdfRenderer);
         _undoRedoService = undoRedoService ?? new UndoRedoService();
-        _printService = printService ?? new WpfPrintService();
+        _printService = printService ?? new GdiPrintService(_pdfRenderer);
         _imageService = imageService ?? new ImageService();
         _printQueueService = printQueueService ?? new BackgroundPrintQueueService(_printService);
         _imageExportService = imageExportService ?? new ImageExportService();
 
         _printQueueService.ActiveJobCountChanged += OnPrintQueueCountChanged;
+        _printQueueService.JobProgressChanged += OnPrintJobProgressChanged;
         _printQueueService.JobCompleted += OnPrintJobCompleted;
 
         _detailEditor = new DetailEditorViewModel(_pdfRenderer, _document);
@@ -2484,7 +2485,8 @@ public partial class MainViewModel : ObservableObject
             (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
             (idx, w, h, ct) => RenderPageWithInkAsync(idx, w, h, ct),
             pageDimensions,
-            docTitle);
+            docTitle,
+            BuildPrintPageSources);
 
         PrintViewModel.RequestClose += OnPrintDialogRequestClose;
         PrintViewModel.SpoolRequested += OnPrintSpoolRequested;
@@ -2578,12 +2580,38 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 現在のドキュメント全ページから印刷用の不変スナップショット一覧を生成します。
+    /// </summary>
+    private IReadOnlyList<PrintPageSource> BuildPrintPageSources()
+        => Document.Pages.Select(PrintPageSource.FromPageModel).ToList();
+
+    /// <summary>
     /// 印刷プレビュー画面からのバックグラウンドスプール要求を処理します。
     /// </summary>
     private void OnPrintSpoolRequested(object? sender, PrintSpoolEventArgs e)
     {
-        var job = new PrintSpoolJob(e.JobName, e.Settings, e.PreparedSheets);
+        var job = e.IsStreamingJob
+            ? new PrintSpoolJob(e.JobName, e.Settings, e.Sheets!, e.PageSources!)
+            : new PrintSpoolJob(e.JobName, e.Settings, e.PreparedSheets);
         _printQueueService.Enqueue(job);
+    }
+
+    /// <summary>
+    /// バックグラウンド印刷ジョブのシート送信進捗通知を処理し、ステータス表示を更新します。
+    /// </summary>
+    private void OnPrintJobProgressChanged(PrintSpoolJob job, int currentSheet, int totalSheets)
+    {
+        RunOnUi(() =>
+        {
+            int count = _printQueueService.ActiveJobCount;
+            if (count == 0) return;
+
+            string text = count <= 1
+                ? $"プリンターへ送信中... ({currentSheet} / {totalSheets})"
+                : $"プリンターへ送信中... ({currentSheet} / {totalSheets}・残り {count} 件)";
+            StatusMessage = text;
+            PrintWaitTaskStatusText = text;
+        });
     }
 
     /// <summary>

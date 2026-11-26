@@ -106,4 +106,22 @@ public interface IPrintService
         string jobName = "PDFBinder",
         IProgress<(int currentSheet, int totalSheets)>? progress = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 面付けシート一覧とページスナップショット情報を使用して、1シートずつストリーミング印刷を実行します。
+    /// </summary>
+    /// <param name="sheets">面付けシート一覧</param>
+    /// <param name="pageSources">印刷時点のページスナップショット一覧</param>
+    /// <param name="settings">印刷設定</param>
+    /// <param name="jobName">印刷ジョブ名</param>
+    /// <param name="progress">進捗通知デリゲート（処理済みシート数, 総シート数）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>印刷が正常に完了したかどうか</returns>
+    Task<bool> PrintStreamingAsync(
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<PrintPageSource> pageSources,
+        PrintSettings settings,
+        string jobName,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default);
 }

@@ -947,6 +947,13 @@
                                                  ToolTip="二つ折り中綴じ用に自動面付け（用紙は横向き・両面短辺とじ）"
                                                  IsChecked="{Binding Settings.LayoutMode, Converter={StaticResource EqualityToBooleanConverter}, ConverterParameter=Booklet}" />
                                 </StackPanel>
+
+                                <!-- 互換オプション：画像として印刷 -->
+                                <CheckBox Content="画像として印刷（文字化け・崩れ対策）"
+                                          IsChecked="{Binding Settings.PrintAsImage, Mode=TwoWay}"
+                                          Style="{StaticResource DarkCheckBoxStyle}"
+                                          ToolTip="PDFのフォントや透明効果が正しく印刷されない場合にオンにします（通常はオフの方が高速・高精細です）"
+                                          Margin="0,2,0,8" />
                             </StackPanel>
                         </ScrollViewer>
 

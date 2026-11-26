@@ -6,13 +6,51 @@ namespace PDFBinder.App.Services;
 /// <summary>
 /// バックグラウンドで順次実行する印刷スプールジョブのデータ
 /// </summary>
-/// <param name="JobName">印刷ジョブ名</param>
-/// <param name="Settings">印刷設定</param>
-/// <param name="PreparedSheets">レンダリング済みシート一覧</param>
-public record PrintSpoolJob(
-    string JobName,
-    PrintSettings Settings,
-    IReadOnlyList<PrintPreparedSheet> PreparedSheets);
+public record PrintSpoolJob
+{
+    /// <summary>印刷ジョブ名</summary>
+    public string JobName { get; }
+
+    /// <summary>印刷設定</summary>
+    public PrintSettings Settings { get; }
+
+    /// <summary>レンダリング済みシート一覧（従来方式用）</summary>
+    public IReadOnlyList<PrintPreparedSheet> PreparedSheets { get; }
+
+    /// <summary>面付けシート一覧（ストリーミング方式用）</summary>
+    public IReadOnlyList<PrintSheetLayout>? Sheets { get; }
+
+    /// <summary>印刷時点のページスナップショット一覧（ストリーミング方式用）</summary>
+    public IReadOnlyList<PrintPageSource>? PageSources { get; }
+
+    /// <summary>ストリーミング印刷ジョブかどうか</summary>
+    public bool IsStreamingJob => Sheets != null && PageSources != null;
+
+    /// <summary>コンストラクタ（従来方式用）</summary>
+    public PrintSpoolJob(
+        string jobName,
+        PrintSettings settings,
+        IReadOnlyList<PrintPreparedSheet> preparedSheets)
+    {
+        JobName = jobName;
+        Settings = settings;
+        PreparedSheets = preparedSheets;
+    }
+
+    /// <summary>コンストラクタ（ストリーミング方式用）</summary>
+    public PrintSpoolJob(
+        string jobName,
+        PrintSettings settings,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<PrintPageSource> pageSources)
+    {
+        JobName = jobName;
+        Settings = settings;
+        PreparedSheets = Array.Empty<PrintPreparedSheet>();
+        Sheets = sheets;
+        PageSources = pageSources;
+    }
+}
 
 /// <summary>
 /// バックグラウンド印刷スプールキューを管理するサービスインターフェース
@@ -30,6 +68,13 @@ public interface IBackgroundPrintQueueService
 
     /// <summary>ジョブの処理が開始されたときのイベント</summary>
     event Action<PrintSpoolJob>? JobStarted;
+
+    /// <summary>ジョブのシート送信進捗が更新されたときのイベント (job, currentSheet, totalSheets)</summary>
+    event Action<PrintSpoolJob, int, int>? JobProgressChanged
+    {
+        add { }
+        remove { }
+    }
 
     /// <summary>ジョブの処理が完了したときのイベント (job, isSuccess, errorMessage)</summary>
     event Action<PrintSpoolJob, bool, string?>? JobCompleted;
@@ -73,6 +118,9 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
 
     /// <inheritdoc/>
     public event Action<PrintSpoolJob>? JobStarted;
+
+    /// <inheritdoc/>
+    public event Action<PrintSpoolJob, int, int>? JobProgressChanged;
 
     /// <inheritdoc/>
     public event Action<PrintSpoolJob, bool, string?>? JobCompleted;
@@ -168,7 +216,24 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
 
         try
         {
-            success = await _printService.SpoolDocumentAsync(job.PreparedSheets, job.Settings, job.JobName);
+            if (job.IsStreamingJob)
+            {
+                var progress = new DirectProgress<(int currentSheet, int totalSheets)>(p =>
+                {
+                    JobProgressChanged?.Invoke(job, p.currentSheet, p.totalSheets);
+                });
+                success = await _printService.PrintStreamingAsync(
+                    job.Sheets!,
+                    job.PageSources!,
+                    job.Settings,
+                    job.JobName,
+                    progress);
+            }
+            else
+            {
+                success = await _printService.SpoolDocumentAsync(job.PreparedSheets, job.Settings, job.JobName);
+            }
+
             if (!success)
             {
                 errorMessage = "印刷処理が完了しませんでした。";
@@ -194,5 +259,14 @@ public class BackgroundPrintQueueService : IBackgroundPrintQueueService
 
         JobCompleted?.Invoke(job, success, errorMessage);
         ActiveJobCountChanged?.Invoke(remaining);
+    }
+
+    /// <summary>
+    /// 進捗通知をスレッドプール遅延なしで即座に同期配信する <see cref="IProgress{T}"/> 実装
+    /// （進捗通知がジョブ完了通知の後に逆転到着する競合を防止）
+    /// </summary>
+    private sealed class DirectProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 }
