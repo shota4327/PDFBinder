@@ -5,6 +5,8 @@ using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using Xunit;
+using PdfPageLayout = PDFBinder.Core.Models.PdfPageLayout;
+using PdfReadingDirection = PDFBinder.Core.Models.PdfReadingDirection;
 
 namespace PDFBinder.Tests.Services;
 
@@ -251,5 +253,76 @@ public class PdfMetadataHelperTests : IDisposable
         bool isMc0Off = reloadedOffArray.Elements.OfType<PdfSharp.Pdf.Advanced.PdfReference>()
             .Any(r => r.ObjectID == mc0Ref.ObjectID);
         Assert.True(isMc0Off, "Page 1's /MC0 layer must be included in /OFF array");
+    }
+
+    [Theory]
+    [InlineData(null, null, PdfPageLayout.Default, PdfReadingDirection.LeftToRight)]
+    [InlineData("/SinglePage", "/L2R", PdfPageLayout.SinglePage, PdfReadingDirection.LeftToRight)]
+    [InlineData("/OneColumn", "/L2R", PdfPageLayout.OneColumn, PdfReadingDirection.LeftToRight)]
+    [InlineData("/TwoColumnLeft", "/R2L", PdfPageLayout.TwoColumnLeft, PdfReadingDirection.RightToLeft)]
+    [InlineData("/TwoColumnRight", "/R2L", PdfPageLayout.TwoColumnRight, PdfReadingDirection.RightToLeft)]
+    [InlineData("/TwoPageLeft", "/L2R", PdfPageLayout.TwoPageLeft, PdfReadingDirection.LeftToRight)]
+    [InlineData("/TwoPageRight", "/L2R", PdfPageLayout.TwoPageRight, PdfReadingDirection.LeftToRight)]
+    [InlineData("/UnknownLayout", "/UnknownDir", PdfPageLayout.Default, PdfReadingDirection.LeftToRight)]
+    public async Task LoadDocumentAsync_ReadsPageLayoutAndReadingDirectionFlags(
+        string? rawLayout,
+        string? rawDirection,
+        PdfPageLayout expectedLayout,
+        PdfReadingDirection expectedDirection)
+    {
+        // Arrange
+        string pdfPath = Path.Combine(_testDirectory, $"flags_{Guid.NewGuid():N}.pdf");
+        using (var doc = new PdfDocument())
+        {
+            doc.AddPage();
+            doc.AddPage();
+
+            if (!string.IsNullOrEmpty(rawLayout))
+            {
+                doc.Internals.Catalog.Elements.SetName("/PageLayout", rawLayout);
+            }
+
+            if (!string.IsNullOrEmpty(rawDirection))
+            {
+                var vpref = new PdfDictionary(doc);
+                vpref.Elements.SetName("/Direction", rawDirection);
+                doc.Internals.Catalog.Elements["/ViewerPreferences"] = vpref;
+            }
+
+            doc.Save(pdfPath);
+        }
+
+        // Act
+        var model = await _service.LoadDocumentAsync(pdfPath);
+
+        // Assert
+        Assert.Equal(expectedLayout, model.InitialPageLayout);
+        Assert.Equal(expectedDirection, model.ReadingDirection);
+    }
+
+    [Fact]
+    public async Task LoadDocumentAsync_IndirectViewerPreferencesReference_ReadsDirectionFlag()
+    {
+        // Arrange: /ViewerPreferences が間接参照（PdfReference）の場合でも安全に解決できること
+        string pdfPath = Path.Combine(_testDirectory, "indirect_vpref.pdf");
+        using (var doc = new PdfDocument())
+        {
+            doc.AddPage();
+            doc.Internals.Catalog.Elements.SetName("/PageLayout", "/TwoColumnRight");
+
+            var vpref = new PdfDictionary(doc);
+            vpref.Elements.SetName("/Direction", "/R2L");
+            doc.Internals.AddObject(vpref);
+            doc.Internals.Catalog.Elements["/ViewerPreferences"] = vpref.Reference!;
+
+            doc.Save(pdfPath);
+        }
+
+        // Act
+        var model = await _service.LoadDocumentAsync(pdfPath);
+
+        // Assert
+        Assert.Equal(PdfPageLayout.TwoColumnRight, model.InitialPageLayout);
+        Assert.Equal(PdfReadingDirection.RightToLeft, model.ReadingDirection);
     }
 }

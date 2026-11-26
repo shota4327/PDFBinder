@@ -13,5 +13,15 @@ public enum DetailPageViewMode
     /// <summary>
     /// 連続表示（全ページを縦一列に並べて連続スクロール表示する）
     /// </summary>
-    Continuous
+    Continuous,
+
+    /// <summary>
+    /// 見開き表示（左右に2ページ並べて表示し、見開き単位でページを切り替える）
+    /// </summary>
+    TwoPage,
+
+    /// <summary>
+    /// 見開き連続表示（左右2ページずつの行を縦に並べて連続スクロール表示する）
+    /// </summary>
+    TwoPageContinuous
 }

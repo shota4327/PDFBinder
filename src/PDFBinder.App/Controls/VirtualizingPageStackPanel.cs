@@ -160,6 +160,11 @@ public class VirtualizingPageStackPanel : VirtualizingPanelBase
 
     private static PageSizeMetric ExtractPageMetric(object? item)
     {
+        if (item is DetailSpreadRowViewModel spreadRow)
+        {
+            return new PageSizeMetric(spreadRow.DisplayWidth, spreadRow.DisplayHeight);
+        }
+
         if (item is DetailPageItemViewModel pageVm)
         {
             return new PageSizeMetric(pageVm.Page.DisplayWidth, pageVm.Page.DisplayHeight);
