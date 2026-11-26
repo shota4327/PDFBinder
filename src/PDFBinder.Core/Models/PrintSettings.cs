@@ -37,6 +37,9 @@ public partial class PrintSettings : ObservableObject
     [ObservableProperty]
     private byte[]? _driverDevMode;
 
+    [ObservableProperty]
+    private bool _printAsImage;
+
     /// <summary>
     /// 設定内容をデフォルト値にリセットします。
     /// </summary>
@@ -52,6 +55,7 @@ public partial class PrintSettings : ObservableObject
         LayoutMode = PrintLayoutMode.FitToPage;
         NUpCount = NUpPagesPerSheet.Two;
         DriverDevMode = null;
+        PrintAsImage = false;
     }
 
     /// <summary>
@@ -70,6 +74,7 @@ public partial class PrintSettings : ObservableObject
         LayoutMode = source.LayoutMode;
         NUpCount = source.NUpCount;
         DriverDevMode = source.DriverDevMode != null ? (byte[])source.DriverDevMode.Clone() : null;
+        PrintAsImage = source.PrintAsImage;
     }
 
     /// <summary>

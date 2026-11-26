@@ -16,6 +16,7 @@ public class FakeBackgroundPrintQueueService : IBackgroundPrintQueueService
 
     public event Action<int>? ActiveJobCountChanged;
     public event Action<PrintSpoolJob>? JobStarted;
+    public event Action<PrintSpoolJob, int, int>? JobProgressChanged;
     public event Action<PrintSpoolJob, bool, string?>? JobCompleted;
 
     public List<PrintSpoolJob> EnqueuedJobs { get; } = new();
@@ -26,6 +27,11 @@ public class FakeBackgroundPrintQueueService : IBackgroundPrintQueueService
         ActiveJobCount++;
         JobStarted?.Invoke(job);
         ActiveJobCountChanged?.Invoke(ActiveJobCount);
+    }
+
+    public void SimulateJobProgress(PrintSpoolJob job, int currentSheet, int totalSheets)
+    {
+        JobProgressChanged?.Invoke(job, currentSheet, totalSheets);
     }
 
     public void SimulateJobCompleted(PrintSpoolJob job, bool success, string? errorMessage)
@@ -174,6 +180,14 @@ public class MainViewModelPrintExitTests
             IProgress<(int currentSheet, int totalSheets)>? progress = null,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
+        public Task<bool> PrintStreamingAsync(
+            IReadOnlyList<PrintSheetLayout> sheets,
+            IReadOnlyList<PrintPageSource> pageSources,
+            PrintSettings settings,
+            string jobName,
+            IProgress<(int currentSheet, int totalSheets)>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            SpoolTcs.Task;
     }
 
     [Fact]
@@ -201,5 +215,26 @@ public class MainViewModelPrintExitTests
         Assert.True(closeRequested);
         Assert.False(vm.IsPrintWaitDialogVisible);
         Assert.Equal("印刷データを送信しました", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void PrintJobProgressChanged_UpdatesStatusMessageAndWaitDialogText()
+    {
+        var fakeQueue = new FakeBackgroundPrintQueueService();
+        var vm = CreateViewModel(fakeQueue);
+
+        var job1 = new PrintSpoolJob("doc1 - PDFBinder", new PrintSettings(), Array.Empty<PrintPreparedSheet>());
+        fakeQueue.Enqueue(job1);
+        fakeQueue.SimulateJobProgress(job1, 3, 10);
+
+        Assert.Equal("プリンターへ送信中... (3 / 10)", vm.StatusMessage);
+        Assert.Equal("プリンターへ送信中... (3 / 10)", vm.PrintWaitTaskStatusText);
+
+        var job2 = new PrintSpoolJob("doc2 - PDFBinder", new PrintSettings(), Array.Empty<PrintPreparedSheet>());
+        fakeQueue.Enqueue(job2);
+        fakeQueue.SimulateJobProgress(job1, 5, 10);
+
+        Assert.Equal("プリンターへ送信中... (5 / 10・残り 2 件)", vm.StatusMessage);
+        Assert.Equal("プリンターへ送信中... (5 / 10・残り 2 件)", vm.PrintWaitTaskStatusText);
     }
 }

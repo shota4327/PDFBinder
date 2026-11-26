@@ -97,6 +97,36 @@ public class PdfiumRenderer : IPdfRenderer
     public void Warmup() => Prewarm();
 
     /// <inheritdoc/>
+    public async Task<IDisposable> AcquirePdfiumLockAsync(
+        RenderPriority priority = RenderPriority.Low,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Prewarm();
+        return await _renderLock.AcquireAsync(priority, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public byte[]? GetCleanPdfBytesIfHasMarker(
+        string filePath,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return null;
+        }
+
+        if (!HasBinderInkAnnotationMarker(filePath, cancellationToken))
+        {
+            return null;
+        }
+
+        return GetRenderBytes(filePath, cancellationToken, password);
+    }
+
+    /// <inheritdoc/>
     public Task<BitmapSource?> RenderPageAsync(
         string? filePath,
         int pageIndex,
@@ -173,10 +203,10 @@ public class PdfiumRenderer : IPdfRenderer
                     // マーカーが存在しない通常のPDFは直接ファイルパスを渡し、PDFiumネイティブのオンデマンド読み込みを活用（メモリ割当ゼロ）
                     using var docReader = string.IsNullOrEmpty(password)
                         ? (hasBinderInk
-                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), dimensions)
+                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken, password), dimensions)
                             : DocLib.Instance.GetDocReader(filePath, dimensions))
                         : (hasBinderInk
-                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken), password, dimensions)
+                            ? DocLib.Instance.GetDocReader(GetRenderBytes(filePath, cancellationToken, password), password, dimensions)
                             : DocLib.Instance.GetDocReader(filePath, password, dimensions));
                     if (pageIndex < 0 || pageIndex >= docReader.GetPageCount())
                     {
@@ -876,7 +906,7 @@ public class PdfiumRenderer : IPdfRenderer
     /// <summary>
     /// 指定されたファイルパスのPDFバイト列を取得し、自前手書き注釈がある場合のみ除去したバイト列を返却します（キャッシュ対応）。
     /// </summary>
-    private byte[] GetRenderBytes(string filePath, CancellationToken cancellationToken)
+    private byte[] GetRenderBytes(string filePath, CancellationToken cancellationToken, string? password = null)
     {
         var fileInfo = new FileInfo(filePath);
         var lastWrite = fileInfo.LastWriteTimeUtc;
@@ -890,7 +920,7 @@ public class PdfiumRenderer : IPdfRenderer
         byte[] rawBytes = File.ReadAllBytes(filePath);
         cancellationToken.ThrowIfCancellationRequested();
 
-        byte[] processedBytes = RemoveBinderInkAnnotationsIfPresent(rawBytes);
+        byte[] processedBytes = RemoveBinderInkAnnotationsIfPresent(rawBytes, password);
         _fileBytesCache[filePath] = (lastWrite, processedBytes);
         return processedBytes;
     }
@@ -899,8 +929,8 @@ public class PdfiumRenderer : IPdfRenderer
     /// PDFバイト列内に自前手書き注釈が存在する場合のみ、それらを除去したバイト列を生成して返却します。
     /// 自前手書き注釈が存在しない場合は、無駄な再シリアライズ（doc.Save）を行わず元のバイト列をそのまま返却します。
     /// </summary>
-    private static byte[] RemoveBinderInkAnnotationsIfPresent(byte[] pdfBytes)
-        => PdfBinderInkAnnotation.RemoveBinderInkAnnotationsIfPresent(pdfBytes);
+    private static byte[] RemoveBinderInkAnnotationsIfPresent(byte[] pdfBytes, string? password = null)
+        => PdfBinderInkAnnotation.RemoveBinderInkAnnotationsIfPresent(pdfBytes, password);
 
     private static readonly byte[] BinderInkMarkerBytes = System.Text.Encoding.ASCII.GetBytes(PdfBinderInkAnnotation.InkKey);
 

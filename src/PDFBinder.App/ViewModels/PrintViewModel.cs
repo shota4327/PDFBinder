@@ -19,6 +19,7 @@ public partial class PrintViewModel : ObservableObject
     private readonly Func<int, int, int, CancellationToken, Task<BitmapSource?>> _renderPreviewPageFunc;
     private readonly Func<int, int, int, CancellationToken, Task<BitmapSource?>> _renderPrintPageFunc;
     private readonly IReadOnlyList<(double width, double height)>? _pageDimensions;
+    private readonly Func<IReadOnlyList<PrintPageSource>>? _createPageSourcesFunc;
     private readonly int _totalPages;
     private readonly int _currentPageIndex;
     private readonly string? _documentTitle;
@@ -104,7 +105,8 @@ public partial class PrintViewModel : ObservableObject
         Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPreviewPageFunc,
         Func<int, int, int, CancellationToken, Task<BitmapSource?>> renderPrintPageFunc,
         IReadOnlyList<(double width, double height)>? pageDimensions = null,
-        string? documentTitle = null)
+        string? documentTitle = null,
+        Func<IReadOnlyList<PrintPageSource>>? createPageSourcesFunc = null)
     {
         _printService = printService;
         _settings = settings;
@@ -114,6 +116,7 @@ public partial class PrintViewModel : ObservableObject
         _renderPrintPageFunc = renderPrintPageFunc;
         _pageDimensions = pageDimensions;
         _documentTitle = documentTitle;
+        _createPageSourcesFunc = createPageSourcesFunc;
 
         InitializePrinters();
         _settings.PropertyChanged += OnSettingsPropertyChanged;
@@ -370,6 +373,21 @@ public partial class PrintViewModel : ObservableObject
 
         try
         {
+            if (_createPageSourcesFunc != null)
+            {
+                var pageSources = _createPageSourcesFunc();
+                var sheetsSnapshot = _currentSheets.ToList();
+
+                SpoolRequested?.Invoke(this, new PrintSpoolEventArgs(
+                    JobName,
+                    Settings.Clone(),
+                    sheetsSnapshot,
+                    pageSources));
+
+                RequestClose?.Invoke(true);
+                return;
+            }
+
             var preparedSheets = await _printService.PrepareSheetsAsync(
                 _renderPrintPageFunc,
                 _currentSheets,
@@ -517,14 +535,37 @@ public class PrintSpoolEventArgs : EventArgs
     /// <summary>印刷設定スナップショット</summary>
     public PrintSettings Settings { get; }
 
-    /// <summary>事前レンダリング済みシート一覧</summary>
+    /// <summary>事前レンダリング済みシート一覧（従来方式用）</summary>
     public IReadOnlyList<PrintPreparedSheet> PreparedSheets { get; }
 
-    /// <summary>コンストラクタ</summary>
+    /// <summary>面付けシート一覧（ストリーミング方式用）</summary>
+    public IReadOnlyList<PrintSheetLayout>? Sheets { get; }
+
+    /// <summary>印刷時点のページスナップショット一覧（ストリーミング方式用）</summary>
+    public IReadOnlyList<PrintPageSource>? PageSources { get; }
+
+    /// <summary>ストリーミング印刷要求かどうか</summary>
+    public bool IsStreamingJob => Sheets != null && PageSources != null;
+
+    /// <summary>コンストラクタ（従来方式用）</summary>
     public PrintSpoolEventArgs(string jobName, PrintSettings settings, IReadOnlyList<PrintPreparedSheet> preparedSheets)
     {
         JobName = jobName;
         Settings = settings;
         PreparedSheets = preparedSheets;
+    }
+
+    /// <summary>コンストラクタ（ストリーミング方式用）</summary>
+    public PrintSpoolEventArgs(
+        string jobName,
+        PrintSettings settings,
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<PrintPageSource> pageSources)
+    {
+        JobName = jobName;
+        Settings = settings;
+        PreparedSheets = Array.Empty<PrintPreparedSheet>();
+        Sheets = sheets;
+        PageSources = pageSources;
     }
 }

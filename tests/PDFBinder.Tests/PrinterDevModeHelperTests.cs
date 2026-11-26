@@ -11,6 +11,8 @@ public class PrinterDevModeHelperTests
 {
     private const uint DM_ORIENTATION = 0x00000001;
     private const uint DM_PAPERSIZE = 0x00000002;
+    private const uint DM_PAPERLENGTH = 0x00000004;
+    private const uint DM_PAPERWIDTH = 0x00000008;
     private const uint DM_COPIES = 0x00000100;
     private const uint DM_DUPLEX = 0x00001000;
 
@@ -88,5 +90,32 @@ public class PrinterDevModeHelperTests
         Assert.Null(result.Orientation);
         Assert.Null(result.PaperSize);
         Assert.Null(result.Copies);
+    }
+
+    [Fact]
+    public void PatchDevModeBytes_WritesSettingsAndClearsPaperLengthWidthFlags()
+    {
+        var buffer = new byte[220];
+        uint initialFields = DM_PAPERLENGTH | DM_PAPERWIDTH;
+        BitConverter.GetBytes(initialFields).CopyTo(buffer, 72);
+
+        var settings = new PrintSettings
+        {
+            PaperSize = PrintPaperSize.A3,
+            Orientation = PrintOrientation.Landscape,
+            Copies = 4,
+            DuplexMode = PrintDuplexMode.TwoSidedShortEdge
+        };
+
+        PrinterDevModeHelper.PatchDevModeBytes(buffer, settings);
+
+        uint patchedFields = BitConverter.ToUInt32(buffer, 72);
+        Assert.Equal(0u, patchedFields & (DM_PAPERLENGTH | DM_PAPERWIDTH));
+
+        var parsed = PrinterDevModeHelper.ParseDevMode(buffer);
+        Assert.Equal(PrintPaperSize.A3, parsed.PaperSize);
+        Assert.Equal(PrintOrientation.Landscape, parsed.Orientation);
+        Assert.Equal(4, parsed.Copies);
+        Assert.Equal(PrintDuplexMode.TwoSidedShortEdge, parsed.DuplexMode);
     }
 }

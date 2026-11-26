@@ -15,6 +15,8 @@ public class BackgroundPrintQueueServiceTests
         public bool SpoolResult { get; set; } = true;
         public Exception? ExceptionToThrow { get; set; }
         public List<string> SpooledJobNames { get; } = new();
+        public List<string> StreamingJobNames { get; } = new();
+        public int SimulatedTotalSheets { get; set; } = 3;
         public int SpoolDelayMs { get; set; } = 10;
 
         public Task<bool> SpoolDocumentAsync(
@@ -67,6 +69,30 @@ public class BackgroundPrintQueueServiceTests
             CancellationToken cancellationToken = default)
         {
             return Task.FromResult(true);
+        }
+
+        public Task<bool> PrintStreamingAsync(
+            IReadOnlyList<PrintSheetLayout> sheets,
+            IReadOnlyList<PrintPageSource> pageSources,
+            PrintSettings settings,
+            string jobName,
+            IProgress<(int currentSheet, int totalSheets)>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            StreamingJobNames.Add(jobName);
+            if (ExceptionToThrow != null)
+            {
+                throw ExceptionToThrow;
+            }
+            for (int i = 1; i <= SimulatedTotalSheets; i++)
+            {
+                progress?.Report((i, SimulatedTotalSheets));
+            }
+            if (SpoolDelayMs > 0)
+            {
+                Thread.Sleep(SpoolDelayMs);
+            }
+            return Task.FromResult(SpoolResult);
         }
     }
 
@@ -215,5 +241,32 @@ public class BackgroundPrintQueueServiceTests
         Assert.Contains(1, recordedCounts);
         Assert.Contains(0, recordedCounts);
         Assert.Equal(0, recordedCounts.Last());
+    }
+
+    [Fact]
+    public async Task Enqueue_StreamingJob_CallsPrintStreamingAndReportsSheetProgress()
+    {
+        var mockService = new MockPrintService { SimulatedTotalSheets = 3 };
+        var queueService = new BackgroundPrintQueueService(mockService);
+
+        var sheets = new List<PrintSheetLayout> { new(1, PrintOrientation.Portrait, PrintPaperSize.A4) };
+        var pageSources = new List<PrintPageSource>();
+        var job = new PrintSpoolJob("stream - PDFBinder", new PrintSettings(), sheets, pageSources);
+
+        var progressReports = new List<(int current, int total)>();
+        queueService.JobProgressChanged += (j, current, total) =>
+        {
+            if (j.JobName == "stream - PDFBinder")
+            {
+                progressReports.Add((current, total));
+            }
+        };
+
+        queueService.Enqueue(job);
+        await queueService.WaitForAllJobsAsync();
+
+        Assert.Contains("stream - PDFBinder", mockService.StreamingJobNames);
+        Assert.Empty(mockService.SpooledJobNames);
+        Assert.Equal(new[] { (1, 3), (2, 3), (3, 3) }, progressReports);
     }
 }

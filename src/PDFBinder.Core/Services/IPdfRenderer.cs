@@ -188,4 +188,29 @@ public interface IPdfRenderer
     /// レンダリングエンジンのネイティブライブラリ等を事前に初期化（プリウォーム）します。
     /// </summary>
     void Warmup() { }
+
+    /// <summary>
+    /// PDFium ネイティブライブラリの排他ロックを非同期に取得します。
+    /// 印刷等で直接 PDFium API を呼び出す際のシングルスレッド排他制御に使用します。
+    /// </summary>
+    Task<IDisposable> AcquirePdfiumLockAsync(
+        RenderPriority priority = RenderPriority.Low,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IDisposable>(NoopDisposable.Instance);
+
+    /// <summary>
+    /// 指定されたPDFファイルに自前手書き注釈マーカー（/PdfBinderInk）が含まれる場合、
+    /// それらを除去した描画用クリーンバイト列を取得します。マーカーが存在しない場合は null を返します。
+    /// </summary>
+    byte[]? GetCleanPdfBytesIfHasMarker(
+        string filePath,
+        string? password,
+        CancellationToken cancellationToken = default)
+        => null;
+
+    private sealed class NoopDisposable : IDisposable
+    {
+        public static readonly NoopDisposable Instance = new();
+        public void Dispose() { }
+    }
 }

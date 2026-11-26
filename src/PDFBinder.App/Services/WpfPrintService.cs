@@ -210,6 +210,19 @@ public class WpfPrintService : IPrintService
         return await SpoolDocumentAsync(preparedSheets, settings, jobName, cancellationToken);
     }
 
+    /// <inheritdoc/>
+    public Task<bool> PrintStreamingAsync(
+        IReadOnlyList<PrintSheetLayout> sheets,
+        IReadOnlyList<PrintPageSource> pageSources,
+        PrintSettings settings,
+        string jobName,
+        IProgress<(int currentSheet, int totalSheets)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var gdiService = new GdiPrintService();
+        return gdiService.PrintStreamingAsync(sheets, pageSources, settings, jobName, progress, cancellationToken);
+    }
+
     /// <summary>
     /// 用紙サイズおよび向きから WPF 座標系論理ピクセル単位（96 DPI、1/96インチ）の幅と高さを取得します。
     /// </summary>

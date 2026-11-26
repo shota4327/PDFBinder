@@ -74,7 +74,7 @@ PDFBinder/
 │   └── PDFBinder.App/            # WPF UI層（Views, ViewModels, Behaviors, Styles）
 │       ├── Views/                # MainWindow, GridView, DetailEditorView
 │       ├── ViewModels/           # MainViewModel, GridViewModel, DetailEditorViewModel, PrintViewModel
-│       ├── Services/             # WpfPrintService
+│       ├── Services/             # GdiPrintService, WpfPrintService, BackgroundPrintQueueService
 │       ├── Models/               # DocumentSession
 │       ├── Controls/             # CustomInkCanvas, ThumbnailCard
 │       ├── Converters/           # 各種ValueConverter
@@ -172,6 +172,8 @@ PDFページの画面表示用ビットマップ生成およびストローク�
 - `Task<PageInteractiveData> ExtractInteractiveDataAsync(string? filePath, int pageIndex, double displayWidth, double displayHeight, PageRotation rotation, CancellationToken cancellationToken = default, RenderPriority priority = RenderPriority.Normal, string? password = null)`: ページの文字座標（Docnet.Core）およびリンク注釈（PdfSharp）を抽出（テキスト選択・リンク用、パスワード対応）
 - `void RegisterBinderInkMarker(string filePath, bool hasMarker, byte[]? cleanRenderBytes = null)`: PDF読み込み時や保存時に手書き注釈マーカー情報および描画用クリーンバイト列を事前登録（全バイト走査の排除）
 - `void Warmup()`: PDFiumネイティブライブラリ（`Docnet.Core` / `pdfium.dll`）の事前初期化（プリウォーム）。アプリ起動後（`App.OnStartup`）のバックグラウンドスレッドで先行実行し、初回PDFオープン時のコールドスタート遅延を解消（#215）
+- `Task<IDisposable> AcquirePdfiumLockAsync(RenderPriority priority = RenderPriority.Low, CancellationToken cancellationToken = default)`: 印刷等で PDFium ネイティブ API を直接呼び出す際の排他ロック取得（#249）
+- `byte[]? GetCleanPdfBytesIfHasMarker(string filePath, string? password, CancellationToken cancellationToken = default)`: 自前手書き注釈マーカーが含まれる場合に除去済み描画用クリーンバイト列を取得（#249）
 
 
 
@@ -440,21 +442,23 @@ stateDiagram-v2
     - `[ サイズに合わせる ]`、`[ 1ページに集約 ]`、`[ 冊子(製本) ]` を幅140pxで縦並び配置。
     - **1ページに集約**: 選択時のみ右横に集約数ドロップダウン（2 / 4 / 8ページ）がインライン展開。
     - **冊子(製本)**: 中綴じ二つ折り用の面付けを自動計算。用紙サイズが4の倍数でない場合は末尾に白紙を自動補完し、用紙の向きを「横」、両面設定を「両面(短辺)」に自動連動。
+  - **互換オプション（画像として印刷）**:
+    - 「画像として印刷（文字化け・崩れ対策）」チェックボックス（初期値 OFF、アプリ起動中は直前状態を保持）。
+    - 通常は OFF（ベクター印刷優先）で最速・高精細に印刷し、PDF の特殊フォントや透明効果がドライバー側で崩れる場合のみ ON にして全ページを 24bpp 非透過ラスター画像として印刷可能。
 - **右側：全幅連動プレビュー領域（残り全幅）**:
   - ウィンドウ幅の拡大に連動して広がる広大な領域を最大限に活用し、用紙全体（手書きストローク合成済み）を自動Fitで高精細表示。
   - 下部に用紙送りナビゲーションバー（「◀ 前の用紙」「1 / N」「次の用紙 ▶」）を配置。
-- **フッターおよび進行状況（2フェーズ処理と非同期スプール）**:
+- **フッターおよび進行状況（即時クローズ ＋ Win32 GDI ストリーミングハイブリッド印刷）**:
   - **印刷ジョブ名**: 開いているファイル名（拡張子を除いたもの）にアプリ名を付加した `{ファイル名} - PDFBinder` を Windows 印刷キューのジョブ名として自動設定（未保存ファイルは `名称未設定 - PDFBinder`）。
-  - **フェーズ1（動的300 DPIレンダリング ＆ PNG可逆圧縮）**:
-    - 「印刷」実行中はプレビュー画面内でプログレスバーと進捗テキスト（「印刷中... (X / Y)」）を表示。
-    - **動的解像度計算**: 用紙サイズ（A4/A3）、印刷の向き（縦/横）、面付けスロット（1-Up, N-Up, 冊子）、および元PDFページの縦横比に完全連動させ、300 DPI基準で最適なピクセル寸法を動的に算出してレンダリング。A3印刷時の解像度不足や横長ページの比率不整合を解消。
-    - **PNG可逆圧縮化**: レンダリング直後にインメモリで可逆圧縮 PNG ストリーム（`BitmapImage`）へ変換して保持。1ページ約35MBの非圧縮生データを数MB（約80〜90%削減）に圧縮し、メモリ消費を激減。
-    - 全シートの生成完了と同時に印刷プレビュー画面を即座にクローズ。
-  - **フェーズ2（バックグラウンドスプール送信 ＆ 高速転送）**:
-    - 独立した専用のバックグラウンド STA スレッドへ引き渡して `PrintDocument` を実行。メインUIスレッドのメッセージループを一切ブロックせず、印刷直前のフリーズを完全解消。
-    - **XPSスプール高速化**: WPF の XPS シリアライザは、入力が PNG ストリーム保持の `BitmapImage` である場合に再エンコードをバイパスして直接パッケージへ格納可能。これにより XPS ドキュメント生成およびプリンタースプーラへの転送時間を他アプリ同等水準に劇的短縮。
-  - **ステータスバー連携 & キューイング**:
-    - スプール送信中はメインウィンドウ下部のステータスバーに「プリンターへ送信中...（複数時は残り件数）」を表示。
+  - **フェーズ1（不変スナップショット生成 ＆ 即時クローズ）**:
+    - 「印刷」ボタン押下時、全ページの事前ビットマップ生成を行わず、元ファイル情報・回転・複製済み手書きストローク（`PrintPageSource`）のスナップショットを即座に作成して印刷ダイアログをクローズ。
+  - **フェーズ2（バックグラウンド 1シート単位ストリーミング GDI 送信）**:
+    - 独立したバックグラウンド STA スレッド上の `GdiPrintService` へ引き渡し、保持またはパッチ済み `DEVMODE` を直接適用した Win32 `CreateDCW("WINSPOOL", ...)` により `StartDocW` 〜 `StartPage` / `EndPage` 〜 `EndDoc` を 1 シートずつストリーミング実行。
+    - **ハイブリッド描画＆自動フォールバック**:
+      - **通常 PDF ページ（手書きインクなし・画像印刷 OFF）**: 同梱 `pdfium.dll`（`FPDF_LoadMemDocument` + `FPDF_RenderPage`）でプリンター `HDC` へ直接ベクター描画。ドライバー本来の高解像度（600/1200 DPI）出力と大幅なスプール軽量化・高速転送を実現。ベクター描画失敗時は自動で 24bpp GDI ラスターへフォールバック。
+      - **手書きインク付きページ / 画像ページ / 画像として印刷 ON**: 300 DPI・24bpp 透過なし可逆 RGB（`BI_RGB`、白背景合成）へ変換し、`StretchDIBits`（`HALFTONE`）で直接送信。XPS 再エンコードや透過起因の 600 DPI 再展開を完全に排除しつつ、WPF 蛍光ペンの見た目を忠実に再現。
+  - **ステータスバー連携 & リアルタイム進捗表示**:
+    - スプール送信中はメインウィンドウ下部のステータスバーおよび終了待機ダイアログにシート進捗（`プリンターへ送信中... (X / Y)`、複数待機時は残り件数併記）をリアルタイム表示。
     - 送信中も新たな印刷操作を並行して受け付け可能（バックグラウンドキューにより順次スプール処理）。
     - 正常完了時は「印刷データを送信しました」と約3秒間表示した後に通常表示へ自動復帰。
     - 送信失敗時はエラーダイアログ（インアプリ・オーバーレイ）を表示して詳細を通知。
@@ -462,10 +466,9 @@ stateDiagram-v2
     - プリンターへのデータ送信が完了する前にアプリを閉じようとした場合、未保存変更の確認（優先順位1）の後に、印刷タスク待機オーバーレイダイアログ（優先順位2）を表示。
     - 完了待機ダイアログには進行スピナーと「キャンセル」ボタンを配置。キャンセル時はダイアログを閉じて通常画面へ復帰（印刷はバックグラウンドで継続）。
     - 全タスクの送信完了時に自動的にウィンドウを閉じて終了。
-- **印刷パイプラインと原寸（100%等倍）配置仕様**:
-  - WPF印刷パイプライン（`FixedDocument`, `FixedPage`, `DocumentPaginator`）は 96 DPI（Device Independent Units: DIU）座標系を採用。
-  - 用紙寸法（A4: 約 793.70 × 1122.52 px、A3: 約 1122.52 × 1587.40 px）を 96 DPI 基準で正確に設定し、72 DPI（PDFポイント単位）との不整合による縮小（75%）を防止。
-  - 「用紙サイズに合わせる」印刷時および A3 冊子（中綴じ）印刷時は、原稿を用紙全体および各スロットに対して 100% 原寸（等倍）で中央配置し、縮小のない美しい印刷出力を実現。
+- **印刷レイアウトと物理用紙全体基準の配置仕様**:
+  - プリンターの物理用紙全体（`PHYSICALWIDTH` × `PHYSICALHEIGHT`、印字可能領域原点に対して `-PHYSICALOFFSETX`, `-PHYSICALOFFSETY`）を基準に各スロット矩形を算出し、非正方 DPI も考慮したアスペクト比維持フィットで従来と同等の等倍・倍率配置を維持。
+  - 集約（N-Up）や冊子印刷時も、スロットごとに `SaveDC` / `IntersectClipRect` / `RestoreDC` で境界クリッピングを行い、はみ出しを防止。
 - **設定のライフサイクル**:
   - アプリ起動中は変更した設定を保持（再印刷時も前回の設定を維持）。
   - アプリ再起動時には常に初期デフォルト値へリセット。
